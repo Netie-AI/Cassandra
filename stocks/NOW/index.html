@@ -1,17 +1,19 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>NOW — CASSANDRA Stock Demo</title>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans&display=swap" rel="stylesheet"/>
+  <title>NOW — Cassandra Stock Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="/static/tokens.css"/>
   <link rel="stylesheet" href="/static/styles.css"/>
   <link rel="stylesheet" href="/static/stock.css"/>
 </head>
-<body>
-  <div class="top-bar"><nav class="nav-links"><a href="/">← Dashboard</a><a href="/pricing">Pricing</a></nav></div>
+<body class="stock-page">
   <main class="stock-main" id="stock-app"></main>
-  <footer><p class="footer-credits"><a href="https://netie.ai">netie.ai</a> · <a href="https://github.com/Netie-AI/Cassandra">GitHub</a></p></footer>
   <script src="/static/stocks/data.js"></script>
   <script src="/static/stock.js"></script>
   <script>renderStock("NOW");</script>

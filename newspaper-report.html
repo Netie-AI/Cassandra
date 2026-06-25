@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>The Cassandra Report — AI Sector Fragility Monitor</title>
+<title>Cassandra's Daily: Market Desk Edition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/static/tokens.css"/>
 <style>
   /* ── Reset + Base ─────────────────────────────────────────────── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -34,22 +38,37 @@
   body {
     background: var(--bg);
     color: var(--ink);
-    font-family: 'Georgia', 'Times New Roman', serif;
+    font-family: var(--font-sans);
     max-width: 980px;
     margin: 0 auto;
     padding: 2rem 2.5rem 4rem;
     line-height: 1.6;
   }
 
-  /* ── Utility controls bar ──────────────────────────────────────── */
+  /* ── Top toolbar: Home left, lang/theme right ─────────────────── */
+  .top-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .top-home {
+    font-family: var(--font-serif);
+    font-size: 13px;
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .top-home:hover { color: var(--accent); }
   .controls {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-    margin-bottom: 0.75rem;
   }
   .ctrl-btn {
-    font-family: 'Georgia', serif;
+    font-family: var(--font-serif);
     font-size: 12px;
     color: var(--ink-3);
     border: 1px solid var(--border);
@@ -65,7 +84,7 @@
   /* ── Masthead ──────────────────────────────────────────────────── */
   .masthead-flag {
     font-size: 10px;
-    font-family: 'Georgia', serif;
+    font-family: var(--font-serif);
     color: var(--ink-3);
     font-style: italic;
     border: 1px solid var(--border);
@@ -74,7 +93,7 @@
     margin-bottom: 0.5rem;
   }
   .masthead-title {
-    font-family: 'Georgia', 'Times New Roman', serif;
+    font-family: var(--font-serif);
     font-size: clamp(28px, 6vw, 56px);
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -87,15 +106,25 @@
     margin-bottom: 4px;
   }
   .masthead-meta {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: baseline;
     font-size: 11px;
     color: var(--ink-3);
     border-bottom: 3px double var(--border-hvy);
     padding-bottom: 5px;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
   }
   .masthead-meta span { font-style: italic; }
+  .meta-left { justify-self: start; }
+  .meta-center {
+    justify-self: center;
+    font-style: normal;
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 12px;
+  }
+  .meta-right { justify-self: end; }
 
   /* ── Kicker + Headline ─────────────────────────────────────────── */
   .kicker {
@@ -107,7 +136,7 @@
     margin-bottom: 6px;
   }
   h1.headline {
-    font-family: 'Georgia', serif;
+    font-family: var(--font-serif);
     font-size: clamp(24px, 5vw, 42px);
     font-weight: 700;
     text-align: center;
@@ -116,7 +145,7 @@
     margin-bottom: 8px;
   }
   h2.sub-headline {
-    font-family: 'Georgia', serif;
+    font-family: var(--font-serif);
     font-size: clamp(14px, 2.5vw, 20px);
     font-weight: 400;
     font-style: italic;
@@ -143,7 +172,7 @@
   }
   .score-item { text-align: center; }
   .score-label { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
-  .score-val { font-family: 'Georgia', monospace; font-size: 22px; font-weight: 700; color: var(--ink); line-height: 1.1; }
+  .score-val { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--ink); line-height: 1.1; }
   .score-sub { font-size: 10px; color: var(--ink-3); font-style: italic; }
   .score-divider { width: 1px; height: 40px; background: var(--border); }
 
@@ -158,15 +187,19 @@
   .col:first-child { padding-left: 0; }
   .col:last-child { border-right: none; padding-right: 0; padding-left: 0.75rem; }
   .col-head {
-    font-size: 9px;
-    letter-spacing: 0.1em;
+    font-family: var(--font-serif);
+    font-size: var(--type-col-head);
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--ink-3);
-    border-bottom: var(--rule);
-    padding-bottom: 4px;
-    margin-bottom: 8px;
+    color: var(--ink);
+    border-bottom: 2px solid var(--border-hvy);
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+    line-height: 1.25;
   }
-  .col p { font-size: 13px; color: var(--ink-2); margin-bottom: 0.6rem; text-align: justify; }
+  .col-trigger { padding-left: 1.35rem; padding-right: 1.35rem; }
+  .col p { font-size: var(--type-body); color: var(--ink-2); margin-bottom: 0.85rem; text-align: justify; line-height: 1.65; font-family: var(--font-sans); }
   .col p strong { color: var(--ink); }
   .col p em { font-style: italic; color: var(--ink-3); }
 
@@ -233,7 +266,7 @@
     flex-wrap: wrap;
   }
   .cta-btn {
-    font-family: 'Georgia', serif;
+    font-family: var(--font-serif);
     font-size: 12px;
     border: 1px solid var(--border-hvy);
     background: transparent;
@@ -257,24 +290,107 @@
     font-style: italic;
   }
 
-  .share-bar {
+  .dateline-feels {
+    font-family: var(--font-serif);
+    font-size: var(--type-dateline);
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.3;
+    text-align: center;
+    margin: 0 0 0.5rem;
+  }
+  .dateline-today {
+    font-size: 14px;
+    color: var(--ink-3);
+    font-style: italic;
+  }
+  .news-rank-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.25rem 0;
+    border-top: var(--rule);
+    padding-top: 1rem;
+  }
+  .news-rank-col h3 {
+    font-family: var(--font-serif);
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--ink);
+  }
+  .news-rank-list { list-style: none; padding: 0; margin: 0; }
+  .news-rank-list li {
+    font-size: 13px;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--ink-2);
+    line-height: 1.45;
+  }
+  .news-rank-list li strong { color: var(--ink); }
+  .news-rank-list .src { font-size: 10px; color: var(--ink-3); display: block; margin-top: 2px; }
+  .access-badge {
+    font-size: 11px;
+    color: var(--ink-3);
+    text-align: center;
+    margin-bottom: 0.75rem;
+    font-style: italic;
+  }
+  .edition-nav {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    justify-content: flex-end;
-    margin-bottom: 1rem;
+    justify-content: center;
+    align-items: center;
+    margin: 0.75rem 0 1rem;
     padding-bottom: 0.75rem;
     border-bottom: 1px solid var(--border);
   }
+  .edition-nav select {
+    font-family: var(--font-serif);
+    font-size: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--ink);
+    padding: 4px 8px;
+  }
+  .tier-preview-nav {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0.35rem 0 0.5rem;
+    font-size: 10px;
+    color: var(--ink-3);
+  }
+  .tier-preview-label { letter-spacing: 0.06em; text-transform: uppercase; font-size: 9px; }
+  .tier-preview-nav .ctrl-btn.on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+  .footer-tools {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+  .footer-tools .share-primary { font-weight: 600; border-color: var(--border-hvy); }
   .credits-bar {
     font-size: 10px;
     color: var(--ink-3);
     text-align: center;
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
   }
   .credits-bar a { color: var(--ink-2); }
+  .footer-flag {
+    font-size: 10px;
+    color: var(--ink-3);
+    font-style: italic;
+    text-align: center;
+    margin-top: 0.5rem;
+  }
   @media print {
-    .controls, .share-bar, .cta-strip button { display: none !important; }
+    .top-toolbar, .footer-tools, .cta-strip button { display: none !important; }
     body { padding: 0.5in; max-width: none; }
   }
   .toast {
@@ -287,50 +403,58 @@
     .columns { grid-template-columns: 1fr; }
     .col { border-right: none; border-bottom: var(--rule); padding: 0.75rem 0; }
     .col:last-child { padding-left: 0; }
+    .col-trigger { padding-left: 0; padding-right: 0; }
+    .news-rank-panel { grid-template-columns: 1fr; }
     .score-divider { display: none; }
   }
 </style>
 </head>
 <body>
 
-<!-- Controls: language + dark/light -->
-<div class="controls" role="toolbar" aria-label="Display controls">
-  <button class="ctrl-btn active" id="lang-en" onclick="setLang('en')">EN</button>
-  <button class="ctrl-btn" id="lang-zh" onclick="setLang('zh')">中文</button>
-  <button class="ctrl-btn" id="lang-ms" onclick="setLang('ms')">BM</button>
-  <span style="width:1px; background: var(--border); margin: 0 4px; display:inline-block;"></span>
-  <button class="ctrl-btn" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode">☀ / ☾</button>
+<div class="top-toolbar">
+  <a href="/" class="top-home">Home</a>
+  <div class="controls" role="toolbar" aria-label="Display controls">
+    <button class="ctrl-btn active" id="lang-en" onclick="setLang('en')">EN</button>
+    <button class="ctrl-btn" id="lang-zh" onclick="setLang('zh')">中文</button>
+    <button class="ctrl-btn" id="lang-ms" onclick="setLang('ms')">BM</button>
+    <span style="width:1px; background: var(--border); margin: 0 4px; display:inline-block;"></span>
+    <button class="ctrl-btn" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode">☀ / ☾</button>
+  </div>
 </div>
-<div class="share-bar" id="share-bar">
-  <button class="ctrl-btn" id="np-copy" type="button">Copy link</button>
-  <button class="ctrl-btn" id="np-download" type="button">Download HTML</button>
-  <button class="ctrl-btn" id="np-print" type="button">Print / PDF</button>
-  <a class="ctrl-btn" href="/" style="text-decoration:none;display:inline-block;">Live dashboard</a>
-</div>
-<p class="credits-bar">
-  CASSANDRA by <a href="https://netie.ai" target="_blank" rel="noopener">netie.ai</a>
-  · <a href="https://github.com/Netie-AI/Cassandra" target="_blank" rel="noopener">GitHub</a>
-  · <a href="https://crash.netie.ai">crash.netie.ai</a>
-</p>
 
 <!-- Masthead -->
 <header>
-  <div class="masthead-flag" data-i18n="flag">"All the Signal That's Fit to Print"</div>
-  <div class="masthead-title">The Cassandra Report</div>
+  <div class="masthead-title">Cassandra's Daily</div>
   <div class="masthead-meta">
-    <span data-i18n="edition">Late City Edition</span>
-    <span id="report-date"></span>
-    <span data-i18n="price">Free · Subscription from $4.99</span>
+    <span class="meta-left" data-i18n="edition">Late City Edition</span>
+    <span class="meta-center" id="report-date"></span>
+    <span class="meta-right" data-i18n="price">Free</span>
   </div>
 </header>
 
+<div class="edition-nav" id="edition-nav">
+  <button class="ctrl-btn" id="edition-prev" type="button">Older</button>
+  <select id="edition-select" aria-label="Select edition date"></select>
+  <button class="ctrl-btn" id="edition-next" type="button">Newer</button>
+</div>
+
+<div class="tier-preview-nav" id="tier-preview-nav" role="toolbar" aria-label="Preview subscription tier">
+  <span class="tier-preview-label">Preview tier:</span>
+  <button type="button" class="ctrl-btn on" data-tier="free">Free</button>
+  <button type="button" class="ctrl-btn" data-tier="report">Report · $4.99</button>
+  <button type="button" class="ctrl-btn" data-tier="briefing">Pro · $9.99</button>
+  <button type="button" class="ctrl-btn" data-tier="agent">API · $49.99</button>
+</div>
+
+<div class="dateline-feels" id="dateline-feels">Today feels like March 14, 2000</div>
+
 <!-- Headline -->
-<div class="kicker" data-i18n="kicker">AI Sector Fragility Monitor · 3× Daily</div>
+<div class="kicker" data-i18n="kicker">Global Market Desk · Morning Edition</div>
 <h1 class="headline" data-i18n="headline">
-  AI sector enters awareness zone as leverage signals mount
+  Risk tone cools as oil slips, chips wobble, and breadth stays thin
 </h1>
 <h2 class="sub-headline" data-i18n="sub">
-  Crash Risk Score climbs to 38.8; fragility index at 0.71 as hyperscaler capex language remains under watch
+  Direction: cautious with selective rebound attempts. Sentiment: still crowded in AI leaders while macro headlines drive fast reversals.
 </h2>
 
 <!-- Score banner -->
@@ -342,21 +466,9 @@
   </div>
   <div class="score-divider"></div>
   <div class="score-item">
-    <div class="score-label" data-i18n="frag_label">Fragility (F)</div>
-    <div class="score-val">0.71</div>
-    <div class="score-sub" data-i18n="rising">rising · dF/dt +0.02</div>
-  </div>
-  <div class="score-divider"></div>
-  <div class="score-item">
-    <div class="score-label" data-i18n="trig_label">Trigger (T)</div>
-    <div class="score-val">0.62</div>
-    <div class="score-sub" data-i18n="capex_watching">capex NLP 0.30</div>
-  </div>
-  <div class="score-divider"></div>
-  <div class="score-item">
     <div class="score-label" data-i18n="phase_label">Wyckoff Phase</div>
     <div class="score-val" style="font-size:16px;" data-i18n="phase_val">Distribution</div>
-    <div class="score-sub">50% confidence</div>
+    <div class="score-sub"></div>
   </div>
 </div>
 
@@ -365,7 +477,7 @@
   <div class="zone-bar">
     <div style="background:#1D9E75; flex:25;"></div>
     <div style="background:#639922; flex:15;"></div>
-    <div style="background:#BA7517; flex:15;"></div>
+    <div style="background:#92400E; flex:15;"></div>
     <div style="background:#D85A30; flex:20;"></div>
     <div style="background:#E24B4A; flex:15;"></div>
     <div style="background:#8b0000; flex:10;"></div>
@@ -380,113 +492,27 @@
 
   <!-- Col 1: The Fragility Signal -->
   <div class="col">
-    <div class="col-head" data-i18n="col1_head">The fragility signal</div>
+    <div class="col-head" data-i18n="col1_head">Headline news and what changed</div>
+    <div id="col1-body"></div>
 
-    <p>
-      The CASSANDRA system's <strong>Leverage factor (L: 0.78)</strong> reached its
-      highest reading in 14 months, driven by record FINRA margin debt relative
-      to free credit balances. When leverage is this elevated, the system requires
-      only a modest trigger to tip into a self-reinforcing unwind.
-    </p>
-
-    <p>
-      <strong>Valuation (V: 0.72)</strong> remains in historically stretched
-      territory. The market-cap-to-GDP ratio continues to track 2021's
-      blow-off peak rather than any prior soft-landing episode.
-    </p>
-
-    <div class="echo-box">
-      <div class="echo-box-head" data-i18n="echo_head">Historical echo — March 2000</div>
-      <table class="echo-table">
-        <tr><th>Signal</th><th>Mar 2000</th><th>Today</th></tr>
-        <tr><td>Margin debt / GDP</td><td>2.1%</td><td>2.4%</td></tr>
-        <tr><td>P/E (AI leaders)</td><td>87×</td><td>74×</td></tr>
-        <tr><td>VIX at peak</td><td>21</td><td>18</td></tr>
-        <tr><td>CRS analogue</td><td>41.2</td><td>38.8</td></tr>
-      </table>
-    </div>
-
-    <p class="caveat" data-i18n="caveat">
-      Coverage: 40% of metrics live. Band wider than normal. Not investment advice.
+    <p class="caveat np-aux" data-i18n="caveat" hidden>
+      Live inputs update through the trading day; confidence bands expand when signals conflict.
     </p>
   </div>
 
   <!-- Col 2: The Trigger Watch -->
-  <div class="col">
-    <div class="col-head" data-i18n="col2_head">The trigger watch</div>
-
-    <p>
-      The system's most critical single input — the <strong>capex-cut NLP grader</strong>
-      — currently reads 0.30. No hyperscaler has formally reduced guidance.
-      This is the "Lehman moment" detector: if any of Microsoft, Amazon, or
-      Google explicitly cuts AI capex in an earnings call, this score jumps
-      to 0.80+ and the CRS is expected to cross 55.
-    </p>
-
-    <p>
-      <strong>Sentiment (S) and Breadth (B)</strong> signals are available
-      to subscribers. The Phase classifier reads Distribution Range at
-      50% confidence — consistent with distribution phases in Q3 2021 and
-      Q4 1999 before the subsequent collapses.
-    </p>
-
-    <!-- Locked content example (for free users) -->
-    <div class="locked-wrap">
-      <p class="locked">
-        The Catalyst factor (C: 0.68) has elevated significantly this week.
-        Fed path divergence from market pricing reached 42 basis points,
-        a signal that has historically preceded volatility spikes.
-        Supply-chain tells from Korean memory sources are particularly
-        concerning given the DRAM forward price curve inversion.
-      </p>
-      <div class="locked-overlay" data-i18n="locked_msg">🔒 Subscribers only — $4.99/mo</div>
-    </div>
-
-    <div class="echo-box" style="margin-top: 0.75rem;">
-      <div class="echo-box-head" data-i18n="echo2_head">Nearest analog date</div>
-      <p style="font-size:12px; color:var(--ink-2); margin:0;">
-        <strong>March 6–14, 2000</strong> — 18 days before the NASDAQ peak.
-        CRS analogue: 41.2. The trigger fired on March 11 (Cisco capex warning).
-        Separation between today and analog: <em>±22 days. Timing humility required.</em>
-      </p>
-    </div>
+  <div class="col col-trigger">
+    <div class="col-head" data-i18n="col2_head">Direction, sentiment, and why</div>
+    <div id="col2-body"></div>
   </div>
 
   <!-- Col 3: What it means + Subscribe -->
   <div class="col">
-    <div class="col-head" data-i18n="col3_head">What it means</div>
+    <div class="col-head" data-i18n="col3_head">Simple analogy and subscriber preview</div>
+    <div id="col3-body"></div>
 
-    <p>
-      CASSANDRA is not predicting a crash date. It is reporting that
-      <strong>the spring is loaded</strong>. Fragility at 0.71 means the system
-      is highly susceptible to a trigger. The trigger at 0.62 means pressure
-      is accumulating but no formal spark has fired.
-    </p>
-    <p>
-      The interaction term (F × T = 0.44) is the load-bearing variable.
-      A capex cut would push F × T toward 0.60, which maps to a CRS above 63 —
-      the top of Mania, entering Danger. That is the scenario to watch.
-    </p>
-
-    <div style="border: 1px solid var(--border); border-top: 2px solid var(--border-hvy); padding: 10px; margin: 0.75rem 0; background: var(--bg-inset);">
-      <div class="score-label" style="margin-bottom:6px;" data-i18n="subscribe_head">Subscribe to unlock</div>
-      <p style="font-size:11px; color:var(--ink-3); margin-bottom:8px;" data-i18n="subscribe_body">
-        Free: CRS + band + phase<br>
-        <strong style="color:var(--ink);">$4.99/mo:</strong> Full 5-factor report daily<br>
-        <strong style="color:var(--ink);">$10/mo:</strong> 10-page deep report + AI insights<br>
-        <strong style="color:var(--ink);">$50/mo:</strong> Custom stock agents + API
-      </p>
-      <div style="display:flex; flex-direction:column; gap:5px;">
-        <input type="email" id="news-email" placeholder="your@email.com" style="font-family:Georgia,serif; font-size:12px; background:var(--bg); color:var(--ink); border:1px solid var(--border); padding:4px 8px; border-radius:2px; width:100%;" aria-label="Email for newsletter" />
-        <button class="cta-btn primary" onclick="handleSubscribe()" data-i18n="sub_btn">Subscribe for free report</button>
-        <div id="sub-cta-payment" style="margin-top:4px;"></div>
-      </div>
-    </div>
-
-    <p class="caveat" data-i18n="disclaimer">
-      CASSANDRA is a decision-support research tool. It does not place trades
-      and does not constitute financial advice. All scores are hypotheses
-      about fragility, not facts about the future.
+    <p class="caveat np-aux" data-i18n="disclaimer" hidden>
+      This edition is published by the Cassandra research desk for decision support and market monitoring.
     </p>
   </div>
 
@@ -494,94 +520,147 @@
 
 <!-- CTA strip -->
 <div class="cta-strip">
-  <span style="font-size:12px; color:var(--ink-3); align-self:center;" data-i18n="cta_label">Read the full report:</span>
-  <button class="cta-btn" onclick="window.location.href='/'" data-i18n="cta_dashboard">Live dashboard</button>
-  <button class="cta-btn primary" onclick="window.location.href='/subscribe'" data-i18n="cta_subscribe">Subscribe — $4.99/mo</button>
+  <span style="font-size:12px; color:var(--ink-3); align-self:center;" data-i18n="cta_label">Continue reading:</span>
+  <button class="cta-btn" onclick="window.location.href='/'" data-i18n="cta_dashboard">Home</button>
+  <button class="cta-btn primary" onclick="window.location.href='/pricing?tier=report'" data-i18n="cta_subscribe">Open subscriber brief</button>
   <button class="cta-btn" onclick="window.location.href='/stocks/NOW'" data-i18n="cta_stocks">Custom stock report →</button>
 </div>
 
 <!-- Footer -->
 <footer class="footer">
-  <span data-i18n="footer">CASSANDRA · crash.netie.ai · Updated 3× daily on NYSE trading days · Not financial advice</span>
-  <br/><span>netie.ai · github.com/Netie-AI/Cassandra</span>
+  <p class="access-badge" id="access-badge"></p>
+  <div class="footer-tools" id="share-bar">
+    <button class="ctrl-btn share-primary" id="np-share" type="button">Share</button>
+    <button class="ctrl-btn" id="np-copy" type="button">Copy link</button>
+    <button class="ctrl-btn" id="np-print" type="button">Print / Save PDF</button>
+  </div>
+  <p class="footer-flag" data-i18n="flag">Market signal, written like news</p>
+  <span data-i18n="footer">CASSANDRA · crash.netie.ai · Market Desk Edition · Updated 3× daily on NYSE trading days</span>
+  <p class="credits-bar">
+    <a href="https://netie.ai" target="_blank" rel="noopener">netie.ai</a>
+    · <a href="https://github.com/Netie-AI/Cassandra" target="_blank" rel="noopener">GitHub</a>
+    · <a href="https://crash.netie.ai">crash.netie.ai</a>
+  </p>
 </footer>
 
 <script src="/static/config.js"></script>
+<script src="/static/newspaper-bodies.js"></script>
 <script src="/static/common.js"></script>
 <script>
 /* ── i18n ───────────────────────────────────────────────────────── */
 const I18N = {
   en: {
-    flag: '"All the Signal That\'s Fit to Print"',
-    edition: 'Late City Edition', price: 'Free · Subscription from $4.99',
-    kicker: 'AI Sector Fragility Monitor · 3× Daily',
-    headline: 'AI sector enters awareness zone as leverage signals mount',
-    sub: 'Crash Risk Score climbs to 38.8; fragility index at 0.71 as hyperscaler capex language remains under watch',
+    flag: 'Market signal, written like news',
+    edition: 'Late City Edition', price: 'Free',
+    kicker: 'Global Market Desk · Morning Edition',
+    headline: 'Risk tone cools as oil slips, chips wobble, and breadth stays thin',
+    sub: 'Direction: cautious with selective rebound attempts. Sentiment: still crowded in AI leaders while macro headlines drive fast reversals.',
     crs_label: 'Crash Risk Score', frag_label: 'Fragility (F)', trig_label: 'Trigger (T)', phase_label: 'Wyckoff Phase',
     rising: 'rising · dF/dt +0.02', capex_watching: 'capex NLP 0.30', phase_val: 'Distribution',
-    col1_head: 'The fragility signal', col2_head: 'The trigger watch', col3_head: 'What it means',
-    echo_head: 'Historical echo — March 2000', echo2_head: 'Nearest analog date',
-    caveat: 'Coverage: 40% of metrics live. Band wider than normal. Not investment advice.',
-    locked_msg: '🔒 Subscribers only — $4.99/mo',
-    subscribe_head: 'Subscribe to unlock', subscribe_body: '',
-    sub_btn: 'Subscribe for free report',
-    cta_label: 'Read the full report:', cta_dashboard: 'Live dashboard',
-    cta_subscribe: 'Subscribe — $4.99/mo', cta_stocks: 'Custom stock report →',
-    disclaimer: 'CASSANDRA is a decision-support research tool. It does not place trades and does not constitute financial advice.',
-    footer: 'CASSANDRA · crash.netie.ai · Updated 3× daily on NYSE trading days · Not financial advice',
+    col1_head: 'Headline news and what changed', col2_head: 'Direction, sentiment, and why', col3_head: 'Simple analogy and subscriber preview',
+    echo_head: 'Historical echo: March 2000', echo2_head: 'Nearest analog date',
+    caveat: 'Live inputs update through the trading day; confidence bands expand when signals conflict.',
+    locked_msg: '🔒 Subscriber brief preview',
+    subscribe_head: 'What subscribers see', subscribe_body: '',
+    sub_btn: 'Get today\'s free edition',
+    cta_label: 'Continue reading:', cta_dashboard: 'Home',
+    cta_subscribe: 'Open subscriber brief', cta_stocks: 'Custom stock report →',
+    disclaimer: 'This edition is published by the Cassandra research desk for decision support and market monitoring.',
+    footer: 'CASSANDRA · crash.netie.ai · Market Desk Edition · Updated 3× daily on NYSE trading days',
   },
   zh: {
     flag: '"值得印刷的所有信号"',
-    edition: '晚城版', price: '免费 · 订阅起价 $4.99',
+    edition: '晚城版', price: '免费',
     kicker: 'AI 行业脆弱性监测 · 每日3次',
     headline: 'AI 行业进入"意识区间"，杠杆信号持续累积',
     sub: '崩盘风险评分升至38.8；脆弱性指数为0.71，超大规模云厂商资本支出语言受到持续关注',
     crs_label: '崩盘风险评分', frag_label: '脆弱性 (F)', trig_label: '触发器 (T)', phase_label: 'Wyckoff 阶段',
-    rising: '上升 · dF/dt +0.02', capex_watching: '资本支出NLP 0.30', phase_val: '分发阶段',
+    rising: '上升 · dF/dt +0.02', capex_watching: '资本支出NLP 0.30', phase_val: '派发区间',
     col1_head: '脆弱性信号', col2_head: '触发器观察', col3_head: '含义解读',
-    echo_head: '历史回声 — 2000年3月', echo2_head: '最近类比日期',
-    caveat: '数据覆盖率：40%。置信带宽于正常。非投资建议。',
-    locked_msg: '🔒 仅限订阅用户 — $4.99/月',
+    echo_head: '历史回声: 2000年3月', echo2_head: '最近类比日期',
+    caveat: '实时输入在交易时段持续更新；当信号冲突时置信区间会扩大。',
+    locked_msg: '🔒 订阅简报预览',
     subscribe_head: '订阅解锁', subscribe_body: '',
     sub_btn: '免费订阅报告',
     cta_label: '阅读完整报告：', cta_dashboard: '实时仪表板',
-    cta_subscribe: '订阅 — $4.99/月', cta_stocks: '自定义股票报告 →',
-    disclaimer: 'CASSANDRA 是决策支持研究工具，不进行交易，不构成投资建议。',
-    footer: 'CASSANDRA · crash.netie.ai · 每个NYSE交易日更新3次 · 非投资建议',
+    cta_subscribe: '订阅: $4.99/月', cta_stocks: '自定义股票报告 →',
+    disclaimer: '本版由 Cassandra 研究台发布，用于决策支持与市场监测。',
+    footer: 'CASSANDRA · crash.netie.ai · 市场桌面版 · NYSE交易日每日更新3次',
   },
   ms: {
     flag: '"Semua Isyarat Yang Layak Dicetak"',
-    edition: 'Edisi Kota Lewat', price: 'Percuma · Langganan dari $4.99',
+    edition: 'Edisi Kota Lewat', price: 'Percuma',
     kicker: 'Pemantau Kerapuhan Sektor AI · 3× Sehari',
-    headline: 'Sektor AI memasuki zon kesedaran apabila isyarat leveraj meningkat',
-    sub: 'Skor Risiko Ranap naik ke 38.8; indeks kerapuhan 0.71 semasa bahasa capex hyperscaler dipantau',
-    crs_label: 'Skor Risiko Ranap', frag_label: 'Kerapuhan (F)', trig_label: 'Pencetus (T)', phase_label: 'Fasa Wyckoff',
-    rising: 'meningkat · dF/dt +0.02', capex_watching: 'NLP capex 0.30', phase_val: 'Pengedaran',
+    headline: 'Sektor AI memasuki band kesedaran apabila isyarat leveraj terus terkumpul',
+    sub: 'Risiko kejatuhan naik ke 38.8. Kerapuhan terbaca 0.71 manakala bahasa perbelanjaan modal hyperscaler terus dipantau rapi.',
+    crs_label: 'Skor Risiko Kejatuhan', frag_label: 'Kerapuhan (F)', trig_label: 'Pencetus (T)', phase_label: 'Fasa Wyckoff',
+    rising: 'meningkat · dF/dt +0.02', capex_watching: 'NLP capex 0.30', phase_val: 'Julat agihan',
     col1_head: 'Isyarat kerapuhan', col2_head: 'Pemantauan pencetus', col3_head: 'Maksudnya',
-    echo_head: 'Gema sejarah — Mac 2000', echo2_head: 'Tarikh analog terdekat',
-    caveat: 'Liputan: 40% metrik langsung. Jalur lebih lebar. Bukan nasihat pelaburan.',
-    locked_msg: '🔒 Pelanggan sahaja — $4.99/bln',
+    echo_head: 'Gema sejarah: Mac 2000', echo2_head: 'Tarikh analog terdekat',
+    caveat: 'Input langsung dikemas kini sepanjang sesi dagangan; julat keyakinan melebar apabila isyarat bercanggah.',
+    locked_msg: '🔒 Pratonton ringkas pelanggan',
     subscribe_head: 'Langgan untuk buka kunci', subscribe_body: '',
     sub_btn: 'Langgan laporan percuma',
     cta_label: 'Baca laporan penuh:', cta_dashboard: 'Papan pemuka langsung',
-    cta_subscribe: 'Langgan — $4.99/bln', cta_stocks: 'Laporan saham tersuai →',
-    disclaimer: 'CASSANDRA adalah alat penyelidikan sokongan keputusan. Ia tidak membuat dagangan dan bukan nasihat kewangan.',
-    footer: 'CASSANDRA · crash.netie.ai · Dikemas kini 3× sehari pada hari dagangan NYSE · Bukan nasihat kewangan',
+    cta_subscribe: 'Langgan: $4.99/bln', cta_stocks: 'Laporan saham tersuai →',
+    disclaimer: 'Edisi ini diterbitkan oleh meja penyelidikan Cassandra untuk sokongan keputusan dan pemantauan pasaran.',
+    footer: 'CASSANDRA · crash.netie.ai · Edisi Meja Pasaran · Dikemas kini 3× sehari pada hari dagangan NYSE',
   }
 };
 
 let currentLang = 'en';
 
+async function applyNewspaperBodies(lang) {
+  const COL_KEYS = { 'col1-body': 'col1_html', 'col2-body': 'col2_html', 'col3-body': 'col3_html' };
+  const asof = window.__reportAsof || new URLSearchParams(location.search).get('asof');
+  let bodies = null;
+  try {
+    const q = new URLSearchParams({ lang });
+    if (asof) q.set('date', asof);
+    const r = await fetch('/api/newspaper-body?' + q.toString());
+    if (r.ok) bodies = await r.json();
+  } catch (_) { /* fallback to golden static */ }
+  if (!bodies) {
+    bodies = (window.NEWSPAPER_BODIES && window.NEWSPAPER_BODIES[lang]) || window.NEWSPAPER_BODIES.en;
+  }
+  if (!bodies) return;
+  Object.entries(COL_KEYS).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el && bodies[key]) el.innerHTML = bodies[key];
+  });
+  const dl = document.getElementById('dateline-feels');
+  if (dl) {
+    if (window.__npAnalogDate) {
+      const prefix = lang === 'zh' ? '今日情势令人想起 ' : lang === 'ms' ? 'Hari ini terasa seperti ' : 'Today feels like ';
+      dl.textContent = prefix + window.__npAnalogDate;
+    } else if (bodies.dateline_feels) {
+      dl.textContent = bodies.dateline_feels;
+    }
+  }
+}
+
+function updateReportDate(lang) {
+  const el = document.getElementById('report-date');
+  if (!el) return;
+  const locale = lang === 'zh' ? 'zh-CN' : lang === 'ms' ? 'ms-MY' : 'en-US';
+  el.textContent = new Date().toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 function setLang(lang) {
   currentLang = lang;
+  window.currentLang = lang;
   const t = I18N[lang];
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (t[key] !== undefined && t[key] !== '') el.innerHTML = t[key];
   });
+  applyNewspaperBodies(lang);
+  updateReportDate(lang);
+  if (window.refreshPaymentCTA) window.refreshPaymentCTA();
   document.querySelectorAll('.ctrl-btn[id^="lang-"]').forEach(b => b.classList.remove('active'));
   document.getElementById('lang-' + lang).classList.add('active');
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang === 'ms' ? 'ms' : 'en';
+  try { localStorage.setItem('cassandra-lang', lang); } catch(e) {}
 }
 
 /* ── Dark / light mode ──────────────────────────────────────────── */
@@ -599,30 +678,26 @@ function toggleTheme() {
 
 /* ── Auto detect language ───────────────────────────────────────── */
 (function autoLang() {
-  const l = navigator.language || 'en';
-  if (l.startsWith('zh')) setLang('zh');
-  else if (l.startsWith('ms') || l === 'id') setLang('ms');
+  let saved = null;
+  try { saved = localStorage.getItem('cassandra-lang'); } catch(e) {}
+  const l = saved || navigator.language || 'en';
+  if (l === 'zh' || l.startsWith('zh')) setLang('zh');
+  else if (l === 'ms' || l.startsWith('ms') || l === 'id') setLang('ms');
   else setLang('en');
 })();
 
-/* ── Date ───────────────────────────────────────────────────────── */
-document.getElementById('report-date').textContent =
-  new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+/* ── Date (locale set by setLang) ───────────────────────────────── */
+updateReportDate(currentLang);
 
 /* ── Payment CTA auto-detect ───────────────────────────────────── */
-(function paymentCTA() {
-  const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '');
-  const isMY = /Kuala_Lumpur|Singapore|Bangkok/.test(tz);
-  const isCN = /Shanghai|Chongqing|Harbin/.test(tz);
+function refreshPaymentCTA() {
   const el = document.getElementById('sub-cta-payment');
-  if (isMY) {
-    el.innerHTML = '<div style="font-size:10px; color:var(--ink-3); font-style:italic;">Pay via FPX / TnG / DuitNow · MYR · via Billplz</div>';
-  } else if (isCN) {
-    el.innerHTML = '<div style="font-size:10px; color:var(--ink-3); font-style:italic;">支付宝 · 微信支付 via Airwallex</div>';
-  } else {
-    el.innerHTML = '<div style="font-size:10px; color:var(--ink-3); font-style:italic;">Stripe (card) or PayPal · cancel anytime</div>';
+  if (el && window.CassandraCommon?.paymentMethodHtml) {
+    el.innerHTML = CassandraCommon.paymentMethodHtml();
   }
-})();
+}
+window.refreshPaymentCTA = refreshPaymentCTA;
+refreshPaymentCTA();
 
 /* ── Fetch live score — see newspaper.js for full update ── */
 </script>

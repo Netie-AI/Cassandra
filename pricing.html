@@ -1,34 +1,77 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>CASSANDRA — Pricing · netie.ai</title>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet"/>
+  <title>Cassandra — Subscription</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="/static/tokens.css"/>
   <link rel="stylesheet" href="/static/styles.css"/>
   <link rel="stylesheet" href="/static/pricing.css"/>
+  <link rel="stylesheet" href="/static/docs.css"/>
 </head>
-<body>
-  <div class="top-bar">
-    <nav class="nav-links"><a href="/">Dashboard</a><a href="/newspaper-report">Newspaper</a></nav>
-    <div class="toolbar">
-      <button type="button" class="ctrl-btn lang-btn active" data-lang="en">EN</button>
-      <button type="button" class="ctrl-btn lang-btn" data-lang="zh">中文</button>
-      <button type="button" id="theme-toggle" class="ctrl-btn">◐</button>
-    </div>
-  </div>
-  <main class="pricing-main">
-    <h1 class="pricing-title">Choose your plan</h1>
-    <p class="pricing-sub">Decision support only · no execution · <a href="https://netie.ai">netie.ai</a></p>
-    <div class="tier-grid" id="tier-grid"></div>
+<body class="home-page pricing-page">
+  <div class="home-wrap">
+    <header class="home-header home-header-v3">
+      <div class="home-header-top">
+        <div class="home-header-brand">
+          <a href="/" class="home-logo cp">Cassandra</a>
+          <nav class="home-header-nav"><a href="/">Home</a><a href="/newspaper-report">Newspaper</a><a href="/pricing">Plans</a></nav>
+        </div>
+        <div class="home-toolbar">
+          <button type="button" id="lang-cycle-btn" class="icon-btn lang-cycle-btn" aria-label="Language">
+            <i class="ti ti-language" aria-hidden="true"></i><span class="cm lang-cycle-lbl" id="lang-cycle-lbl">EN</span><span class="icon-tip">Language</span>
+          </button>
+          <button type="button" id="theme-toggle" class="icon-btn" aria-label="Toggle theme"><i class="ti ti-moon" aria-hidden="true"></i><span class="icon-tip">Theme</span></button>
+          <div class="acct-wrap">
+            <button type="button" id="acct-btn" class="icon-btn" aria-label="Account menu" aria-expanded="false"><i class="ti ti-user" aria-hidden="true"></i></button>
+            <div id="acct-menu" class="acct-menu" hidden></div>
+          </div>
+        </div>
+      </div>
+      <div class="home-header-meta">
+        <a href="/" class="home-link">← Home</a>
+        <a href="/newspaper-report" class="home-link">Today's edition</a>
+      </div>
+    </header>
+
+    <section class="pricing-section pricing-page-head">
+      <div class="sh pricing-section-label">Subscription</div>
+      <h1 class="cp pricing-headline">Start with a full edition. No commitments.</h1>
+      <p class="pricing-lead" id="trial-lead">First-time subscribers receive the complete edition free for 7 days. Cancel anytime before renewal.</p>
+    </section>
+
+    <div class="pricing-grid" id="tier-grid"></div>
+
+    <div class="pricing-note" id="pay-note">Pay via FPX · TnG · DuitNow (MYR) · Credit / Debit card</div>
+
+    <section class="compare-section">
+      <h2 class="cp compare-title">Compare plans</h2>
+      <p class="compare-lead">Research support only. We score risk, we don't trade for you.</p>
+      <div class="compare-matrix" id="compare-matrix"></div>
+    </section>
+
     <section class="faq">
-      <h2>FAQ</h2>
-      <details><summary>Does CASSANDRA predict crash dates?</summary><p>No. Level, band, phase, and analog resemblance with timing humility only.</p></details>
+      <h2 class="cp compare-title">FAQ</h2>
+      <details><summary>Does Cassandra predict crash dates?</summary><p>No. Level, band, phase, and analog resemblance with timing humility only.</p></details>
+      <details><summary>First subscription trial?</summary><p>New subscribers get 7 days free on any paid tier. Cancel before renewal — no charge.</p></details>
       <details><summary>Referral program?</summary><p>Share your link — when someone subscribes, you get 7 days free API (voucher in account).</p></details>
       <details><summary>Payment methods?</summary><p>Auto-routed: Stripe/PayPal (intl), Billplz/Curlec (MY), Airwallex (CN).</p></details>
     </section>
-    <p class="footer-credits"><a href="https://github.com/Netie-AI/Cassandra">Netie-AI/Cassandra</a></p>
-  </main>
+
+    <div class="home-footer-tools footer-tools">
+      <span>Cassandra Research Desk · crash.netie.ai</span>
+      <nav class="docs-footer-nav">
+        <a href="/docs/api">API reference</a>
+        <a href="/docs/institutional">Institutional feed</a>
+        <a href="/docs/methodology">Methodology</a>
+      </nav>
+    </div>
+  </div>
+
   <script src="/static/config.js"></script>
   <script src="/static/common.js"></script>
   <script src="/static/pricing.js"></script>

@@ -1,177 +1,173 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="description" content="CASSANDRA — AI sector crash risk score by netie.ai"/>
-  <title>CASSANDRA — Crash Risk Score · netie.ai</title>
+  <meta name="description" content="Cassandra market desk: traceable risk editions and score history"/>
+  <title>Cassandra · Market Desk</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="/static/tokens.css"/>
   <link rel="stylesheet" href="/static/styles.css"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <link rel="stylesheet" href="/static/docs.css"/>
 </head>
-<body>
-  <div class="top-bar">
-    <nav class="nav-links">
-      <a href="/pricing" data-i18n="pricing">Pricing</a>
-      <a href="/newspaper-report" data-i18n="shareView">Newspaper</a>
-      <a href="/stocks/NOW" data-i18n="stocks">Demos</a>
-    </nav>
-    <div class="toolbar" role="toolbar">
-      <button type="button" class="ctrl-btn lang-btn active" data-lang="en">EN</button>
-      <button type="button" class="ctrl-btn lang-btn" data-lang="zh">中文</button>
-      <button type="button" class="ctrl-btn lang-btn" data-lang="ms">BM</button>
-      <span class="toolbar-sep"></span>
-      <button type="button" id="theme-toggle" class="ctrl-btn" aria-label="Toggle theme">◐</button>
+<body class="home-page">
+  <div class="home-wrap">
+
+    <header class="home-header home-header-v3">
+      <div class="home-header-top">
+        <div class="home-header-brand">
+          <a href="/" class="home-logo cp">Cassandra</a>
+          <nav class="home-header-nav" aria-label="Primary">
+            <a href="/">Home</a>
+            <a href="/newspaper-report">Newspaper</a>
+            <a href="/pricing">Plans</a>
+          </nav>
+        </div>
+        <div class="home-toolbar" role="toolbar">
+          <button type="button" id="lang-cycle-btn" class="icon-btn lang-cycle-btn" aria-label="Language">
+            <i class="ti ti-language" aria-hidden="true"></i>
+            <span class="cm lang-cycle-lbl" id="lang-cycle-lbl">EN</span>
+            <span class="icon-tip">Language</span>
+          </button>
+          <button type="button" id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
+            <i class="ti ti-moon" aria-hidden="true"></i>
+            <span class="icon-tip">Theme</span>
+          </button>
+          <div class="acct-wrap">
+            <button type="button" id="acct-btn" class="icon-btn" aria-label="Account menu" aria-expanded="false" aria-haspopup="true">
+              <i class="ti ti-user" aria-hidden="true"></i>
+              <span class="icon-tip">Account</span>
+            </button>
+            <div id="acct-menu" class="acct-menu" hidden role="menu"></div>
+          </div>
+        </div>
+      </div>
+      <div class="home-header-meta">
+        <span id="h-ed">Late City Edition</span>
+        <span id="cdate" class="home-date-inline"></span>
+        <span id="h-cov">Live coverage: 100%</span>
+      </div>
+    </header>
+
+    <div class="home-analog-row">
+      <span class="cp home-analog" id="analog-t"></span>
+      <span id="desk-l" class="home-desk-label"></span>
     </div>
+
+    <div class="c-grid c-grid-v3">
+
+      <aside class="c-col c-col-left" id="watchlist">
+        <div class="home-panel-head">
+          <span class="sh-inline" id="h-wl">Watchlist</span>
+          <button type="button" id="edit-wl" class="home-edit-btn">Edit</button>
+        </div>
+        <div id="wl-tbl"></div>
+
+        <div class="sh c-mt" id="h-si">Score Inputs</div>
+        <div id="si-rows"></div>
+      </aside>
+
+      <main class="c-col c-col-center">
+        <div class="crs-block crs-block-inline">
+          <div class="cm crs-hero-num" id="crs">--</div>
+          <div class="crs-inline-meta">
+            <div id="bname" class="crs-band-name"></div>
+            <div class="cm crs-band-range" id="band-range">--</div>
+          </div>
+          <div id="bscale" class="crs-scale"></div>
+        </div>
+        <h1 class="cp home-headline" id="hl"></h1>
+        <div id="bp1" class="home-body"></div>
+        <div id="bp2" class="home-body c-mt-sm"></div>
+        <div class="home-read-row">
+          <a href="/newspaper-report" id="read-l" class="home-link"></a>
+          <a href="/newspaper-report" id="ed-btn" class="home-ed-btn"></a>
+        </div>
+      </main>
+
+      <aside class="c-col c-col-right">
+        <div class="home-panel-head">
+          <span class="sh-inline" id="h-vol">Top Volatility</span>
+          <button type="button" id="tf-btn" class="tf-btn">1D ▸</button>
+        </div>
+        <div id="vol-rows"></div>
+
+        <div class="sh c-mt" id="h-fg">Fear &amp; Greed</div>
+        <div class="fg-row">
+          <div class="cm fg-value" id="fg-val">--</div>
+          <div>
+            <div class="fg-label" id="fg-label">--</div>
+            <div id="fg-spark"></div>
+          </div>
+        </div>
+
+        <div class="sh c-mt" id="h-idx">Index Snapshot</div>
+        <div id="idx-el"></div>
+      </aside>
+
+    </div>
+
+    <section class="platform-section">
+      <div class="sh platform-label" id="fc-head">Platform</div>
+      <div class="feat-grid" id="feat-grid"></div>
+    </section>
+
+    <section class="analog-section" id="analog-demo">
+      <div class="sh platform-label" id="analog-section-label">Analog resolution</div>
+      <h2 class="cp analog-headline" id="analog-h2">The market has been here before. Here's what happened next.</h2>
+      <p class="analog-sub" id="analog-sub">Illustrative demo until archives are wired. Each outcome links to a source.</p>
+      <div class="analog-tabs">
+        <button type="button" class="analog-tab on" id="analog-tab-rep">Report · $4.99</button>
+        <button type="button" class="analog-tab" id="analog-tab-pro">Pro · $9.99</button>
+        <button type="button" class="analog-tab" id="analog-tab-api">API · $49.99</button>
+      </div>
+      <div class="analog-cap" id="analog-cap"></div>
+      <div id="analog-list"></div>
+      <p class="analog-footnote" id="analog-footnote">History is an analog, not a forecast. Past outcomes do not predict future results.</p>
+    </section>
+
+    <div class="home-footer-tools footer-tools">
+      <span id="f-pub">Cassandra Research Desk · crash.netie.ai</span>
+      <span id="f-disc">For decision support only. Not financial advice.</span>
+    </div>
+
+    <nav class="nav home-nav-links">
+      <a href="/newspaper-report">Newspaper</a>
+      <a href="/pricing">Plans</a>
+      <a href="/stocks/MU">MU demo</a>
+      <a href="/stocks/NOW">NOW demo</a>
+      <a href="/docs/api">API docs</a>
+      <a href="/docs/institutional">Institutional feed</a>
+      <a href="/docs/methodology">Methodology</a>
+    </nav>
+
+    <button id="runBtn" type="button" class="desk-run">Run cycle</button>
   </div>
 
-  <header class="site-header fu">
-    <div class="brand-block">
-      <div class="logo-sub">CASSANDRA</div>
-      <h1 class="logo-title">AI sector crash monitor</h1>
-      <p class="tagline" data-i18n="tagline">Fragility × trigger · decision support only · no execution</p>
-      <p class="brand-credit">
-        <span data-i18n="credit">Built by</span>
-        <a href="https://netie.ai" target="_blank" rel="noopener">netie.ai</a>
-        · <a href="https://github.com/Netie-AI/Cassandra" target="_blank" rel="noopener">GitHub</a>
-      </p>
-    </div>
-    <div class="header-actions">
-      <div class="countdown">
-        <span id="countdown-label" data-i18n="nextUpdate">Next score update</span>
-        <strong id="countdown">—</strong>
-        <span id="countdown-slot" class="mono"></span>
+  <dialog id="wl-modal" class="wl-modal">
+    <form method="dialog" id="wl-form">
+      <h2 class="cp wl-modal-title" id="wl-modal-title">Edit watchlist</h2>
+      <p class="wl-modal-hint" id="wl-modal-hint">Pick tickers below or search to add.</p>
+      <input type="search" id="wl-search" class="wl-search" placeholder="Search ticker…" aria-label="Search tickers"/>
+      <div id="wl-chips" class="wl-chips"></div>
+      <div class="wl-selected-wrap">
+        <span class="sh-inline">Selected</span>
+        <div id="wl-selected" class="wl-selected"></div>
       </div>
-      <button id="runBtn" type="button">Run cycle</button>
-    </div>
-  </header>
-
-  <main>
-    <!-- CRS Hero -->
-    <section class="crs-hero fu d1">
-      <div class="crs-hero-label" data-i18n="crsLabel">Crash Risk Score</div>
-      <div id="crs" class="crs-mega">—</div>
-      <div class="crs-band-row">
-        <span id="band-label" class="band-name">—</span>
-        <span id="band-range" class="band-range mono">± —</span>
+      <div class="wl-modal-actions">
+        <button type="button" id="wl-cancel" class="lang-btn">Cancel</button>
+        <button type="submit" class="lang-btn on">Save</button>
       </div>
-      <p id="distance-mania" class="distance-line"></p>
-      <div class="zone-track zone-track-slim">
-        <div id="zone-needle" class="zone-needle zone-needle-slim"></div>
-      </div>
-      <div class="zone-labels zone-labels-slim">
-        <span>Stable</span><span>Complace</span><span>Aware</span><span>Mania</span><span>Danger</span><span>Crisis</span>
-      </div>
-    </section>
-
-    <!-- Share -->
-    <section class="share-panel fu d2">
-      <div>
-        <h3 data-i18n="shareTitle">Share today's report</h3>
-        <p data-i18n="shareBody">Copy link or download the NYT-style edition — same format emailed to subscribers.</p>
-      </div>
-      <div class="share-actions">
-        <button type="button" id="btn-share" class="btn btn-secondary" data-i18n="shareCopy">Copy link</button>
-        <button type="button" id="btn-download-report" class="btn btn-secondary" data-i18n="shareDownload">Download HTML</button>
-        <a href="/newspaper-report" class="btn btn-primary" data-i18n="shareView">Read newspaper</a>
-      </div>
-    </section>
-
-    <!-- Metrics -->
-    <section class="grid-4 fu d2">
-      <div class="metric-card">
-        <div class="metric-label" data-i18n="fragility">Fragility (F)</div>
-        <div id="f" class="metric-value">—</div>
-        <div class="metric-bar"><div id="bar-f" class="metric-fill"></div></div>
-        <div id="f-sub" class="metric-sub mono"></div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label" data-i18n="trigger">Trigger (T)</div>
-        <div id="t" class="metric-value">—</div>
-        <div class="metric-bar"><div id="bar-t" class="metric-fill"></div></div>
-        <div id="t-sub" class="metric-sub mono"></div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label" data-i18n="phase">Phase</div>
-        <div id="phase" class="metric-value metric-value-sm">—</div>
-        <div class="metric-bar"><div id="bar-phase" class="metric-fill"></div></div>
-        <div id="phase-sub" class="metric-sub mono"></div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label" data-i18n="coverage">Coverage</div>
-        <div id="cov-pct" class="metric-value">—</div>
-        <div class="metric-bar"><div id="bar-cov" class="metric-fill metric-fill-warn"></div></div>
-        <div id="coverage-note" class="metric-sub metric-sub-warn"></div>
-      </div>
-    </section>
-
-    <!-- Factors -->
-    <section class="factors-section fu d3">
-      <div class="section-head">
-        <span class="section-title" data-i18n="factorsTitle">Factor breakdown</span>
-        <span class="section-hint">🔒 S · B · C <span data-i18n="subTitle">for subscribers</span></span>
-      </div>
-      <div id="factors" class="factors-grid factors-grid-rich"></div>
-      <p class="formula-footnote mono">CRS = 100 · (0.35·F + 0.20·T + 0.45·F·T) · freshness · coverage</p>
-    </section>
-
-    <!-- History -->
-    <section class="history-section fu d3">
-      <div class="section-title">30-DAY CRS HISTORY</div>
-      <div class="chart-wrap">
-        <canvas id="histChart" role="img" aria-label="CRS history chart"></canvas>
-      </div>
-    </section>
-
-    <!-- CTAs -->
-    <section class="cta-grid fu d4">
-      <div class="cta-box">
-        <div class="cta-kicker" data-i18n="digestTitle">Free daily report</div>
-        <p data-i18n="digestBody">Newspaper-style score in your inbox · 3× on trading days.</p>
-        <form id="newsletter-form" class="newsletter-form" action="#" method="post">
-          <input type="email" name="email" placeholder="you@example.com" required aria-label="Email"/>
-          <button type="submit" class="btn btn-primary">Subscribe</button>
-        </form>
-      </div>
-      <div class="cta-box cta-box-highlight">
-        <div class="cta-badge">API ACCESS</div>
-        <div class="cta-kicker">$4.99 / month</div>
-        <p data-i18n="subBody">All 5 factors · newspaper report · JSON history.</p>
-        <div id="sub-buttons"></div>
-      </div>
-    </section>
-
-    <section class="referral-strip fu d5">
-      <div>
-        <strong data-i18n="referralTitle">Refer & earn 7 days free API</strong>
-        <p data-i18n="referralBody">When a referral subscribes, activate trial in account vouchers.</p>
-      </div>
-      <button type="button" id="btn-referral" class="btn btn-secondary" data-i18n="referralCopy">Copy referral link</button>
-    </section>
-
-    <section class="donate-strip fu d5">
-      <div>
-        <strong data-i18n="donateTitle">Support the research</strong>
-        <p data-i18n="donateBody">Keep CASSANDRA free for everyone.</p>
-      </div>
-      <div id="donate-buttons" class="donate-actions"></div>
-    </section>
-  </main>
-
-  <footer>
-    <p data-i18n="footerLegal">Personal research tooling — not financial advice.</p>
-    <p class="disclaimer" data-i18n="footerDisclaimer">No crash-date predictions. Low coverage widens bands.</p>
-    <p class="footer-credits">
-      <a href="https://crash.netie.ai">crash.netie.ai</a>
-      · <a href="https://netie.ai">netie.ai</a>
-      · <a href="https://github.com/Netie-AI/Cassandra">Netie-AI/Cassandra</a>
-    </p>
-  </footer>
+    </form>
+  </dialog>
 
   <script src="/static/config.js"></script>
+  <script src="/static/demo-data.js"></script>
   <script src="/static/common.js"></script>
+  <script src="/static/analog-resolution.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

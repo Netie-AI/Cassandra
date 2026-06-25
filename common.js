@@ -5,36 +5,44 @@ window.CassandraCommon = (function () {
 
   const DASH_I18N = {
     en: {
-      tagline: "Crash Risk Score · decision support only · no execution",
-      nextUpdate: "Next score update",
+      tagline: "Daily market desk with traceable editions, timestamps, and score context.",
+      nextUpdate: "Next update",
       crsLabel: "Crash Risk Score",
+      home: "Home",
       zoneTitle: "Risk zone",
-      fragility: "Fragility (F)",
-      trigger: "Trigger (T)",
-      phase: "Phase",
+      fragility: "Fragility",
+      trigger: "Trigger",
+      phase: "Market phase",
       confidence: "Confidence",
-      factorsTitle: "Factor breakdown · L/V live · S/B/C for subscribers",
-      subTitle: "Full factor access",
-      subBody: "Unlock S, B, C factors + daily newspaper report.",
-      donateTitle: "Support the research",
-      donateBody: "One-off contribution — routed to your local payment method.",
-      digestTitle: "Daily thesis digest",
-      digestBody: "Newspaper-style report emailed 3× on trading days.",
-      shareTitle: "Share today's report",
-      shareBody: "Copy a link or download the NYT-style edition for subscribers.",
+      factorsTitle: "What’s driving the score",
+      subTitle: "full breakdown for subscribers",
+      subBody: "Unlock trigger board, watchlist levels, edition archive retrieval, and API access.",
+      donateTitle: "Keep this research free",
+      donateBody: "One-off tip — thank you for supporting the work.",
+      digestTitle: "Get the daily brief",
+      digestBody: "Pre-market and during-session editions on trading days.",
+      shareTitle: "Open today’s desk edition",
+      shareBody: "Read the full narrative, copy a dated link, or print it for archive.",
       shareCopy: "Copy link",
+      shareNative: "Share",
+      sharePrint: "Print / PDF",
       shareDownload: "Download HTML",
-      shareView: "Read newspaper",
-      referralTitle: "Refer & earn 7 days free API",
-      referralBody: "When someone subscribes with your link, activate a 7-day API trial in your account vouchers.",
+      shareView: "Newspaper",
+      referralTitle: "Refer a friend",
+      referralBody: "When they subscribe, you get 7 days of API access on the top plan.",
       referralCopy: "Copy referral link",
-      insideZone: "Inside",
-      belowMania: "pts below Mania",
-      coverage: "Coverage",
-      coverageNote: "wider band when data is thin",
+      insideZone: "In",
+      belowMania: "points below Mania",
+      coverage: "Data coverage",
+      coverageNote: "wider band when sources are thin",
+      accessDelayed: "Free plan: scores are 2 days behind. Upgrade for today’s edition.",
+      accessLive: "You’re on a live plan — today’s score.",
+      sessionPreMarket: "Pre-market · NASDAQ",
+      sessionDuring: "During session · NASDAQ",
+      apiFrom: "Subscriber research desk",
       asof: "as of",
       noData: "No data yet",
-      footerLegal: "Personal research tooling — not financial advice.",
+      footerLegal: "Research desk for decision support and market monitoring.",
       footerDisclaimer: "CRS is a composite index with confidence bands. Low coverage widens uncertainty. No crash-date predictions.",
       credit: "Built by",
       pricing: "Pricing",
@@ -188,16 +196,27 @@ window.CassandraCommon = (function () {
     setTimeout(() => el.classList.remove("show"), 2500);
   }
 
-  async function shareReport(asof) {
+  async function shareNative(asof, title, text) {
     const url = reportUrl(asof);
     if (navigator.share) {
       try {
-        await navigator.share({ title: "CASSANDRA Report", url, text: "AI sector fragility monitor" });
-        return;
-      } catch (_) { /* fall through */ }
+        await navigator.share({ title: title || "Cassandra's Daily", url, text: text || "" });
+        return true;
+      } catch (e) {
+        if (e.name === "AbortError") return false;
+      }
     }
-    await copyText(url);
+    return false;
+  }
+
+  async function copyReportLink(asof) {
+    await copyText(reportUrl(asof));
     toast("Link copied");
+  }
+
+  async function shareReport(asof) {
+    const shared = await shareNative(asof, "Cassandra's Daily", "Today's market risk brief from Cassandra.");
+    if (!shared) await copyReportLink(asof);
   }
 
   function downloadHtml(filename) {
@@ -222,8 +241,195 @@ window.CassandraCommon = (function () {
     return code;
   }
 
+  function buildClientDiagnostics() {
+    let lang = null;
+    try { lang = localStorage.getItem(STORAGE_LANG); } catch (_) { /* ignore */ }
+    return {
+      app_version: (window.CASSANDRA_CONFIG && window.CASSANDRA_CONFIG.version) || "unknown",
+      url: location.href,
+      path: location.pathname,
+      lang: lang || document.documentElement.lang,
+      theme: document.documentElement.getAttribute("data-theme"),
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+      client_time: new Date().toISOString(),
+      user_agent: navigator.userAgent,
+    };
+  }
+
+  async function sendContact(message, email) {
+    const r = await fetch("/api/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        email: email || undefined,
+        client: buildClientDiagnostics(),
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "Contact failed");
+    return d;
+  }
+
+  function openContactFlow() {
+    const msg = window.prompt("Message for the Cassandra research desk:");
+    if (!msg || !msg.trim()) return;
+    const email = window.prompt("Your email (optional, for reply):") || "";
+    sendContact(msg.trim(), email.trim())
+      .then((d) => toast(d.email_sent ? "Message sent — we'll reply soon." : "Message logged — email pending config."))
+      .catch(() => toast("Could not send contact. Try desk@netie.ai"));
+  }
+
   function referralUrl() {
     return `${location.origin}/subscribe?ref=${referralCode()}`;
+  }
+
+  const SESSION_KEY = "cassandra-session";
+
+  function getSession() {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function setSession(user) {
+    try {
+      if (user) localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+      else localStorage.removeItem(SESSION_KEY);
+    } catch (_) { /* ignore */ }
+    renderAccountMenu();
+  }
+
+  function signOut() {
+    setSession(null);
+    toast("Signed out");
+  }
+
+  const LANG_ORDER = ["en", "zh", "ms"];
+  const LANG_LABELS = { en: "EN", zh: "文", ms: "MS" };
+
+  function initLangCycle(onChange) {
+    const btn = document.getElementById("lang-cycle-btn");
+    const lbl = document.getElementById("lang-cycle-lbl");
+    if (!btn || !lbl) return detectLang();
+
+    let lang = detectLang();
+    if (!DASH_I18N[lang]) lang = "en";
+
+    const sync = () => {
+      lbl.textContent = LANG_LABELS[lang] || "EN";
+      document.documentElement.lang = lang === "zh" ? "zh-CN" : lang;
+      setLang(lang);
+      if (onChange) onChange(lang);
+    };
+
+    sync();
+    btn.addEventListener("click", () => {
+      const idx = LANG_ORDER.indexOf(lang);
+      lang = LANG_ORDER[(idx + 1) % LANG_ORDER.length];
+      try { localStorage.setItem(STORAGE_LANG, lang); } catch (_) { /* ignore */ }
+      sync();
+    });
+    return lang;
+  }
+
+  function initAccountMenu() {
+    const btn = document.getElementById("acct-btn");
+    const menu = document.getElementById("acct-menu");
+    if (!btn || !menu) return;
+
+    renderAccountMenu();
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = menu.hidden;
+      menu.hidden = !open;
+      btn.setAttribute("aria-expanded", String(open));
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".acct-wrap")) {
+        menu.hidden = true;
+        btn.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+
+  function renderAccountMenu() {
+    const menu = document.getElementById("acct-menu");
+    const btn = document.getElementById("acct-btn");
+    if (!menu || !btn) return;
+
+    const session = getSession();
+    const loggedIn = Boolean(session?.name);
+
+    btn.classList.toggle("acct-active", loggedIn);
+
+    if (loggedIn) {
+      menu.innerHTML = `
+        <button type="button" class="acct-item" data-acct-action="agents"><i class="ti ti-cpu" aria-hidden="true"></i>My agents</button>
+        <button type="button" class="acct-item" data-acct-action="watchlist"><i class="ti ti-star" aria-hidden="true"></i>My watchlist</button>
+        <button type="button" class="acct-item" data-acct-action="settings"><i class="ti ti-settings" aria-hidden="true"></i>Settings</button>
+        <button type="button" class="acct-item" data-acct-action="contact"><i class="ti ti-message-2" aria-hidden="true"></i>Contact</button>
+        <button type="button" class="acct-item acct-item-last" data-acct-action="signout"><i class="ti ti-logout" aria-hidden="true"></i>Sign out</button>
+        <div class="acct-footer">
+          <div class="acct-avatar">${(session.initials || session.name.slice(0, 2)).toUpperCase()}</div>
+          <div class="acct-user-meta">
+            <div class="acct-user-name">${session.name}</div>
+            <div class="acct-user-tier">${session.tier || "Pro Desk · $9.99"}</div>
+          </div>
+        </div>`;
+    } else {
+      menu.innerHTML = `
+        <button type="button" class="acct-item" data-acct-action="signin"><i class="ti ti-login" aria-hidden="true"></i>Sign in</button>
+        <button type="button" class="acct-item" data-acct-action="signup"><i class="ti ti-user-plus" aria-hidden="true"></i>Create account</button>
+        <button type="button" class="acct-item acct-item-last" data-acct-action="contact"><i class="ti ti-message-2" aria-hidden="true"></i>Contact</button>`;
+    }
+
+    menu.querySelectorAll("[data-acct-action]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const action = el.getAttribute("data-acct-action");
+        menu.hidden = true;
+        btn.setAttribute("aria-expanded", "false");
+        if (action === "signin") window.location.href = "/subscribe";
+        else if (action === "signup") window.location.href = "/subscribe?new=1";
+        else if (action === "contact") openContactFlow();
+        else if (action === "agents") window.location.href = "/stocks/NOW";
+        else if (action === "watchlist") window.location.href = "/#watchlist";
+        else if (action === "settings") window.location.href = "/subscribe?settings=1";
+        else if (action === "signout") signOut();
+      });
+    });
+  }
+
+  function updateThemeIcon() {
+    const icon = document.querySelector("#theme-toggle i");
+    if (!icon) return;
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    icon.className = dark ? "ti ti-sun" : "ti ti-moon";
+  }
+
+  function paymentMethodHtml() {
+    const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || "");
+    if (/Kuala_Lumpur|Singapore|Bangkok/.test(tz)) {
+      return '<div class="pay-note">FPX · TnG · DuitNow (MYR) · via Billplz</div>';
+    }
+    if (/Shanghai|Chongqing|Harbin/.test(tz)) {
+      return '<div class="pay-note">支付宝 · 微信支付 via Airwallex</div>';
+    }
+    return '<div class="pay-note">Stripe · PayPal · cancel anytime</div>';
+  }
+
+  function initThemeToggle(defaultDark) {
+    initTheme(defaultDark);
+    updateThemeIcon();
+    document.getElementById("theme-toggle")?.addEventListener("click", () => {
+      toggleTheme();
+      updateThemeIcon();
+    });
   }
 
   return {
@@ -234,10 +440,23 @@ window.CassandraCommon = (function () {
     toggleTheme,
     reportUrl,
     shareReport,
+    shareNative,
+    copyReportLink,
     downloadHtml,
     copyText,
     toast,
     referralCode,
     referralUrl,
+    getSession,
+    setSession,
+    signOut,
+    initAccountMenu,
+    initLangCycle,
+    initThemeToggle,
+    updateThemeIcon,
+    paymentMethodHtml,
+    buildClientDiagnostics,
+    sendContact,
+    openContactFlow,
   };
 })();

@@ -1,364 +1,618 @@
-/** CASSANDRA dashboard v2 — mockup-aligned, live data from /api/dashboard */
+/** CASSANDRA home dashboard v3 — watchlist, score inputs, volatility, fear/greed */
 
-const BANDS = [
-  { max: 25, label: "Benign" },
-  { max: 45, label: "Awareness" },
-  { max: 65, label: "Mania" },
-  { max: 80, label: "Danger" },
-  { max: 101, label: "Blow-off" },
-];
-const MANIA_THRESHOLD = 65;
-const FACTOR_NAMES = { L: "Leverage", V: "Valuation", S: "Sentiment", B: "Breadth", C: "Catalyst" };
-const PAID_TIERS = new Set(["report", "briefing", "agent"]);
-const SLOT_LABELS = { 0: "Overnight", 12: "Asia PM", 21: "Pre-open" };
+const BCOLORS = ["#15803D", "#4D7C0F", "#92400E", "#C2410C", "#B91C1C", "#7F1D1D"];
+const BTHRESH = [0, 20, 35, 50, 65, 80, 100];
+const UP = "#15803D";
+const DOWN = "#B91C1C";
+const TF_FRAMES = ["1D", "5D", "1M"];
+const WL_STORAGE = "cassandra-watchlist";
+const WL_USER_KEY = "cassandra-user-id";
 
-const cfg = window.CASSANDRA_CONFIG || {};
-const CC = window.CassandraCommon;
+const DEMO = window.CassandraDemo || {};
+
+const FDATA = {
+  en: [
+    { t: "API as Ground Truth", d: "Integrate CRS score and factor feeds directly into your models, screeners, and alerts.", cta: "View API docs →", href: "/docs/api" },
+    { t: "Build Your AI Agent", d: "Deploy a dedicated agent scoped to your watchlist, a specific sector, or a macro scenario.", cta: "Start building →", href: "/stocks/NOW" },
+    { t: "Institutional Data Feed", d: "Real-time options flow, on-chain signals, and dark pool access. Full-tier subscribers only.", cta: "See what's included →", href: "/docs/institutional" },
+    { t: "Talk with Our Agents", d: "RAG-grounded chat using today's knowledge graph. Gated — only meaningful market questions get through.", cta: "Try the agent →", href: "/agent", chat: true },
+  ],
+  zh: [
+    { t: "API作为基础数据", d: "将CRS评分和因子数据流直接集成到您的模型、筛选器和预警系统中。", cta: "查看API文档 →", href: "/docs/api" },
+    { t: "构建您的AI代理", d: "部署专用代理，可针对您的自选股、特定行业或宏观情景进行定制。", cta: "立即开始构建 →", href: "/stocks/NOW" },
+    { t: "机构数据订阅", d: "实时期权流、链上信号和暗池访问权限，仅限全级别订阅用户。", cta: "查看包含内容 →", href: "/docs/institutional" },
+    { t: "与我们的代理对话", d: "基于今日知识图谱的RAG驱动对话，设有质量门控。", cta: "体验代理 →", href: "/agent", chat: true },
+  ],
+  ms: [
+    { t: "API sebagai Sumber Kebenaran", d: "Integrasi skor CRS dan suapan faktor terus ke dalam model, penyaring, dan amaran anda.", cta: "Lihat dokumen API →", href: "/docs/api" },
+    { t: "Bina Ejen AI Anda", d: "Sebarkan ejen khusus yang dilingkupkan kepada senarai pantau, sektor tertentu, atau senario makro.", cta: "Mula bina →", href: "/stocks/NOW" },
+    { t: "Suapan Data Institusi", d: "Aliran opsyen masa nyata, isyarat on-chain, dan akses kumpulan gelap. Pelanggan peringkat penuh sahaja.", cta: "Lihat kandungan →", href: "/docs/institutional" },
+    { t: "Bercakap dengan Ejen Kami", d: "Sembang RAG berasaskan graf pengetahuan hari ini. Bergerik, hanya soalan pasaran bermakna yang lulus.", cta: "Cuba ejen →", href: "/agent", chat: true },
+  ],
+};
+
+const WL_PRESET = ["LEU", "NVDA", "MSFT", "AMZN", "TSM", "MU", "AMD", "AVGO", "SMCI", "ARM", "WDC", "NOW", "GOOGL", "META", "CRWD"];
+
+const T = {
+  en: {
+    ed: "Late City Edition", cov: "Live coverage: 100%", analog: "Today feels like March 14, 2000",
+    desk: "Global Market Desk", hwl: "Watchlist", editwl: "Edit", hsi: "Score Inputs",
+    read: "Read today's full edition →", edbtn: "Morning edition", hvol: "Top Volatility",
+    hfg: "Fear & Greed", hidx: "Index Snapshot", fcHead: "Platform",
+    fpub: "Cassandra Research Desk · crash.netie.ai", fdisc: "For decision support only. Not financial advice.",
+    wlTitle: "Edit watchlist", wlHint: "Pick tickers below or search to add.",
+    siTrigger: "Trigger", siFrag: "Fragility", siCapex: "Capex NLP",
+    fgFear: "Fear", fgGreed: "Greed", fgNeutral: "Neutral",
+    phaseDist: "distribution range",
+    bands: ["Stable", "Complacent", "Aware", "Mania", "Danger", "Crisis"],
+    lvlHigh: "high", lvlElevated: "elevated", lvlModerate: "moderate", lvlCut: "cut signal", lvlNoCut: "no cut yet",
+    p1: "Crash risk reflects a market that has not yet broken distribution but lacks the catalyst to recover toward neutral territory.",
+    p2: "The primary variable this cycle is hyperscaler capital expenditure intent, still unresolved across major cloud vendors.",
+  },
+  zh: {
+    ed: "晚城版", cov: "实时覆盖率：100%", analog: "今日情势令人想起 2000 年 3 月 14 日",
+    desk: "全球市场观察台", hwl: "自选股", editwl: "编辑", hsi: "评分输入",
+    read: "阅读今日完整版 →", edbtn: "早版", hvol: "高波动排行",
+    hfg: "恐慌贪婪指数", hidx: "指数速览", fcHead: "平台功能",
+    fpub: "Cassandra 研究台 · crash.netie.ai", fdisc: "仅供决策支持，非投资建议。",
+    wlTitle: "编辑自选股", wlHint: "点击下方代码或搜索添加。",
+    siTrigger: "触发器", siFrag: "脆弱性", siCapex: "资本支出 NLP",
+    fgFear: "恐慌", fgGreed: "贪婪", fgNeutral: "中性",
+    phaseDist: "派发区间",
+    bands: ["稳定", "自满", "预警", "狂热", "危险", "危机"],
+    lvlHigh: "偏高", lvlElevated: "抬升", lvlModerate: "中等", lvlCut: "削减信号", lvlNoCut: "尚无削减",
+    p1: "崩溃风险反映市场尚未打破分布结构，但缺乏向中性区间修复的催化剂。",
+    p2: "本轮核心变量是超大规模云厂商的资本开支意向，仍未在各主要云厂商间形成一致结论。",
+  },
+  ms: {
+    ed: "Edisi Kota Lewat", cov: "Liputan langsung: 100%", analog: "Hari ini terasa seperti 14 Mac 2000",
+    desk: "Meja Pasaran Global", hwl: "Senarai Pantau", editwl: "Edit", hsi: "Input Skor",
+    read: "Baca edisi penuh hari ini →", edbtn: "Edisi pagi", hvol: "Volatiliti Tertinggi",
+    hfg: "Takut & Tamak", hidx: "Gambaran Indeks", fcHead: "Platform",
+    fpub: "Meja Penyelidikan Cassandra · crash.netie.ai", fdisc: "Sokongan keputusan sahaja. Bukan nasihat kewangan.",
+    wlTitle: "Edit senarai pantau", wlHint: "Pilih ticker di bawah atau cari untuk tambah.",
+    siTrigger: "Pencetus", siFrag: "Kerapuhan", siCapex: "NLP Capex",
+    fgFear: "Takut", fgGreed: "Tamak", fgNeutral: "Neutral",
+    phaseDist: "julat pengedaran",
+    bands: ["Stabil", "Puas Diri", "Sedar", "Mania", "Bahaya", "Krisis"],
+    lvlHigh: "tinggi", lvlElevated: "meningkat", lvlModerate: "sederhana", lvlCut: "isyarat potong", lvlNoCut: "belum potong",
+    p1: "Risiko runtuh mencerminkan pasaran yang belum memecah taburan tetapi kekurangan pemangkin untuk pulih ke zon neutral.",
+    p2: "Pemboleh ubah utama kitaran ini ialah niat perbelanjaan modal hyperscaler, masih belum selesai merentasi vendor awan utama.",
+  },
+};
+
+const CC = window.CassandraCommon || {};
 let currentLang = "en";
-let currentTier = "free";
+let curTF = "1D";
+let volScale = 14;
 let lastAsof = null;
-let histChart = null;
+
+function tx(key) {
+  return T[currentLang]?.[key] ?? T.en[key] ?? key;
+}
+
+function userId() {
+  try {
+    let id = localStorage.getItem(WL_USER_KEY);
+    if (!id) {
+      id = "local-" + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem(WL_USER_KEY, id);
+    }
+    return id;
+  } catch (_) {
+    return "local";
+  }
+}
+
+function bandIndex(crs) {
+  for (let i = BTHRESH.length - 2; i >= 0; i--) {
+    if (crs >= BTHRESH[i]) return i;
+  }
+  return 0;
+}
+
+function bandColor(crs) {
+  return BCOLORS[bandIndex(crs)];
+}
+
+function renderScale(crs, bands) {
+  const idx = bandIndex(crs);
+  return `<div class="scale-labels">${bands.map((b, i) =>
+    `<span style="color:${i === idx ? BCOLORS[i] : "var(--color-text-tertiary)"};font-weight:${i === idx ? "600" : "400"}">${b}${i === idx ? " ◀" : ""}</span>`
+  ).join("")}</div>`;
+}
+
+function fmtPct(pct) {
+  const up = pct >= 0;
+  return { up, color: up ? UP : DOWN, text: `${up ? "+" : ""}${Number(pct).toFixed(2)}%` };
+}
+
+function spark(d, w, h, c, lbl) {
+  if (!d?.length) return "";
+  const mn = Math.min(...d);
+  const mx = Math.max(...d);
+  const rng = mx - mn || 1;
+  const pts = d.map((v, i) => `${(i / (d.length - 1)) * w},${h - ((v - mn) / rng) * (h - 2) - 1}`).join(" ");
+  return `<svg role="img" aria-label="${lbl}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="spark"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el && text != null) el.textContent = text;
+}
+
+function applyLang() {
+  const t = T[currentLang];
+  const ids = {
+    "h-ed": t.ed, "h-cov": t.cov, "analog-t": t.analog, "desk-l": t.desk,
+    "h-wl": t.hwl, "edit-wl": t.editwl, "h-si": t.hsi, "read-l": t.read,
+    "ed-btn": t.edbtn, "h-vol": t.hvol, "h-fg": t.hfg, "h-idx": t.hidx, "fc-head": t.fcHead,
+    "f-pub": t.fpub, "f-disc": t.fdisc, "wl-modal-title": t.wlTitle, "wl-modal-hint": t.wlHint,
+  };
+  Object.keys(ids).forEach((id) => setText(id, ids[id]));
+  setDateLine(lastAsof);
+  if (window.__lastScore) renderScoreInputs(window.__lastScore);
+  if (window.__lastHi) populateNarrative(window.__lastHi);
+  else { setText("bp1", t.p1); setText("bp2", t.p2); }
+  renderFeats();
+  if (window.setAnalogLang) window.setAnalogLang(currentLang);
+  try { window.dispatchEvent(new CustomEvent("cassandra:lang", { detail: { lang: currentLang } })); } catch (_) { /* ignore */ }
+}
+
+function renderFeats() {
+  const fg = document.getElementById("feat-grid");
+  if (!fg) return;
+  fg.innerHTML = FDATA[currentLang].map((f) => `
+    <div class="feat-card">
+      <div class="feat-card-title">${f.t}</div>
+      <div class="feat-card-body">${f.d}</div>
+      ${f.chat ? `<div class="agent-chat-row" id="agent-chat">
+        <input type="text" id="agent-input" placeholder="Ask about the market..." aria-label="Agent question"/>
+        <button type="button" id="agent-send">→</button>
+      </div>
+      <div id="agent-reply" class="agent-reply" hidden></div>` : ""}
+      <a href="${f.href}" class="home-link feat-cta">${f.cta}</a>
+    </div>`).join("");
+  document.getElementById("agent-send")?.addEventListener("click", sendAgent);
+  document.getElementById("agent-input")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendAgent();
+  });
+}
+
+async function sendAgent() {
+  const input = document.getElementById("agent-input");
+  const reply = document.getElementById("agent-reply");
+  if (!input || !reply) return;
+  const msg = input.value.trim();
+  if (!msg) return;
+  reply.hidden = false;
+  reply.textContent = "Thinking…";
+  try {
+    const r = await fetch("/api/agent/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg }),
+    });
+    const d = await r.json();
+    reply.textContent = d.reply || d.response || "No response.";
+  } catch (_) {
+    reply.textContent = "Agent unavailable offline.";
+  }
+}
+
+function renderWatchlist(rows) {
+  const el = document.getElementById("wl-tbl");
+  if (!el) return;
+  el.innerHTML = "";
+  if (!rows?.length) {
+    el.innerHTML = '<div class="home-empty">No tickers.</div>';
+    return;
+  }
+  rows.forEach((r) => {
+    try {
+      const { color, text } = fmtPct(Number(r.pct) || 0);
+      el.innerHTML += `<div class="rb home-pt-row">
+        <a href="/stocks/${r.sym}" class="cm home-pt-sym home-ticker-link">${r.sym}</a>
+        <span class="cm home-pt-px">${r.px ?? "—"}</span>
+        <span class="cm home-pt-pct" style="color:${color}">${text}</span>
+      </div>`;
+    } catch (_) { /* skip */ }
+  });
+}
+
+function renderScoreInputs(score) {
+  const el = document.getElementById("si-rows");
+  if (!el || !score) return;
+  const capex = score.capex_cut_nlp ?? score.extra?.capex_cut_nlp;
+  const rows = [
+    { n: tx("siTrigger"), v: score.trigger?.toFixed(2) ?? "—", lbl: labelLevel(score.trigger) },
+    { n: tx("siFrag"), v: score.fragility?.toFixed(2) ?? "—", lbl: labelLevel(score.fragility) },
+    { n: tx("siCapex"), v: capex != null ? Number(capex).toFixed(2) : "—", lbl: capex != null && Number(capex) > 0.5 ? tx("lvlCut") : tx("lvlNoCut") },
+  ];
+  el.innerHTML = rows.map((r) => `<div class="rb home-si-row">
+    <span class="home-si-name">${r.n}</span>
+    <span class="cm home-si-val">${r.v}</span>
+    <span class="home-si-lbl">${r.lbl}</span>
+  </div>`).join("");
+}
+
+function labelLevel(v) {
+  if (v == null) return "—";
+  const n = Number(v);
+  if (n >= 0.65) return tx("lvlHigh");
+  if (n >= 0.45) return tx("lvlElevated");
+  return tx("lvlModerate");
+}
+
+function fgLabelText(label) {
+  const l = String(label || "").toLowerCase();
+  if (l.includes("fear")) return tx("fgFear");
+  if (l.includes("greed")) return tx("fgGreed");
+  return tx("fgNeutral");
+}
+
+function renderVol(movers) {
+  const vr = document.getElementById("vol-rows");
+  if (!vr) return;
+  vr.innerHTML = "";
+  (movers || []).forEach((r) => {
+    try {
+      const { color, text } = fmtPct(Number(r.pct) || 0);
+      const bw = Math.min(100, Math.abs(Number(r.pct) || 0) / volScale * 100).toFixed(1);
+      vr.innerHTML += `<div class="home-mov-row">
+        <span class="cm home-mov-sym">${r.sym}</span>
+        <div class="home-mov-bar"><div style="width:${bw}%;background:${color}"></div></div>
+        <span class="cm home-mov-pct" style="color:${color}">${text.replace(".00", ".0")}</span>
+      </div>`;
+    } catch (_) { /* skip */ }
+  });
+}
+
+function renderIndices(indices) {
+  const ie = document.getElementById("idx-el");
+  if (!ie) return;
+  ie.innerHTML = "";
+  (indices || []).forEach((r) => {
+    try {
+      const { color, text } = fmtPct(Number(r.pct) || 0);
+      ie.innerHTML += `<div class="home-idx-row">
+        <span class="cm home-idx-sym">${r.sym}</span>
+        <span class="cm home-idx-val">${r.val ?? "—"}</span>
+        ${spark(r.spark || r.d, 42, 15, color, r.sym)}
+        <span class="cm home-idx-pct" style="color:${color}">${text}</span>
+      </div>`;
+    } catch (_) { /* skip */ }
+  });
+}
+
+function renderFearGreed(fg) {
+  if (!fg) return;
+  const val = document.getElementById("fg-val");
+  const lbl = document.getElementById("fg-label");
+  const sp = document.getElementById("fg-spark");
+  if (val) {
+    val.textContent = fg.value;
+    val.style.color = fg.color || DOWN;
+  }
+  if (lbl) {
+    lbl.textContent = fgLabelText(fg.label);
+    lbl.style.color = fg.color || DOWN;
+  }
+  if (sp) sp.innerHTML = spark(fg.spark || [], 62, 18, fg.color || DOWN, "Fear greed");
+}
+
+function populateScore(score) {
+  if (!score) {
+    setText("crs", "—");
+    return;
+  }
+  lastAsof = score.asof;
+  setText("crs", Number(score.crs).toFixed(1));
+  const band = score.band || T.en.bands[bandIndex(score.crs)];
+  setText("bname", band.toUpperCase());
+  const bEl = document.getElementById("bname");
+  if (bEl) bEl.style.color = bandColor(score.crs);
+  const hw = score.band_halfwidth != null ? score.band_halfwidth : 1;
+  const phase = (score.phase || "distribution").replace(/_/g, " ");
+  const phaseTxt = currentLang === "en" ? phase : tx("phaseDist");
+  setText("band-range", `${(score.crs - hw).toFixed(1)} – ${(score.crs + hw).toFixed(1)} · ${phaseTxt}`);
+  const scale = document.getElementById("bscale");
+  if (scale) scale.innerHTML = renderScale(score.crs, T[currentLang].bands);
+  const cov = score.coverage != null ? `${(score.coverage * 100).toFixed(0)}%` : "100%";
+  setText("h-cov", tx("cov").replace("100%", cov));
+  renderScoreInputs(score);
+}
+
+function populateNarrative(hi) {
+  window.__lastHi = hi;
+  if (!hi) {
+    setText("bp1", tx("p1"));
+    setText("bp2", tx("p2"));
+    setText("analog-t", tx("analog"));
+    return;
+  }
+  if (hi.analog_date) {
+    const analog = document.getElementById("analog-t");
+    if (analog) {
+      const prefix = currentLang === "zh" ? "今日情势令人想起 " : currentLang === "ms" ? "Hari ini terasa seperti " : "Today feels like ";
+      analog.textContent = `${prefix}${hi.analog_date}`;
+    }
+  } else {
+    setText("analog-t", tx("analog"));
+  }
+  if (hi.headline && currentLang === "en") setText("hl", hi.headline);
+  else setText("hl", "");
+  setText("bp1", tx("p1"));
+  setText("bp2", tx("p2"));
+}
+
+function setDateLine(asof) {
+  const el = document.getElementById("cdate");
+  if (!el) return;
+  const d = asof ? new Date(asof + "T12:00:00") : new Date();
+  const locale = currentLang === "zh" ? "zh-CN" : currentLang === "ms" ? "ms-MY" : "en-US";
+  el.textContent = d.toLocaleDateString(locale, {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  }).toUpperCase();
+}
+
+async function loadWatchlist() {
+  const uid = userId();
+  let tickers = null;
+  try {
+    const saved = localStorage.getItem(WL_STORAGE);
+    if (saved) tickers = JSON.parse(saved);
+  } catch (_) { /* ignore */ }
+  if (tickers?.length) {
+    try {
+      await fetch("/api/watchlist/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: uid, tickers }),
+      });
+    } catch (_) { /* offline */ }
+  }
+  try {
+    const r = await fetch(`/api/watchlist?user=${encodeURIComponent(uid)}`);
+    if (r.ok) {
+      const d = await r.json();
+      if (d.rows?.length) {
+        renderWatchlist(d.rows);
+        try { localStorage.setItem(WL_STORAGE, JSON.stringify(d.tickers)); } catch (_) { /* ignore */ }
+        return d.tickers;
+      }
+    }
+  } catch (_) { /* offline */ }
+  renderWatchlist(DEMO.watchlist || []);
+  return tickers || ["LEU", "NVDA", "MSFT", "AMZN", "TSM"];
+}
+
+async function saveWatchlist(tickers) {
+  const uid = userId();
+  try { localStorage.setItem(WL_STORAGE, JSON.stringify(tickers)); } catch (_) { /* ignore */ }
+  try {
+    const r = await fetch("/api/watchlist/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: uid, tickers }),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      renderWatchlist(d.rows);
+    }
+  } catch (_) { /* offline */ }
+}
+
+async function fetchLatest() {
+  try {
+    const r = await fetch("/api/latest");
+    if (r.ok) return await r.json();
+  } catch (_) { /* offline */ }
+  return null;
+}
+
+async function fetchHighlights() {
+  try {
+    const r = await fetch("/api/report/highlights");
+    if (r.ok) return await r.json();
+  } catch (_) { /* offline */ }
+  return null;
+}
+
+async function fetchMovers() {
+  try {
+    const r = await fetch(`/api/movers?tf=${curTF}&sector=tech,semis&limit=10`);
+    if (r.ok) {
+      const d = await r.json();
+      if (d.movers?.length) {
+        volScale = d.scale || 14;
+        return d.movers;
+      }
+    }
+  } catch (_) { /* offline */ }
+  const pack = DEMO.movers?.[curTF] || DEMO.movers?.["1D"];
+  volScale = pack?.scale || 14;
+  return pack?.movers || [];
+}
+
+async function loadIndices() {
+  try {
+    const r = await fetch("/api/indices");
+    if (r.ok) {
+      const d = await r.json();
+      if (d.indices?.length) {
+        renderIndices(d.indices);
+        return;
+      }
+    }
+  } catch (_) { /* offline */ }
+  renderIndices((DEMO.indices || []).map((r) => ({ ...r, spark: demoSpark(r.sym) })));
+}
+
+function demoSpark(sym) {
+  const out = [];
+  let v = 50;
+  for (let i = 0; i < 20; i++) {
+    v += (Math.sin(i + sym.length) - 0.5) * 2;
+    out.push(v);
+  }
+  return out;
+}
+
+function cycleTF() {
+  curTF = TF_FRAMES[(TF_FRAMES.indexOf(curTF) + 1) % TF_FRAMES.length];
+  document.getElementById("tf-btn").textContent = `${curTF} ▸`;
+  loadMovers();
+}
+
+async function loadMovers() {
+  renderVol(await fetchMovers());
+}
+
+function setupWatchlistModal() {
+  const modal = document.getElementById("wl-modal");
+  const edit = document.getElementById("edit-wl");
+  const search = document.getElementById("wl-search");
+  const chipsEl = document.getElementById("wl-chips");
+  const selectedEl = document.getElementById("wl-selected");
+  const cancel = document.getElementById("wl-cancel");
+  let selected = [];
+
+  function renderSelected() {
+    if (!selectedEl) return;
+    selectedEl.innerHTML = selected.map((s) =>
+      `<span class="wl-sel-chip">${s}<button type="button" data-rm="${s}" aria-label="Remove ${s}">×</button></span>`
+    ).join("");
+    selectedEl.querySelectorAll("[data-rm]").forEach((btn) => {
+      btn.onclick = () => {
+        selected = selected.filter((x) => x !== btn.dataset.rm);
+        renderSelected();
+        renderChips(search?.value || "");
+      };
+    });
+  }
+
+  function renderChips(filter) {
+    if (!chipsEl) return;
+    const q = (filter || "").trim().toUpperCase();
+    const list = WL_PRESET.filter((s) => !q || s.includes(q));
+    chipsEl.innerHTML = list.map((s) =>
+      `<button type="button" class="wl-chip${selected.includes(s) ? " on" : ""}" data-sym="${s}">${s}</button>`
+    ).join("");
+    chipsEl.querySelectorAll(".wl-chip").forEach((btn) => {
+      btn.onclick = () => {
+        const sym = btn.dataset.sym;
+        if (selected.includes(sym)) selected = selected.filter((x) => x !== sym);
+        else if (selected.length < 12) selected.push(sym);
+        renderSelected();
+        renderChips(search?.value || "");
+      };
+    });
+  }
+
+  edit?.addEventListener("click", async () => {
+    const tickers = await loadWatchlist();
+    selected = [...(tickers || DEFAULT_WL)];
+    renderSelected();
+    renderChips("");
+    if (search) search.value = "";
+    modal?.showModal();
+  });
+  search?.addEventListener("input", () => renderChips(search.value));
+  cancel?.addEventListener("click", () => modal?.close());
+  document.getElementById("wl-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!selected.length) selected = [...DEFAULT_WL];
+    await saveWatchlist(selected);
+    modal?.close();
+  });
+}
+
+const DEFAULT_WL = ["LEU", "NVDA", "MSFT", "AMZN", "TSM"];
+
+async function safeGet(url, fallback) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return fallback;
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) return fallback;
+    return await r.json();
+  } catch (_) {
+    return fallback;
+  }
+}
 
 function isLocalDev() {
   const h = window.location.hostname;
   return h === "localhost" || h === "127.0.0.1";
 }
 
-function t(key) {
-  return CC?.DASH_I18N?.[currentLang]?.[key] || CC?.DASH_I18N?.en?.[key] || key;
-}
-
-function lockedFactors() {
-  return PAID_TIERS.has(currentTier) ? new Set() : new Set(["S", "B", "C"]);
-}
-
-function bandFor(crs) {
-  for (const b of BANDS) if (crs < b.max) return b.label;
-  return "Blow-off";
-}
-
-function riskColor(v) {
-  if (v >= 0.7) return "#E24B4A";
-  if (v >= 0.5) return "#D85A30";
-  if (v >= 0.35) return "#BA7517";
-  return "#639922";
-}
-
-function setBar(id, pct, color) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  requestAnimationFrame(() => {
-    el.style.width = `${Math.min(100, Math.max(0, pct))}%`;
-    if (color) el.style.background = color;
-  });
-}
-
-function animateCount(el, target, duration = 1300) {
-  const start = performance.now();
-  function frame(now) {
-    const p = Math.min((now - start) / duration, 1);
-    const eased = 1 - Math.pow(1 - p, 3);
-    el.textContent = (target * eased).toFixed(1);
-    if (p < 1) requestAnimationFrame(frame);
-    else el.textContent = Number(target).toFixed(1);
-  }
-  requestAnimationFrame(frame);
-}
-
-function setNeedle(crs) {
-  const needle = document.getElementById("zone-needle");
-  if (!needle) return;
-  setTimeout(() => { needle.style.left = `${Math.max(0, Math.min(100, crs))}%`; }, 150);
-}
-
-function distanceToMania(crs) {
-  const el = document.getElementById("distance-mania");
-  if (!el) return;
-  if (crs >= MANIA_THRESHOLD) {
-    el.textContent = `${t("insideZone")} ${bandFor(crs)} · spring loaded`;
-    return;
-  }
-  const gap = (MANIA_THRESHOLD - crs).toFixed(1);
-  el.textContent = `→ ${gap} ${t("belowMania")} · spring loaded, no spark confirmed yet`;
-}
-
-function renderFactors(factors) {
-  const locked = lockedFactors();
-  document.getElementById("factors").innerHTML = ["L", "V", "S", "B", "C"].map((k) => {
-    const isLocked = locked.has(k);
-    const val = factors?.[k];
-    const pct = val != null ? Number(val) * 100 : 0;
-    if (isLocked) {
-      return `
-        <div class="factor-card locked">
-          <span class="lock-icon" aria-hidden="true">🔒</span>
-          <div class="fk">${k}</div>
-          <div class="fname">${FACTOR_NAMES[k]}</div>
-          <div style="font-size:0.65rem;color:var(--muted);margin-top:0.5rem">subscribe</div>
-        </div>`;
-    }
-    return `
-      <div class="factor-card">
-        <div class="fk">${k}</div>
-        <div class="fname">${FACTOR_NAMES[k]}</div>
-        <div class="fv">${val != null ? Number(val).toFixed(2) : "—"}</div>
-        <div class="fbar"><div class="fbar-fill" style="width:${pct}%;background:${riskColor(Number(val))}"></div></div>
-      </div>`;
-  }).join("");
-}
-
-async function fetchDashboard() {
-  try {
-    const r = await fetch("/api/dashboard");
-    if (r.ok) {
-      const d = await r.json();
-      return { score: d.score, tier: d.tier || "free" };
-    }
-  } catch (_) { /* offline */ }
-  try {
-    const r = await fetch("/api/latest");
-    if (r.ok) return { score: await r.json(), tier: "free" };
-  } catch (_) { /* offline */ }
-  return { score: null, tier: "free" };
-}
-
-function populate(score) {
-  if (!score) {
-    document.getElementById("band-label").textContent = t("noData");
-    return;
-  }
-  lastAsof = score.asof;
-  animateCount(document.getElementById("crs"), score.crs);
-  document.getElementById("band-label").textContent = (score.band || bandFor(score.crs)).toUpperCase();
-
-  const hw = score.band_halfwidth != null ? score.band_halfwidth : 1;
-  const lo = (score.crs - hw).toFixed(1);
-  const hi = (score.crs + hw).toFixed(1);
-  document.getElementById("band-range").textContent = `${lo} – ${hi}`;
-
-  distanceToMania(score.crs);
-  setNeedle(score.crs);
-
-  const cov = score.coverage != null ? score.coverage : 0;
-  document.getElementById("cov-pct").textContent = `${(cov * 100).toFixed(0)}%`;
-  document.getElementById("coverage-note").textContent = t("coverageNote");
-  setBar("bar-cov", cov * 100);
-
-  document.getElementById("f").textContent = score.fragility?.toFixed(2) ?? "—";
-  document.getElementById("t").textContent = score.trigger?.toFixed(2) ?? "—";
-  setBar("bar-f", (score.fragility || 0) * 100, riskColor(score.fragility || 0));
-  setBar("bar-t", (score.trigger || 0) * 100, riskColor(score.trigger || 0));
-
-  const phaseLabel = (score.phase || "—").replace(/_/g, " ");
-  document.getElementById("phase").textContent = phaseLabel;
-  document.getElementById("phase-sub").textContent =
-    score.phase_confidence != null ? `${(score.phase_confidence * 100).toFixed(0)}% confidence` : "";
-  setBar("bar-phase", (score.phase_confidence || 0) * 100, "#BA7517");
-
-  document.getElementById("f-sub").textContent =
-    score.df_dt != null ? `dF/dt ${score.df_dt >= 0 ? "+" : ""}${Number(score.df_dt).toFixed(2)}` : "";
-  document.getElementById("t-sub").textContent = "capex NLP watch";
-
-  document.getElementById("asof")?.remove();
-  renderFactors(score.factors);
-}
-
-async function loadHistoryChart() {
-  if (typeof Chart === "undefined") return;
-  let rows = [];
-  try {
-    const r = await fetch("/api/scores/history?limit=30");
-    if (r.ok) rows = (await r.json()).history || [];
-  } catch (_) { /* seed fallback */ }
-
-  if (rows.length < 2) {
-    rows = Array.from({ length: 30 }, (_, i) => ({ crs: 28 + i * 0.35 + Math.sin(i / 4) * 2 }));
-  } else {
-    rows = rows.reverse();
-  }
-
-  const labels = rows.map((row, i) => {
-    if (row.asof) return row.asof.slice(5);
-    const d = new Date();
-    d.setDate(d.getDate() - (rows.length - 1 - i));
-    return d.toLocaleDateString("en", { month: "short", day: "numeric" });
-  });
-  const data = rows.map((r) => r.crs);
-  const dark = document.documentElement.getAttribute("data-theme") === "dark";
-  const lc = dark ? "#5DCAA5" : "#1D9E75";
-  const tc = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
-  const gc = dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)";
-
-  const ctx = document.getElementById("histChart");
-  if (!ctx) return;
-  if (histChart) histChart.destroy();
-  histChart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [{
-        data,
-        borderColor: lc,
-        borderWidth: 1.5,
-        pointRadius: 2,
-        tension: 0.35,
-        fill: true,
-        backgroundColor: dark ? "rgba(93,202,165,0.08)" : "rgba(29,158,117,0.07)",
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: tc, font: { family: "IBM Plex Mono", size: 9 }, maxTicksLimit: 7 }, grid: { display: false } },
-        y: { min: 15, max: 70, ticks: { color: tc, font: { family: "IBM Plex Mono", size: 9 } }, grid: { color: gc } },
-      },
-    },
-  });
-}
-
-function nextSlotMYT() {
-  const slots = [0, 12, 21];
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kuala_Lumpur",
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-  }).formatToParts(new Date());
-  const get = (ty) => Number(parts.find((p) => p.type === ty)?.value);
-  const y = get("year"), mo = get("month"), d = get("day"), h = get("hour");
-  for (const slotH of slots) {
-    if (h < slotH) return { slotH, target: zonedTime(y, mo, d, slotH, 0, 0) };
-  }
-  const tomorrow = new Date(Date.UTC(y, mo - 1, d + 1));
-  return { slotH: 0, target: zonedTime(tomorrow.getUTCFullYear(), tomorrow.getUTCMonth() + 1, tomorrow.getUTCDate(), 0, 0, 0) };
-}
-
-function zonedTime(y, mo, d, h, mi, s) {
-  return new Date(`${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}T${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}:${String(s).padStart(2, "0")}+08:00`);
-}
-
-function tickCountdown() {
-  const { slotH, target } = nextSlotMYT();
-  const diff = Math.max(0, target - Date.now());
-  const hrs = Math.floor(diff / 3600000);
-  const mins = Math.floor((diff % 3600000) / 60000);
-  const secs = Math.floor((diff % 60000) / 1000);
-  document.getElementById("countdown").textContent =
-    `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  document.getElementById("countdown-slot").textContent = SLOT_LABELS[slotH] || "";
-}
-
-async function detectCountry() {
-  try {
-    const r = await fetch("/api/geo");
-    if (r.ok) return (await r.json()).country?.toUpperCase() || "US";
-  } catch (_) { /* fallback */ }
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-  if (/Kuala_Lumpur|Singapore/.test(tz)) return "MY";
-  if ((navigator.language || "").startsWith("zh")) return "CN";
-  return "US";
-}
-
-function renderPaymentWidgets(country) {
-  const p = cfg.payments || {};
-  const subEl = document.getElementById("sub-buttons");
-  const donEl = document.getElementById("donate-buttons");
-  if (country === "CN") {
-    subEl.innerHTML = `<a class="btn btn-primary" href="${p.cn?.airwallexSubscribe || "/pricing"}">Alipay / WeChat</a>`;
-    donEl.innerHTML = `<a class="btn btn-secondary" href="${p.cn?.airwallexDonate || "#"}">Donate</a>`;
-    return;
-  }
-  if (country === "MY") {
-    subEl.innerHTML = `<a class="btn btn-primary" href="${p.my?.curlecSubscribe || "/pricing"}">FPX / DuitNow</a>`;
-    donEl.innerHTML = `<a class="btn btn-secondary" href="${p.my?.billplzDonate || "#"}">Billplz</a>`;
-    return;
-  }
-  const i = p.international || {};
-  subEl.innerHTML = `<a class="btn btn-primary" href="${i.stripeSubscribe || "/pricing?tier=report"}">Stripe · $4.99</a>`;
-  donEl.innerHTML = `
-    <a class="btn btn-secondary" href="${i.stripeDonate || "#"}">Stripe</a>
-    <a class="btn btn-secondary" href="${i.paypalDonate || "#"}">PayPal</a>`;
-}
-
 function setupControls() {
-  CC.initTheme(true);
-  currentLang = CC.detectLang();
-  CC.setLang(currentLang);
-  document.querySelectorAll(".lang-btn").forEach((btn) => {
-    btn.onclick = () => {
-      currentLang = CC.setLang(btn.dataset.lang);
-      if (window.__lastDashboard?.score) populate(window.__lastDashboard.score);
-    };
-  });
-  document.getElementById("theme-toggle").onclick = () => {
-    CC.toggleTheme();
-    loadHistoryChart();
-  };
-  document.getElementById("btn-share").onclick = () => CC.shareReport(lastAsof);
-  document.getElementById("btn-download-report").onclick = async () => {
-    try {
-      const r = await fetch("/newspaper-report");
-      const html = await r.text();
-      const asof = lastAsof || new Date().toISOString().slice(0, 10);
-      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `cassandra-report-${asof}.html`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      CC.toast("Report downloaded");
-    } catch (_) {
-      window.open(CC.reportUrl(lastAsof), "_blank");
-    }
-  };
-  document.getElementById("btn-referral").onclick = async () => {
-    await CC.copyText(CC.referralUrl());
-    CC.toast("Referral link copied");
-  };
-}
-
-function setupNewsletter() {
-  document.getElementById("newsletter-form").addEventListener("submit", (e) => {
-    if (!cfg.newsletterAction) {
-      e.preventDefault();
-      const email = e.target.email.value;
-      window.location.href = `/subscribe?email=${encodeURIComponent(email)}`;
-    }
-  });
+  if (CC.initThemeToggle) CC.initThemeToggle(false);
+  if (CC.initAccountMenu) CC.initAccountMenu();
+  if (CC.initLangCycle) {
+    CC.initLangCycle((lang) => {
+      currentLang = lang;
+      if (!T[currentLang]) currentLang = "en";
+      applyLang();
+      if (window.__lastScore) {
+        populateScore(window.__lastScore);
+        const scale = document.getElementById("bscale");
+        if (scale) scale.innerHTML = renderScale(window.__lastScore.crs, T[currentLang].bands);
+      }
+    });
+  } else {
+    currentLang = CC.detectLang ? CC.detectLang() : "en";
+    if (!T[currentLang]) currentLang = "en";
+    applyLang();
+  }
+  document.getElementById("tf-btn")?.addEventListener("click", cycleTF);
 }
 
 function setupRunButton() {
   const btn = document.getElementById("runBtn");
-  if (!isLocalDev()) return;
+  if (!btn || !isLocalDev()) return;
   btn.classList.add("visible");
   btn.onclick = async () => {
     btn.disabled = true;
     btn.textContent = "Running…";
     await fetch("/api/run", { method: "POST" });
-    const dash = await fetchDashboard();
-    window.__lastDashboard = dash;
-    currentTier = dash.tier;
-    populate(dash.score);
-    await loadHistoryChart();
+    await refresh();
     btn.disabled = false;
     btn.textContent = "Run cycle";
   };
 }
 
-async function init() {
-  setupControls();
-  setupRunButton();
-  setupNewsletter();
-  tickCountdown();
-  setInterval(tickCountdown, 1000);
-  const dash = await fetchDashboard();
-  window.__lastDashboard = dash;
-  currentTier = dash.tier;
-  populate(dash.score);
-  renderPaymentWidgets(await detectCountry());
-  if (document.readyState === "complete") await loadHistoryChart();
-  else window.addEventListener("load", () => loadHistoryChart());
+async function refresh() {
+  const fgFallback = DEMO.fearGreed || null;
+  let score = null;
+  let hi = null;
+  let fg = null;
+
+  try { score = await fetchLatest(); } catch (e) { console.warn("latest", e); }
+  try { hi = await fetchHighlights(); } catch (e) { console.warn("highlights", e); }
+  try { fg = await safeGet("/api/signals/fear_greed", null); } catch (e) { console.warn("fg", e); }
+
+  window.__lastScore = score;
+  setDateLine(score?.asof || hi?.asof);
+  populateScore(score);
+  populateNarrative(hi);
+  renderFearGreed(fg?.value != null ? fg : fgFallback);
+
+  try { await loadWatchlist(); } catch (e) { console.warn("watchlist", e); renderWatchlist(DEMO.watchlist || []); }
+  try { await loadMovers(); } catch (e) { console.warn("movers", e); renderVol((DEMO.movers?.[curTF] || DEMO.movers?.["1D"])?.movers || []); }
+  try { await loadIndices(); } catch (e) { console.warn("indices", e); renderIndices((DEMO.indices || []).map((r) => ({ ...r, spark: demoSpark(r.sym) }))); }
 }
 
-init();
+function initApp() {
+  setupControls();
+  setupWatchlistModal();
+  setupRunButton();
+  refresh().catch((e) => console.warn("refresh failed", e));
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initApp);
+} else {
+  initApp();
+}
