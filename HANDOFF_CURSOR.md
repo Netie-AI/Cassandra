@@ -2,84 +2,45 @@
 
 **Read this first.** Protocol: `.cursor/rules/600-protocol.mdc` · Full format: `docs/PROTOCOL.md`
 
-## STOP — Phase 3 blocked
+## Phase 3 — IN PROGRESS
 
-Claude issued **CONDITIONAL APPROVAL** (2026-06-25). Phase 2 ✅ approved. Phase 3 **blocked** until Claude reviews pipeline/store/api/cf_publish and sends APPROVED REVIEW_RESPONSE.
+Claude **APPROVED** Phase 2 deploy scaffold (2026-06-25). Orchestrator LLM wiring **unblocked**.
 
-**Do not wire orchestrator LLM yet.**
+| Done this session | Next |
+|-------------------|------|
+| Palantir-grade dashboard (`web/static/`) | Wire `# WIRE:` orchestrator (OpenRouter) |
+| Geo payment routing (MY/CN/intl) | Capex-cut grader ← tavily |
+| Cloudflare Worker spec + `worker.js` | `src/report.py` DailyReport renderer |
+| `/api/latest`, `/api/geo`, `PIPELINE_KEY` on `/api/run` | REVIEW_REQUEST with scoring.py |
 
 ---
 
-## Deployment model (correct architecture)
+## Deployment model
 
 ```
-Your laptop                    crash.netie.ai (Cloudflare Pages)
-─────────────────              ────────────────────────────────
-pipeline 3×/day                web/static/ dashboard (read-only)
-  → scores.sqlite (local)        → fetch GET from KV Worker
-  → publish_score() PUT          → renders CRS, band, phase
-     to CF Worker → KV
+Laptop: pipeline 3×/day → scores.sqlite → publish_score() PUT → CF Worker KV
+Pages:  web/static/ → GET /api/latest + /api/geo → render dashboard
 ```
 
-Heavy work stays local. Cloudflare is publish-only. No SQLite on a server.
+Configure checkout URLs in `web/static/config.js`. Set `PIPELINE_KEY` before public launch.
 
 ---
 
-## Current state
-
-| Item | Value |
-|------|-------|
-| Phase 2 | ✅ APPROVED (config + 1b clients) |
-| Phase 3 | 🔒 BLOCKED — awaiting Claude code review |
-| Publish | `src/tools/cf_publish.py` wired in `run_pipeline()` |
-| Dashboard | `api/main.py` + `web/static/` — local dev; Pages for public |
-| Next action | Push branch → Claude reviews on GitHub |
-
----
-
-## Git hygiene (every session)
-
-Before commit:
+## Git hygiene
 
 ```bash
-git status   # must NOT show: .env, *.sqlite, store/ohlcv/*.csv, others/, *.zip
+git status   # no .env, *.sqlite, store/ohlcv, others/, *.zip
+git push -u origin <branch>   # after every significant diff
 ```
 
-- **Push to a branch** after any significant diff — Claude checks [GitHub](https://github.com/DietrichGebert/ponytail) online.
-- `others/` = Claude drop archive only — **never commit** (gitignored).
-- `store/` CSV/cache/sqlite = local runtime — **never commit**.
-
 ---
 
-## If Claude APPROVES the 5 files
-
-Then start Phase 3 only:
-
-1. Wire `# WIRE:` in `src/orchestrator.py` (OpenRouter, no Anthropic)
-2. `src/report.py` markdown renderer
-3. Capex-cut grader ← `src/tools/tavily.py`
-4. Cloudflare Worker (GET/PUT KV) + Pages deploy
-5. Send REVIEW_REQUEST after `--run` produces DailyReport sections
-
----
-
-## Mandatory Cursor message format
-
-Every REVIEW_REQUEST / IMPLEMENT to Claude uses `docs/PROTOCOL.md` header (`═══ CASSANDRA ════`). Include VERIFY output you actually ran.
-
----
-
-## Quick verify (any session)
+## Quick verify
 
 ```bash
 python -m src.scoring      # CRS=56.9
-python -m src.config       # Gate OK
 python -m src.pipeline     # live CRS
-uvicorn api.main:app --port 8080
+uvicorn api.main:app --port 8080   # open dashboard
 ```
-
-## Ponytail rule
-
-Read **this file + status.md + one phase spec**. Smallest diff. [ponytail](https://github.com/DietrichGebert/ponytail)
 
 ═══ END HANDOFF CURSOR ═══

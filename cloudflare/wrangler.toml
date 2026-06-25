@@ -1,0 +1,11 @@
+# Cloudflare Worker — paste into dashboard or use wrangler
+name = "cassandra-score"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "SCORE_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[vars]
+# Set KV_SECRET in dashboard Secrets, not here

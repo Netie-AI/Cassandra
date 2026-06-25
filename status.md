@@ -5,18 +5,18 @@
 
 ---
 
-## Phase 2 ✅ APPROVED · Phase 3 🔒 blocked (4-file review)
+## Phase 2 ✅ APPROVED · Phase 3 🔓 orchestrator unblocked · UI + Worker delivered
 
-Claude CONDITIONAL: approve pipeline/store/api/handoff in code before Phase 3 LLM wiring.
+Claude REVIEW_RESPONSE 2026-06-25: Phase 2 deploy scaffold APPROVED. Phase 3 LLM wiring unblocked.
 
 | Phase | Status | Gate |
 |-------|--------|------|
 | 0 Scaffold | ✅ | CRS=56.9 self-tests |
 | 1 Data clients | ✅ | All clients import; core live |
-| 2 Config weights | ✅ awaiting Claude REVIEW | `python -m src.config` CRS=56.9 |
-| 3 Agents | ⬜ | Full DailyReport via OpenRouter |
-| 8 UI (early) | ✅ MVP | FastAPI + static dashboard |
-| 9 Deploy | 🔄 scaffold | Docker + docs/DEPLOY.md → crash.netie.ai |
+| 2 Config weights | ✅ | `python -m src.config` CRS=56.9 |
+| 3 Agents | 🔄 | Orchestrator + capex grader + DailyReport |
+| 8 UI | 🔄 | Palantir dashboard + geo payments |
+| 9 Deploy | 🔄 | CF Worker spec + `publish_score()` |
 
 ---
 
@@ -46,9 +46,10 @@ See `docs/DEPLOY.md`. Local dev: `uvicorn api.main:app --port 8080`. CF Worker +
 
 ## Blockers for Phase 3
 
-1. Claude REVIEW_RESPONSE on Phase 2
+1. Claude review scoring.py `confidence_band()` (coverage gate)
 2. Wire orchestrator LLM via OpenRouter (no Anthropic)
 3. Capex-cut grader ← tavily (critical calibration with Claude)
+4. Set real payment URLs in `web/static/config.js` before go-live
 
 ---
 
