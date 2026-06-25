@@ -24,6 +24,8 @@ data/
 # ═══ Claude drop zone (archive only — not source) ═════════
 others/
 *.zip
+cassandra_dashboard_ui_mockup.html
+newspaper.html
 
 # ═══ Python ════════════════════════════════════════════════
 __pycache__/

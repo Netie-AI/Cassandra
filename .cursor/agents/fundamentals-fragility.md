@@ -1,9 +1,22 @@
-# Cursor agent: Fundamentals / Fragility
+# Agent: Fundamentals / Fragility
 
-**Model:** claude-sonnet-4-6  
-**Skill:** `.cursor/skills/fundamentals-fragility/SKILL.md`  
-**Prompt:** `agents/subagents.md` §5  
-**Schema:** `FragilityRead` in `src/schemas.py`  
-**Tools:** `src/tools/fred.py`, `src/tools/finra.py`, `src/tools/fmp.py`
+**Model:** claude-sonnet-4-6 · **Skill:** `.cursor/skills/fundamentals-fragility/SKILL.md`  
+**Schema:** `FragilityRead` · **Spec:** `agents/subagents.md` §5
 
-Owns leverage, valuation, and macro trigger backbone (L, V, C inputs).
+## Output contract
+
+JSON `FragilityRead` only. Pull FRED/FINRA/FMP in **code**; LLM extracts transcript gaps only.
+
+Factors **L** + **V** + macro **C** inputs: margin debt, spreads, cohort P/S, mktcap/GDP, fed path, net liquidity
+
+## Tools
+
+`fred`, `finra`, `fmp` — per `config/data_sources.yaml`
+
+## Never
+
+Invert spread tightness as safety without flagging complacency · compute CRS
+
+## Freshness
+
+Flag monthly FINRA lag in metric `note`

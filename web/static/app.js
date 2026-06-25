@@ -1,4 +1,4 @@
-/** CASSANDRA public dashboard */
+/** CASSANDRA dashboard v2 — mockup-aligned, live data from /api/dashboard */
 
 const BANDS = [
   { max: 25, label: "Benign" },
@@ -8,6 +8,7 @@ const BANDS = [
   { max: 101, label: "Blow-off" },
 ];
 const MANIA_THRESHOLD = 65;
+const FACTOR_NAMES = { L: "Leverage", V: "Valuation", S: "Sentiment", B: "Breadth", C: "Catalyst" };
 const PAID_TIERS = new Set(["report", "briefing", "agent"]);
 const SLOT_LABELS = { 0: "Overnight", 12: "Asia PM", 21: "Pre-open" };
 
@@ -16,6 +17,7 @@ const CC = window.CassandraCommon;
 let currentLang = "en";
 let currentTier = "free";
 let lastAsof = null;
+let histChart = null;
 
 function isLocalDev() {
   const h = window.location.hostname;
@@ -30,7 +32,28 @@ function lockedFactors() {
   return PAID_TIERS.has(currentTier) ? new Set() : new Set(["S", "B", "C"]);
 }
 
-function animateCount(el, target, duration = 1200) {
+function bandFor(crs) {
+  for (const b of BANDS) if (crs < b.max) return b.label;
+  return "Blow-off";
+}
+
+function riskColor(v) {
+  if (v >= 0.7) return "#E24B4A";
+  if (v >= 0.5) return "#D85A30";
+  if (v >= 0.35) return "#BA7517";
+  return "#639922";
+}
+
+function setBar(id, pct, color) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  requestAnimationFrame(() => {
+    el.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+    if (color) el.style.background = color;
+  });
+}
+
+function animateCount(el, target, duration = 1300) {
   const start = performance.now();
   function frame(now) {
     const p = Math.min((now - start) / duration, 1);
@@ -44,24 +67,19 @@ function animateCount(el, target, duration = 1200) {
 
 function setNeedle(crs) {
   const needle = document.getElementById("zone-needle");
-  const pct = Math.max(0, Math.min(100, crs));
-  requestAnimationFrame(() => { needle.style.left = `${pct}%`; });
-}
-
-function bandFor(crs) {
-  for (const b of BANDS) {
-    if (crs < b.max) return b.label;
-  }
-  return "Blow-off";
+  if (!needle) return;
+  setTimeout(() => { needle.style.left = `${Math.max(0, Math.min(100, crs))}%`; }, 150);
 }
 
 function distanceToMania(crs) {
   const el = document.getElementById("distance-mania");
+  if (!el) return;
   if (crs >= MANIA_THRESHOLD) {
-    el.textContent = `${t("insideZone")} ${bandFor(crs)} zone`;
+    el.textContent = `${t("insideZone")} ${bandFor(crs)} · spring loaded`;
     return;
   }
-  el.textContent = `→ ${(MANIA_THRESHOLD - crs).toFixed(1)} ${t("belowMania")}`;
+  const gap = (MANIA_THRESHOLD - crs).toFixed(1);
+  el.textContent = `→ ${gap} ${t("belowMania")} · spring loaded, no spark confirmed yet`;
 }
 
 function renderFactors(factors) {
@@ -69,26 +87,33 @@ function renderFactors(factors) {
   document.getElementById("factors").innerHTML = ["L", "V", "S", "B", "C"].map((k) => {
     const isLocked = locked.has(k);
     const val = factors?.[k];
-    const display = isLocked ? "0.000" : (val != null ? Number(val).toFixed(3) : "—");
+    const pct = val != null ? Number(val) * 100 : 0;
+    if (isLocked) {
+      return `
+        <div class="factor-card locked">
+          <span class="lock-icon" aria-hidden="true">🔒</span>
+          <div class="fk">${k}</div>
+          <div class="fname">${FACTOR_NAMES[k]}</div>
+          <div style="font-size:0.65rem;color:var(--muted);margin-top:0.5rem">subscribe</div>
+        </div>`;
+    }
     return `
-      <div class="factor-card${isLocked ? " locked" : ""}">
-        ${isLocked ? '<span class="lock-icon" aria-hidden="true">🔒</span>' : ""}
+      <div class="factor-card">
         <div class="fk">${k}</div>
-        <div class="fv">${display}</div>
+        <div class="fname">${FACTOR_NAMES[k]}</div>
+        <div class="fv">${val != null ? Number(val).toFixed(2) : "—"}</div>
+        <div class="fbar"><div class="fbar-fill" style="width:${pct}%;background:${riskColor(Number(val))}"></div></div>
       </div>`;
   }).join("");
-}
-
-function normalizePayload(raw) {
-  if (!raw) return { score: null, tier: "free" };
-  if (raw.score) return { score: raw.score, tier: raw.tier || "free" };
-  return { score: raw, tier: "free" };
 }
 
 async function fetchDashboard() {
   try {
     const r = await fetch("/api/dashboard");
-    if (r.ok) return normalizePayload(await r.json());
+    if (r.ok) {
+      const d = await r.json();
+      return { score: d.score, tier: d.tier || "free" };
+    }
   } catch (_) { /* offline */ }
   try {
     const r = await fetch("/api/latest");
@@ -104,24 +129,93 @@ function populate(score) {
   }
   lastAsof = score.asof;
   animateCount(document.getElementById("crs"), score.crs);
-  document.getElementById("band-label").textContent = score.band || bandFor(score.crs);
+  document.getElementById("band-label").textContent = (score.band || bandFor(score.crs)).toUpperCase();
+
+  const hw = score.band_halfwidth != null ? score.band_halfwidth : 1;
+  const lo = (score.crs - hw).toFixed(1);
+  const hi = (score.crs + hw).toFixed(1);
+  document.getElementById("band-range").textContent = `${lo} – ${hi}`;
+
   distanceToMania(score.crs);
   setNeedle(score.crs);
 
-  const cov = score.coverage != null ? (score.coverage * 100).toFixed(0) : "—";
-  document.getElementById("coverage-note").textContent =
-    `${t("coverage")} ${cov}% · ${t("coverageNote")}`;
-  document.getElementById("asof").textContent =
-    score.asof ? `${t("asof")} ${score.asof}` : "";
+  const cov = score.coverage != null ? score.coverage : 0;
+  document.getElementById("cov-pct").textContent = `${(cov * 100).toFixed(0)}%`;
+  document.getElementById("coverage-note").textContent = t("coverageNote");
+  setBar("bar-cov", cov * 100);
 
-  document.getElementById("f").textContent = score.fragility?.toFixed(3) ?? "—";
-  document.getElementById("t").textContent = score.trigger?.toFixed(3) ?? "—";
-  document.getElementById("phase").textContent = (score.phase || "—").replace(/_/g, " ");
+  document.getElementById("f").textContent = score.fragility?.toFixed(2) ?? "—";
+  document.getElementById("t").textContent = score.trigger?.toFixed(2) ?? "—";
+  setBar("bar-f", (score.fragility || 0) * 100, riskColor(score.fragility || 0));
+  setBar("bar-t", (score.trigger || 0) * 100, riskColor(score.trigger || 0));
 
-  const hw = score.band_halfwidth ?? "—";
-  const conf = score.confidence != null ? (score.confidence * 100).toFixed(0) : "—";
-  document.getElementById("conf").textContent = `±${hw} · ${conf}%`;
+  const phaseLabel = (score.phase || "—").replace(/_/g, " ");
+  document.getElementById("phase").textContent = phaseLabel;
+  document.getElementById("phase-sub").textContent =
+    score.phase_confidence != null ? `${(score.phase_confidence * 100).toFixed(0)}% confidence` : "";
+  setBar("bar-phase", (score.phase_confidence || 0) * 100, "#BA7517");
+
+  document.getElementById("f-sub").textContent =
+    score.df_dt != null ? `dF/dt ${score.df_dt >= 0 ? "+" : ""}${Number(score.df_dt).toFixed(2)}` : "";
+  document.getElementById("t-sub").textContent = "capex NLP watch";
+
+  document.getElementById("asof")?.remove();
   renderFactors(score.factors);
+}
+
+async function loadHistoryChart() {
+  if (typeof Chart === "undefined") return;
+  let rows = [];
+  try {
+    const r = await fetch("/api/scores/history?limit=30");
+    if (r.ok) rows = (await r.json()).history || [];
+  } catch (_) { /* seed fallback */ }
+
+  if (rows.length < 2) {
+    rows = Array.from({ length: 30 }, (_, i) => ({ crs: 28 + i * 0.35 + Math.sin(i / 4) * 2 }));
+  } else {
+    rows = rows.reverse();
+  }
+
+  const labels = rows.map((row, i) => {
+    if (row.asof) return row.asof.slice(5);
+    const d = new Date();
+    d.setDate(d.getDate() - (rows.length - 1 - i));
+    return d.toLocaleDateString("en", { month: "short", day: "numeric" });
+  });
+  const data = rows.map((r) => r.crs);
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  const lc = dark ? "#5DCAA5" : "#1D9E75";
+  const tc = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
+  const gc = dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)";
+
+  const ctx = document.getElementById("histChart");
+  if (!ctx) return;
+  if (histChart) histChart.destroy();
+  histChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: lc,
+        borderWidth: 1.5,
+        pointRadius: 2,
+        tension: 0.35,
+        fill: true,
+        backgroundColor: dark ? "rgba(93,202,165,0.08)" : "rgba(29,158,117,0.07)",
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: tc, font: { family: "IBM Plex Mono", size: 9 }, maxTicksLimit: 7 }, grid: { display: false } },
+        y: { min: 15, max: 70, ticks: { color: tc, font: { family: "IBM Plex Mono", size: 9 } }, grid: { color: gc } },
+      },
+    },
+  });
 }
 
 function nextSlotMYT() {
@@ -132,24 +226,16 @@ function nextSlotMYT() {
     hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
   }).formatToParts(new Date());
   const get = (ty) => Number(parts.find((p) => p.type === ty)?.value);
-  const y = get("year"), mo = get("month"), d = get("day");
-  const h = get("hour");
-
+  const y = get("year"), mo = get("month"), d = get("day"), h = get("hour");
   for (const slotH of slots) {
-    if (h < slotH) {
-      return { slotH, target: zonedTime(y, mo, d, slotH, 0, 0) };
-    }
+    if (h < slotH) return { slotH, target: zonedTime(y, mo, d, slotH, 0, 0) };
   }
   const tomorrow = new Date(Date.UTC(y, mo - 1, d + 1));
-  return {
-    slotH: 0,
-    target: zonedTime(tomorrow.getUTCFullYear(), tomorrow.getUTCMonth() + 1, tomorrow.getUTCDate(), 0, 0, 0),
-  };
+  return { slotH: 0, target: zonedTime(tomorrow.getUTCFullYear(), tomorrow.getUTCMonth() + 1, tomorrow.getUTCDate(), 0, 0, 0) };
 }
 
 function zonedTime(y, mo, d, h, mi, s) {
-  const iso = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}T${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}:${String(s).padStart(2, "0")}+08:00`;
-  return new Date(iso);
+  return new Date(`${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}T${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}:${String(s).padStart(2, "0")}+08:00`);
 }
 
 function tickCountdown() {
@@ -179,38 +265,36 @@ function renderPaymentWidgets(country) {
   const subEl = document.getElementById("sub-buttons");
   const donEl = document.getElementById("donate-buttons");
   if (country === "CN") {
-    const c = p.cn || {};
-    subEl.innerHTML = `<a class="btn btn-primary" href="${c.airwallexSubscribe || "/pricing?tier=report"}" target="_blank" rel="noopener">Subscribe · Alipay / WeChat</a>`;
-    donEl.innerHTML = `<a class="btn btn-secondary" href="${c.airwallexDonate || "#"}" target="_blank" rel="noopener">Donate</a>`;
+    subEl.innerHTML = `<a class="btn btn-primary" href="${p.cn?.airwallexSubscribe || "/pricing"}">Alipay / WeChat</a>`;
+    donEl.innerHTML = `<a class="btn btn-secondary" href="${p.cn?.airwallexDonate || "#"}">Donate</a>`;
     return;
   }
   if (country === "MY") {
-    const m = p.my || {};
-    subEl.innerHTML = `<a class="btn btn-primary" href="${m.curlecSubscribe || "/pricing?tier=report"}" target="_blank" rel="noopener">Subscribe · Curlec</a>`;
-    donEl.innerHTML = `<a class="btn btn-secondary" href="${m.billplzDonate || "#"}" target="_blank" rel="noopener">Donate · Billplz</a>`;
+    subEl.innerHTML = `<a class="btn btn-primary" href="${p.my?.curlecSubscribe || "/pricing"}">FPX / DuitNow</a>`;
+    donEl.innerHTML = `<a class="btn btn-secondary" href="${p.my?.billplzDonate || "#"}">Billplz</a>`;
     return;
   }
   const i = p.international || {};
-  subEl.innerHTML = `<a class="btn btn-primary" href="${i.stripeSubscribe || "/pricing?tier=report"}" target="_blank" rel="noopener">Subscribe · $4.99/mo</a>`;
+  subEl.innerHTML = `<a class="btn btn-primary" href="${i.stripeSubscribe || "/pricing?tier=report"}">Stripe · $4.99</a>`;
   donEl.innerHTML = `
-    <a class="btn btn-secondary" href="${i.stripeDonate || "#"}" target="_blank" rel="noopener">Stripe</a>
-    <a class="btn btn-secondary" href="${i.paypalDonate || "#"}" target="_blank" rel="noopener">PayPal</a>`;
+    <a class="btn btn-secondary" href="${i.stripeDonate || "#"}">Stripe</a>
+    <a class="btn btn-secondary" href="${i.paypalDonate || "#"}">PayPal</a>`;
 }
 
 function setupControls() {
   CC.initTheme(true);
   currentLang = CC.detectLang();
   CC.setLang(currentLang);
-
   document.querySelectorAll(".lang-btn").forEach((btn) => {
     btn.onclick = () => {
       currentLang = CC.setLang(btn.dataset.lang);
-      const { score } = window.__lastDashboard || {};
-      if (score) populate(score);
+      if (window.__lastDashboard?.score) populate(window.__lastDashboard.score);
     };
   });
-  document.getElementById("theme-toggle").onclick = () => CC.toggleTheme();
-
+  document.getElementById("theme-toggle").onclick = () => {
+    CC.toggleTheme();
+    loadHistoryChart();
+  };
   document.getElementById("btn-share").onclick = () => CC.shareReport(lastAsof);
   document.getElementById("btn-download-report").onclick = async () => {
     try {
@@ -232,16 +316,14 @@ function setupControls() {
     await CC.copyText(CC.referralUrl());
     CC.toast("Referral link copied");
   };
-  document.getElementById("referral-display").textContent = CC.referralCode();
 }
 
 function setupNewsletter() {
-  const form = document.getElementById("newsletter-form");
-  if (cfg.newsletterAction) form.action = cfg.newsletterAction;
-  form.addEventListener("submit", (e) => {
+  document.getElementById("newsletter-form").addEventListener("submit", (e) => {
     if (!cfg.newsletterAction) {
       e.preventDefault();
-      window.location.href = `/subscribe?email=${encodeURIComponent(form.email.value)}`;
+      const email = e.target.email.value;
+      window.location.href = `/subscribe?email=${encodeURIComponent(email)}`;
     }
   });
 }
@@ -258,6 +340,7 @@ function setupRunButton() {
     window.__lastDashboard = dash;
     currentTier = dash.tier;
     populate(dash.score);
+    await loadHistoryChart();
     btn.disabled = false;
     btn.textContent = "Run cycle";
   };
@@ -274,6 +357,8 @@ async function init() {
   currentTier = dash.tier;
   populate(dash.score);
   renderPaymentWidgets(await detectCountry());
+  if (document.readyState === "complete") await loadHistoryChart();
+  else window.addEventListener("load", () => loadHistoryChart());
 }
 
 init();

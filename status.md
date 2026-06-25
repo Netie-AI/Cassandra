@@ -5,14 +5,14 @@
 
 ---
 
-## Phase 2 ✅ · Phase 3 dashboard ✅ · Phase 4 UI + report 🔄
+## Phase 4 ✅ APPROVED · Phase 5 orchestrator next
 
 | Phase | Status | Gate |
 |-------|--------|------|
-| 3 Dashboard | ✅ | Claude APPROVED 2026-06-25 |
-| 4 UI + report | 🔄 | Newspaper, pricing, stocks, Gemini report.py |
-| 4 Orchestrator | ⬜ | OpenRouter `# WIRE:` next |
-| 8 UI | 🔄 | Main + newspaper + pricing |
+| 4 UI + report | ✅ | Claude APPROVED 2026-06-25 |
+| 5 Orchestrator | ⏳ | Wire `# WIRE:` orchestrator.py |
+| 5 capex grader | ✅ scaffold | `src/tools/capex_nlp.py` |
+| 8 UI v2 | ✅ | Mockup dashboard + Chart.js history |
 | 9 Deploy | 🔄 | CF Worker + Pages |
 
 ---
@@ -41,12 +41,12 @@ See `docs/DEPLOY.md`. Local dev: `uvicorn api.main:app --port 8080`. CF Worker +
 
 ---
 
-## Blockers for Phase 3
+## Blockers for Phase 5
 
-1. Claude review scoring.py `confidence_band()` (coverage gate)
-2. Wire orchestrator LLM via OpenRouter (no Anthropic)
-3. Capex-cut grader ← tavily (critical calibration with Claude)
-4. Set real payment URLs in `web/static/config.js` before go-live
+1. Wire orchestrator `# WIRE:` (OpenRouter subagents + opus pass-2)
+2. End-to-end `--run` produces DailyReport + publish
+3. Set payment URLs in `web/static/config.js` before go-live
+4. Supabase auth — PARKING_LOT.md
 
 ---
 
