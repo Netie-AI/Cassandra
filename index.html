@@ -1,32 +1,56 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>CASSANDRA — Crash Risk Score</title>
+  <meta name="description" content="CASSANDRA — AI sector crash risk score. Decision support only. By netie.ai"/>
+  <title>CASSANDRA — Crash Risk Score · netie.ai</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/styles.css"/>
 </head>
 <body>
-  <header>
-    <div>
-      <div class="logo">CASSANDRA</div>
-      <p class="tagline">Crash Risk Score · decision support only · no execution</p>
+  <div class="top-bar">
+    <nav class="nav-links">
+      <a href="/pricing" data-i18n="pricing">Pricing</a>
+      <a href="/newspaper-report" data-i18n="shareView">Read newspaper</a>
+      <a href="/stocks/NOW" data-i18n="stocks">Stock demos</a>
+    </nav>
+    <div class="toolbar" role="toolbar" aria-label="Display controls">
+      <button type="button" class="ctrl-btn lang-btn active" data-lang="en">EN</button>
+      <button type="button" class="ctrl-btn lang-btn" data-lang="zh">中文</button>
+      <button type="button" class="ctrl-btn lang-btn" data-lang="ms">BM</button>
+      <span class="toolbar-sep"></span>
+      <button type="button" id="theme-toggle" class="ctrl-btn" aria-label="Toggle theme">◐</button>
     </div>
-    <div class="countdown">
-      <span>Next score update</span>
-      <strong id="countdown">—</strong>
-      <span id="countdown-slot" class="mono"></span>
+  </div>
+
+  <header class="site-header">
+    <div class="brand-block">
+      <div class="logo glow">CASSANDRA</div>
+      <p class="tagline" data-i18n="tagline">Crash Risk Score · decision support only · no execution</p>
+      <p class="brand-credit">
+        <span data-i18n="credit">Built by</span>
+        <a href="https://netie.ai" target="_blank" rel="noopener">netie.ai</a>
+        ·
+        <a href="https://github.com/Netie-AI/Cassandra" target="_blank" rel="noopener">GitHub</a>
+      </p>
     </div>
-    <button id="runBtn" type="button">Run cycle</button>
+    <div class="header-actions">
+      <div class="countdown">
+        <span data-i18n="nextUpdate">Next score update</span>
+        <strong id="countdown">—</strong>
+        <span id="countdown-slot" class="mono"></span>
+      </div>
+      <button id="runBtn" type="button">Run cycle</button>
+    </div>
   </header>
 
   <main>
-    <section class="hero">
+    <section class="hero edge-glow">
       <div class="crs-panel">
-        <div class="crs-label">Crash Risk Score</div>
+        <div class="crs-label" data-i18n="crsLabel">Crash Risk Score</div>
         <div id="crs">—</div>
         <div id="band-label">—</div>
         <div id="distance-mania"></div>
@@ -34,7 +58,7 @@
         <div id="asof"></div>
       </div>
       <div class="zone-panel">
-        <div class="zone-title">Risk zone</div>
+        <div class="zone-title" data-i18n="zoneTitle">Risk zone</div>
         <div class="zone-track">
           <div id="zone-needle" class="zone-needle"></div>
         </div>
@@ -48,59 +72,85 @@
       </div>
     </section>
 
+    <section class="share-panel">
+      <div>
+        <h3 data-i18n="shareTitle">Share today's report</h3>
+        <p data-i18n="shareBody">Copy a link or download the NYT-style edition for subscribers.</p>
+      </div>
+      <div class="share-actions">
+        <button type="button" id="btn-share" class="btn btn-secondary" data-i18n="shareCopy">Copy link</button>
+        <button type="button" id="btn-download-report" class="btn btn-secondary" data-i18n="shareDownload">Download HTML</button>
+        <a href="/newspaper-report" class="btn btn-primary" data-i18n="shareView">Read newspaper</a>
+      </div>
+    </section>
+
     <section class="grid-4">
       <div class="stat-card">
-        <div class="label">Fragility (F)</div>
+        <div class="label" data-i18n="fragility">Fragility (F)</div>
         <div id="f" class="value">—</div>
       </div>
       <div class="stat-card">
-        <div class="label">Trigger (T)</div>
+        <div class="label" data-i18n="trigger">Trigger (T)</div>
         <div id="t" class="value">—</div>
       </div>
       <div class="stat-card">
-        <div class="label">Phase</div>
-        <div id="phase" class="value" style="font-size:0.85rem">—</div>
+        <div class="label" data-i18n="phase">Phase</div>
+        <div id="phase" class="value value-sm">—</div>
       </div>
       <div class="stat-card">
-        <div class="label">Confidence</div>
-        <div id="conf" class="value" style="font-size:0.85rem">—</div>
+        <div class="label" data-i18n="confidence">Confidence</div>
+        <div id="conf" class="value value-sm">—</div>
       </div>
     </section>
 
     <section class="factors-section">
-      <div class="section-title">Factor breakdown · L/V live · S/B/C for subscribers</div>
+      <div class="section-title" data-i18n="factorsTitle">Factor breakdown · L/V live · S/B/C for subscribers</div>
       <div id="factors" class="factors-grid"></div>
     </section>
 
     <section class="cta-panel">
-      <div class="cta-box" id="sub-cta">
-        <h3>Full factor access</h3>
-        <p>Unlock S, B, C factors + daily report sections.</p>
-        <div id="sub-buttons"></div>
+      <div class="cta-box referral-box" id="referral-cta">
+        <h3 data-i18n="referralTitle">Refer & earn 7 days free API</h3>
+        <p data-i18n="referralBody">When someone subscribes with your link, activate a 7-day API trial in your account vouchers.</p>
+        <button type="button" id="btn-referral" class="btn btn-primary" data-i18n="referralCopy">Copy referral link</button>
+        <p class="referral-code mono" id="referral-display"></p>
       </div>
-      <div class="cta-box" id="donate-cta">
-        <h3>Support the research</h3>
-        <p>One-off contribution — routed to your local payment method.</p>
-        <div id="donate-buttons"></div>
+      <div class="cta-box" id="sub-cta">
+        <h3 data-i18n="subTitle">Full factor access</h3>
+        <p data-i18n="subBody">Unlock S, B, C factors + daily newspaper report.</p>
+        <div id="sub-buttons"></div>
       </div>
     </section>
 
-    <section class="cta-box" style="margin-bottom:1.5rem">
-      <h3>Daily thesis digest</h3>
-      <p>Get the headline + what-changed when the score updates (3× on trading days).</p>
-      <form id="newsletter-form" class="newsletter-form" action="#" method="post">
-        <input type="email" name="email" placeholder="you@example.com" required aria-label="Email"/>
-        <button type="submit" class="btn btn-primary">Subscribe</button>
-      </form>
+    <section class="cta-panel">
+      <div class="cta-box" id="donate-cta">
+        <h3 data-i18n="donateTitle">Support the research</h3>
+        <p data-i18n="donateBody">One-off contribution — routed to your local payment method.</p>
+        <div id="donate-buttons"></div>
+      </div>
+      <div class="cta-box">
+        <h3 data-i18n="digestTitle">Daily thesis digest</h3>
+        <p data-i18n="digestBody">Newspaper-style report emailed 3× on trading days.</p>
+        <form id="newsletter-form" class="newsletter-form" action="#" method="post">
+          <input type="email" name="email" placeholder="you@example.com" required aria-label="Email"/>
+          <button type="submit" class="btn btn-primary">Subscribe</button>
+        </form>
+      </div>
     </section>
   </main>
 
   <footer>
-    <p>Personal research tooling — not financial advice.</p>
-    <p class="disclaimer">CRS is a composite index with confidence bands. Low coverage widens uncertainty. No crash-date predictions.</p>
+    <p data-i18n="footerLegal">Personal research tooling — not financial advice.</p>
+    <p class="disclaimer" data-i18n="footerDisclaimer">CRS is a composite index with confidence bands. Low coverage widens uncertainty. No crash-date predictions.</p>
+    <p class="footer-credits">
+      <a href="https://crash.netie.ai">crash.netie.ai</a>
+      · <a href="https://netie.ai">netie.ai</a>
+      · <a href="https://github.com/Netie-AI/Cassandra">Netie-AI/Cassandra</a>
+    </p>
   </footer>
 
   <script src="/static/config.js"></script>
+  <script src="/static/common.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

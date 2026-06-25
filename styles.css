@@ -1,4 +1,5 @@
-:root {
+:root,
+[data-theme="dark"] {
   --bg: #070a0f;
   --surface: #0d1219;
   --surface-2: #131a24;
@@ -10,8 +11,30 @@
   --yellow: #eab308;
   --red: #ef4444;
   --crimson: #991b1b;
+  --glow: rgba(245, 158, 11, 0.15);
   --mono: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
   --sans: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+[data-theme="light"] {
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef2f7;
+  --border: #cbd5e1;
+  --text: #0f172a;
+  --muted: #64748b;
+  --amber: #d97706;
+  --glow: rgba(217, 119, 6, 0.12);
+}
+
+[data-theme="light"] body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(217, 119, 6, 0.06), transparent);
+}
+
+[data-theme="light"] .zone-needle {
+  background: #0f172a;
+  box-shadow: 0 0 8px rgba(15, 23, 42, 0.4);
 }
 
 * { box-sizing: border-box; }
@@ -31,6 +54,62 @@ body {
 
 .mono { font-family: var(--mono); }
 
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.6rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.nav-links { display: flex; gap: 1rem; font-size: 0.75rem; }
+.nav-links a { color: var(--muted); text-decoration: none; }
+.nav-links a:hover { color: var(--amber); }
+
+.toolbar { display: flex; align-items: center; gap: 0.35rem; }
+.toolbar-sep { width: 1px; height: 16px; background: var(--border); margin: 0 0.25rem; }
+
+.ctrl-btn {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.ctrl-btn:hover, .ctrl-btn.active { color: var(--text); border-color: var(--amber); }
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  padding: 1.5rem 1.5rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand-block { flex: 1; min-width: 240px; }
+
+header.site-header .logo,
+.logo.glow {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  text-shadow: 0 0 24px var(--glow);
+}
+
+.brand-credit { font-size: 0.7rem; color: var(--muted); margin-top: 0.35rem; }
+.brand-credit a { color: var(--amber); text-decoration: none; }
+
+.header-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+
 header {
   display: flex;
   flex-wrap: wrap;
@@ -39,13 +118,6 @@ header {
   gap: 1rem;
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border);
-}
-
-.logo {
-  font-family: var(--mono);
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: 0.2em;
 }
 
 .tagline { color: var(--muted); font-size: 0.75rem; margin-top: 0.25rem; }
@@ -59,7 +131,58 @@ header {
 
 .countdown strong { color: var(--amber); font-size: 1rem; display: block; }
 
-main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+main { max-width: 1140px; margin: 0 auto; padding: 2rem 1.75rem; }
+
+.hero.edge-glow {
+  position: relative;
+  padding: 0.25rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--glow), transparent 60%);
+}
+
+.share-panel {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  border-left: 3px solid var(--amber);
+}
+
+.share-panel h3 { margin: 0 0 0.35rem; font-size: 0.95rem; }
+.share-panel p { margin: 0; color: var(--muted); font-size: 0.8rem; }
+.share-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.referral-box { border-color: var(--amber); }
+.referral-code { font-size: 0.7rem; color: var(--muted); margin: 0.5rem 0 0; }
+
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--amber);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 999;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+.value-sm { font-size: 0.85rem !important; }
+
+.footer-credits { margin-top: 0.75rem; }
+.footer-credits a { color: var(--amber); text-decoration: none; }
 
 .hero {
   display: grid;

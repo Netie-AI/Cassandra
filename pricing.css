@@ -1,0 +1,26 @@
+.pricing-main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+.pricing-title { font-family: var(--mono); letter-spacing: 0.15em; font-size: 1.5rem; margin: 0 0 0.5rem; }
+.pricing-sub { color: var(--muted); margin-bottom: 2rem; font-size: 0.85rem; }
+.pricing-sub a { color: var(--amber); }
+.tier-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+.tier-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  position: relative;
+}
+.tier-card.popular { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
+.tier-badge {
+  position: absolute; top: -10px; right: 12px;
+  background: var(--amber); color: #000; font-size: 0.6rem; font-weight: 700;
+  padding: 2px 8px; border-radius: 3px; letter-spacing: 0.05em;
+}
+.tier-name { font-weight: 600; margin-bottom: 0.25rem; }
+.tier-price { font-family: var(--mono); font-size: 1.75rem; color: var(--amber); margin-bottom: 0.75rem; }
+.tier-card ul { margin: 0 0 1rem; padding-left: 1.1rem; font-size: 0.8rem; color: var(--muted); }
+.tier-card li { margin-bottom: 0.35rem; }
+.video-ph { height: 48px; background: var(--surface-2); border: 1px dashed var(--border); border-radius: 4px; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: var(--muted); }
+.faq h2 { font-size: 1rem; margin-bottom: 0.75rem; }
+.faq details { margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--muted); }
+.faq summary { cursor: pointer; color: var(--text); }

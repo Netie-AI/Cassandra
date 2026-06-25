@@ -1,0 +1,11 @@
+.stock-main { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem; }
+.stock-header { margin-bottom: 1.5rem; }
+.stock-ticker { font-family: var(--mono); font-size: 2.5rem; letter-spacing: 0.1em; color: var(--amber); }
+.stock-name { color: var(--muted); font-size: 0.9rem; }
+.stock-crs { font-family: var(--mono); font-size: 3rem; margin: 1rem 0 0.25rem; }
+.stock-band { font-size: 0.85rem; color: var(--yellow); }
+.stock-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
+.stock-section h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 0 0 0.75rem; }
+.stock-section li { margin-bottom: 0.5rem; font-size: 0.9rem; }
+.stock-note { font-size: 0.75rem; color: var(--muted); font-style: italic; margin-top: 1rem; }
+.stock-cta { margin-top: 1.5rem; }
