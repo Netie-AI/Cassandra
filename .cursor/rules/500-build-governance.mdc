@@ -1,0 +1,14 @@
+---
+description: Build phase governance — follow BUILD.md gates, update status.md
+globs: BUILD.md,status.md,handoff.md
+alwaysApply: true
+---
+
+# Build governance
+
+- Follow `BUILD.md` phases **in order**. Do not skip acceptance gates or loosen them to pass.
+- Before starting work: read `status.md` for current phase and blockers.
+- After completing a gate: update `status.md` and, if `[REVIEW]`, prepare the artifact for `handoff.md`.
+- Specs live in `docs/`. Agent prompts live in `agents/`. Skills live in `.cursor/skills/`.
+- When Claude reviews and Cursor implements (or vice versa), use `handoff.md` as the single handoff contract.
+- Never let the LLM compute CRS, edge, or EV. Never add execution features.

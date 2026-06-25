@@ -1,0 +1,13 @@
+---
+description: CRS scoring discipline — pure Python math, no LLM arithmetic
+globs: src/scoring.py,src/phase.py,src/methods.py,docs/CRASH_SCORE_SPEC.md
+alwaysApply: false
+---
+
+# Scoring math discipline
+
+- All CRS, F, T, edge, EV, and distance arithmetic lives in `src/scoring.py`, `src/phase.py`, `src/methods.py`, `src/options_engine.py`, `src/sentiment_analog.py`. Unit-test against `docs/CRASH_SCORE_SPEC.md` §9.
+- **Fragility ≠ Trigger.** Never collapse the interaction term `c·(F·T)` into a sum.
+- Load weights from `config/settings.yaml` (`intra_weights`, `factor_weights`, `crs_weights`) — do not hardcode overrides without updating the spec.
+- Missing metrics → down-weight + widen confidence band; never guess values.
+- Run `python -m src.scoring` after any scoring change. A failing self-test is a stop-the-line event.

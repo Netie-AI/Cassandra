@@ -1,0 +1,42 @@
+---
+description: CASSANDRA core discipline — applies to all work in this repo
+alwaysApply: true
+---
+
+# Non-negotiable rules for this repo
+
+These govern every file, every agent, every feature. They are not style preferences; violating them
+makes the system dishonest or unsafe.
+
+1. **The LLM never computes the score.** All arithmetic (CRS, edge, EV, distances) lives in pure
+   Python in `src/` and is unit-tested against a worked example. LLMs research, extract, summarize,
+   and narrate — they never produce the number that drives a decision.
+
+2. **Fragility ≠ Trigger.** Keep them separate everywhere. A high score from fragility alone is
+   "loaded spring," not "fired." The interaction term in `scoring.py` is load-bearing — do not collapse
+   it into a sum.
+
+3. **No crash-date prediction. No Elliott Wave. No chart prophecy.** Outputs are level + band + phase
+   + analog-resemblance-with-band. "It crashes on date X" is forbidden in code and copy.
+
+4. **Decision-support, never execution.** No module places orders, moves funds, or auto-trades. The
+   options engine ranks and gates; the human decides. If a feature request implies auto-execution,
+   stop and flag it — do not build it.
+
+5. **The system must be able to say NO and say "I don't know."** The options engine returns NO TRADE
+   by default. The analog engine reports wide bands and regime warnings. Confidence shrinks when
+   evidence is thin or conflicting. Never manufacture certainty.
+
+6. **Verify before asserting.** No present-day fact (price, Fed odds, who cut capex) enters a report
+   from memory — only from a freshly pulled, dated, sourced value. Missing data is reported as missing.
+
+7. **Every displayed fact is source-attributable.** Each metric/news item carries `source` + `asof`.
+   The UI must expose the source on hover. A claim with no traceable source does not ship.
+
+8. **Survival ≠ stock.** When reasoning about a company, separate solvency from valuation. Do not
+   model a de-rating as a bankruptcy.
+
+9. **Trading days only, date-aware.** Scheduled runs go through `calendar_guard`. The system always
+   knows today's date and the current year's market holidays. Pull only recent-window news.
+
+10. **This is personal research tooling, not financial advice.** Keep that framing in user-facing copy.

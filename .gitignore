@@ -1,0 +1,33 @@
+# Secrets and local config
+.env
+config/settings.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env.local
+
+# Runtime data
+store/*.sqlite
+store/evidence/**/*
+!store/.gitkeep
+!store/evidence/.gitkeep
+reports/*
+!reports/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# UI (Phase 8)
+ui/node_modules/
+ui/.next/
+ui/out/

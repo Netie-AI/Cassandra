@@ -1,0 +1,15 @@
+---
+description: Agent orchestration — subagent dispatch, LLM boundaries, report contract
+globs: src/orchestrator.py,agents/**,.cursor/skills/**
+alwaysApply: false
+---
+
+# Agent orchestration
+
+- **Orchestrator** (`claude-opus-4-8`): synthesis only. Prompt: `agents/orchestrator.md`. Never computes CRS.
+- **Subagents** (5× `claude-sonnet-4-6`): fetch + extract + normalize. Prompts: `agents/subagents.md` sections 1–5. Each returns typed `*Read` bundles per `src/schemas.py`.
+- Wire at `# WIRE:` markers in `src/orchestrator.py`. Parse LLM JSON into pydantic types.
+- Pre-summarize heavy payloads (options chains, 13F, transcripts) in pandas **before** the LLM sees them.
+- Every metric carries `source`, `asof`, `direction`. Failed pulls → `raw_value=None` + `note`.
+- Report sections (required): headline, what-changed, firing/warning/watch, who's-next, what-would-change-my-mind, timing-caveat.
+- Use `.cursor/skills/<role>/SKILL.md` when building or testing a single subagent in isolation.

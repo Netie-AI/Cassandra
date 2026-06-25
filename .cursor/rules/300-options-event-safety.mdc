@@ -1,0 +1,14 @@
+---
+description: Options engine safety — NO TRADE by default, no execution, theta honesty
+globs: src/options_engine.py,docs/OPTIONS_ENGINE_SPEC.md
+alwaysApply: false
+---
+
+# Options & event safety
+
+- **Decision-support only.** No order placement, broker integration, or auto-trading. Ever.
+- **NO TRADE by default.** All gates must pass: conviction ≥ 0.60, edge ≥ 0.08, EV_multiple ≥ 0.25; NEAR horizon requires `has_dated_catalyst_within_expiry`.
+- NEAR (~7 DTE) weeklies without a dated catalyst → reject with theta-bleed reason. FAR (LEAPS) is the default for structural CRS theses.
+- Surface `theta_per_day_pct` when cumulative bleed can dominate before a vague catalyst.
+- Next-day learning loop: classify misses as direction / timing / vol — log honestly, never hide losses.
+- See `docs/OPTIONS_ENGINE_SPEC.md` for the full gate table and jump-diffusion thesis distribution.

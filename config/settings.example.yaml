@@ -1,0 +1,56 @@
+# CASSANDRA settings — copy to settings.yaml and edit. Weights mirror CRASH_SCORE_SPEC §7.
+
+timezone: "Asia/Kuala_Lumpur"
+run_time: "07:30"            # after prior US close + Asia session underway (captures overnight tells)
+
+llm:
+  orchestrator_model: "claude-opus-4-8"
+  subagent_model: "claude-sonnet-4-6"
+
+# The cohort the score tracks. Edit to your universe.
+basket:
+  semis:        ["NVDA", "AMD", "AVGO", "MU", "MRVL", "TSM", "ASML", "AMAT", "LRCX", "CRDO", "SNDK"]
+  hyperscalers: ["MSFT", "GOOGL", "AMZN", "META", "ORCL"]
+  neoclouds:    ["CRWV"]            # debt-funded layer — watch refinancing
+  index_proxy:  "^GSPC"
+  semi_index:   "^SOX"
+  vol_index:    "^VIX"
+
+# Normalization (§2)
+normalization:
+  history_window_days: 756          # ~3y daily
+  logistic_steepness_k: 1.2
+  percentile_metrics: ["crypto_mvrv", "crypto_nupl"]   # non-normal -> use percentile rank
+  hard_thresholds:
+    crypto_mvrv: 7.0                # documented top marker
+
+# Intra-factor weights (§7) — override here
+intra_weights:
+  L: {margin_yoy: 0.35, margin_to_mktcap: 0.25, credit_spread_inv: 0.20, debt_capex: 0.20}
+  B: {pct_above_200dma: 0.30, new_high_low: 0.25, divergence: 0.30, ad_slope: 0.15}
+  V: {cohort_fwd_ps: 0.35, mktcap_gdp: 0.25, top10_concentration: 0.20, erp_inv: 0.20}
+  S: {put_call_inv: 0.25, retail_call_streak: 0.25, iv_skew: 0.20, survey: 0.15, crypto_mvrv: 0.15}
+  C: {fed_path: 0.30, supply_tells: 0.25, capex_cut_nlp: 0.25, capex_rev_gap_slope: 0.10, net_liquidity: 0.10}
+
+# Fragility composition + CRS interaction (§4–§5)
+factor_weights: {L: 0.30, B: 0.25, V: 0.25, S: 0.20}
+crs_weights:    {a: 0.35, b: 0.20, c: 0.45}    # F, T, F*T interaction
+
+# Momentum (§6) + confidence (§8)
+momentum_window_days: 10
+momentum_eps: 0.005
+confidence_weights: {freshness: 0.35, agreement: 0.40, coverage: 0.25}
+max_band_points: 12
+
+# Phase classifier (§7 / phase.py)
+phase:
+  vol_spike_sigma: 2.0
+  swing_window: 20
+  atr_mult_extension: 2.5
+
+# Feature flags
+features:
+  enable_crypto_crossread: true     # BTC MVRV-Z / NUPL as sentiment confirmation
+
+# Bands (§5)
+bands: [[25, "Benign"], [45, "Awareness"], [65, "Mania"], [80, "Danger"], [101, "Blow-off"]]
