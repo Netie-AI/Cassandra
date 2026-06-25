@@ -68,9 +68,11 @@ def normalize_percentile(raw: float, history: Sequence[float], direction: int,
 # --------------------------------------------------------------------------- #
 # §3 factor aggregation (over PRESENT metrics only)
 # --------------------------------------------------------------------------- #
-def aggregate_factor(factor: str, normalized: dict[str, Optional[float]]) -> Optional[float]:
-    """Weighted mean of present normalized metrics within one factor."""
-    w = INTRA[factor]
+def aggregate_factor(factor: str, normalized: dict[str, Optional[float]],
+                     intra: dict | None = None) -> Optional[float]:
+    """Weighted mean of present normalized metrics within one factor.
+    `intra` overrides module-level INTRA defaults when supplied (from settings.yaml)."""
+    w = (intra or {}).get(factor) or INTRA[factor]
     num = den = 0.0
     for name, weight in w.items():
         n = normalized.get(name)
@@ -149,19 +151,34 @@ def confidence_band(freshness: float, factor_scores: Sequence[float], coverage: 
 # --------------------------------------------------------------------------- #
 def compute_crs(normalized_by_factor: dict[str, dict[str, Optional[float]]],
                 freshness: float = 1.0,
-                coverage: float = 1.0) -> ScoreResult:
+                coverage: float = 1.0,
+                weights: dict | None = None) -> ScoreResult:
     """
-    normalized_by_factor: {"L": {metric: n_i}, "V": {...}, "S": {...}, "B": {...}, "C": {...}}
-    Each n_i already in [0,1] from §2 (or None if missing).
+    normalized_by_factor: {"L": {metric: n_i}, ...} — n_i in [0,1] from §2, or None.
+    weights: optional {'intra': {...}, 'factor': {...}, 'crs': {...}} from config.load_weights().
+             If None, uses module-level defaults (INTRA, FACTOR_W, CRS_W) — backwards compatible.
     """
+    _intra  = (weights or {}).get("intra")  or None   # None → aggregate_factor falls back to INTRA
+    _fw     = (weights or {}).get("factor") or FACTOR_W
+    _cw     = (weights or {}).get("crs")    or CRS_W
+
     factors: dict[str, float] = {}
     for f in ("L", "V", "S", "B", "C"):
-        val = aggregate_factor(f, normalized_by_factor.get(f, {}))
-        factors[f] = 0.5 if val is None else val      # neutral fallback if a whole factor is missing
+        val = aggregate_factor(f, normalized_by_factor.get(f, {}), intra=_intra)
+        factors[f] = 0.5 if val is None else val      # neutral fallback if whole factor missing
 
-    F = compute_fragility(factors["L"], factors["V"], factors["S"], factors["B"])
+    # §4 — Fragility (F) and Trigger (T)
+    F = (_fw.get("L", FACTOR_W["L"]) * factors["L"] +
+         _fw.get("V", FACTOR_W["V"]) * factors["V"] +
+         _fw.get("S", FACTOR_W["S"]) * factors["S"] +
+         _fw.get("B", FACTOR_W["B"]) * factors["B"])
     T = factors["C"]
-    crs = 100.0 * compute_crs_raw(F, T)
+
+    # §5 — CRS with interaction term (the load-bearing formula: never remove c*F*T)
+    a = _cw.get("a", CRS_W["a"])
+    b = _cw.get("b", CRS_W["b"])
+    c = _cw.get("c", CRS_W["c"])
+    crs = 100.0 * (a * F + b * T + c * (F * T))
 
     conf, band = confidence_band(freshness, [factors[k] for k in ("L", "V", "S", "B", "C")], coverage)
     return ScoreResult(
@@ -175,7 +192,7 @@ def compute_crs(normalized_by_factor: dict[str, dict[str, Optional[float]]],
 # --------------------------------------------------------------------------- #
 # Self-test: reproduce CRASH_SCORE_SPEC §9
 # --------------------------------------------------------------------------- #
-def _worked_example() -> ScoreResult:
+def _worked_example(weights: dict | None = None) -> ScoreResult:
     nbf = {
         "L": {"margin_yoy": .88, "margin_to_mktcap": .80, "credit_spread_inv": .75, "debt_capex": .70},
         "B": {"pct_above_200dma": .55, "new_high_low": .62, "divergence": .70, "ad_slope": .50},
@@ -183,7 +200,7 @@ def _worked_example() -> ScoreResult:
         "S": {"put_call_inv": .60, "retail_call_streak": .80, "iv_skew": .45, "survey": .55, "crypto_mvrv": .40},
         "C": {"fed_path": .90, "supply_tells": .65, "capex_cut_nlp": .30, "capex_rev_gap_slope": .60, "net_liquidity": .55},
     }
-    return compute_crs(nbf, freshness=1.0, coverage=1.0)
+    return compute_crs(nbf, freshness=1.0, coverage=1.0, weights=weights)
 
 
 if __name__ == "__main__":

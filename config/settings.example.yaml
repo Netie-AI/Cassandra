@@ -4,8 +4,14 @@ timezone: "Asia/Kuala_Lumpur"
 run_time: "07:30"            # after prior US close + Asia session underway (captures overnight tells)
 
 llm:
-  orchestrator_model: "claude-opus-4-8"
-  subagent_model: "claude-sonnet-4-6"
+  provider: openrouter              # openrouter | groq | anthropic | sea_lion
+  orchestrator_model: anthropic/claude-opus-4
+  subagent_model: anthropic/claude-sonnet-4
+  groq_orchestrator: llama-3.3-70b-versatile
+  groq_subagent: llama-3.1-8b-instant
+
+# Data source routing — see config/data_sources.yaml and docs/DATA_ROUTING.md
+data_sources: config/data_sources.yaml
 
 # The cohort the score tracks. Edit to your universe.
 basket:

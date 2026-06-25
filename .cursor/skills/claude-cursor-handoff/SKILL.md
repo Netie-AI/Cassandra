@@ -8,7 +8,7 @@ description: >-
 
 # Claude ↔ Cursor handoff
 
-`status.md` = where we are. `handoff.md` = what crosses the boundary. Both humans and agents read these first.
+`status.md` = where we are. `handoff.md` = what crosses the boundary. Format: `docs/PROTOCOL.md`.
 
 ## Cursor → Claude (request review)
 
@@ -32,7 +32,13 @@ Fill `handoff.md` **To Cursor** section with:
 4. Constraints from `.cursor/rules/000-project.mdc` (especially: no LLM math, no execution)
 5. Skill to load: `.cursor/skills/<role>/SKILL.md`
 
-Cursor implements, runs gate, updates `status.md`, loops back if `[REVIEW]`.
+Cursor implements, runs gate, updates `status.md`, **pushes to a GitHub branch**, loops back if `[REVIEW]`.
+
+## Claude's mandatory reply format
+
+Every Claude message uses `docs/PROTOCOL.md` — header `═══ CASSANDRA ════`, sections SUMMARY / GATE STATUS / FILES / VERIFY / KNOWN GAPS / TO CURSOR. Types: IMPLEMENT, REVIEW_RESPONSE, STATUS_UPDATE. See `HANDOFF_CLAUDE.md` for role + checklist.
+
+Claude verifies on **GitHub** (branch diff), not only pasted snippets.
 
 ## Teaching loop
 

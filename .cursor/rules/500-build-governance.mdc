@@ -11,4 +11,5 @@ alwaysApply: true
 - After completing a gate: update `status.md` and, if `[REVIEW]`, prepare the artifact for `handoff.md`.
 - Specs live in `docs/`. Agent prompts live in `agents/`. Skills live in `.cursor/skills/`.
 - When Claude reviews and Cursor implements (or vice versa), use `handoff.md` as the single handoff contract.
+- Claude may drop files at repo root — copy to target paths, merge `status2.md`/`handoff2.md` into canonical files, archive root copies in `others/`.
 - Never let the LLM compute CRS, edge, or EV. Never add execution features.

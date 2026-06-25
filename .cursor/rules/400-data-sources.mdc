@@ -8,7 +8,7 @@ alwaysApply: false
 
 - One client per source in `src/tools/<name>.py`. Copy the `fred.py` pattern.
 - Each client returns `list[MetricReading]` tagged with `factor`, `direction`, `source`, `asof`. Does NOT normalize or score.
-- Build order (Phase 1): `fred.py` → `finra.py` → `alphavantage.py` → `polygon.py` → `unusual_whales.py` → `fmp.py` → optional `glassnode.py`.
+- Build order (Phase 1): `fred.py` → `finra.py` → `yfinance_client.py` → `alphavantage.py` → `polygon.py` → optional clients per `docs/DATA_ROUTING.md`.
 - Keys in `.env` per `docs/DATA_SOURCES.md`. Never commit secrets.
 - Cache aggressively on rate-limited free tiers (Alpha Vantage 25 req/day).
 - Verify each client standalone with a live key before wiring to subagents.

@@ -1,0 +1,47 @@
+---
+description: CASSANDRA communication protocol — EVERY message from Cursor follows this format exactly
+alwaysApply: true
+---
+
+# Protocol enforcement — non-negotiable
+
+Every single response Cursor sends — whether implementing code, requesting a review, reporting status,
+or asking a question — MUST open with the protocol header block below and close with `═══ END ═══`.
+No exceptions. A response that doesn't start with `═══ CASSANDRA ════` is malformed and must be redone.
+
+## The mandatory header
+
+```
+═══ CASSANDRA ════════════════════════════════════════════════════════════
+PHASE   : <N> — <Name>
+FROM    : Cursor
+TO      : Claude
+TYPE    : IMPLEMENT | REVIEW_REQUEST | REVIEW_RESPONSE | STATUS_UPDATE
+DATE    : YYYY-MM-DD
+═══════════════════════════════════════════════════════════════════════════
+```
+
+## The mandatory sections (in order, all present every time)
+
+1. **SUMMARY** — ≤5 lines. What this message delivers. What problem it solves.
+2. **GATE STATUS** — ✅ / ❌ / ⏳ for every gate relevant to the current phase. If ❌ stop here.
+3. **FILES** — every file delivered, full content, path first. No truncation, no "# unchanged".
+4. **VERIFY** — copy-pasteable commands + expected output. Run them yourself first.
+5. **KNOWN GAPS** — honest list of what is NOT included and why. "None" is acceptable; silence is not.
+6. **TO CLAUDE** — numbered action list for Claude. Flag any judgment calls or keys needed.
+
+## Type rules
+
+- `IMPLEMENT` — Cursor is delivering code. Always includes FILES + VERIFY.
+- `REVIEW_REQUEST` — Cursor is asking Claude to verify a gate. Always includes the artifact (table, output, log) in FILES or inline.
+- `STATUS_UPDATE` — Cursor is reporting a gate pass/fail without new files. Still needs GATE STATUS.
+- Never send freeform prose without the header. Even a "quick update" uses the format.
+
+## Self-check before sending
+
+Cursor must verify:
+- [ ] Header block present and complete
+- [ ] All VERIFY commands were actually run (paste real output, not expected)
+- [ ] No file is truncated or uses "..." / "rest unchanged"
+- [ ] GATE STATUS has a ✅ ❌ or ⏳ for every open gate in status.md
+- [ ] status.md and handoff.md are updated before any REVIEW_REQUEST

@@ -13,7 +13,9 @@ import os
 import httpx
 
 from ..schemas import Direction, MetricReading
+from ._env import load_env
 
+load_env()
 FRED_BASE = "https://api.stlouisfed.org/fred/series/observations"
 
 

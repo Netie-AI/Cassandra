@@ -1,0 +1,48 @@
+# Data source routing — which provider wins for each job.
+# See docs/DATA_ROUTING.md for the full matrix and labels.
+#
+# Labels: CORE | FALLBACK | PAID | OPTIONAL | MANUAL | DEFERRED
+
+llm:
+  provider: openrouter          # openrouter | groq | anthropic | sea_lion
+  orchestrator_model: anthropic/claude-opus-4
+  subagent_model: anthropic/claude-sonnet-4
+  groq_orchestrator: llama-3.3-70b-versatile
+  groq_subagent: llama-3.1-8b-instant
+
+routes:
+  # Factor L — leverage / macro fragility
+  leverage_margin:     { primary: finra,       fallback: [fred] }
+  credit_spreads:      { primary: fred,        fallback: [] }
+  macro_liquidity:     { primary: fred,        fallback: [twelvedata] }
+
+  # Factor B — breadth / phase OHLCV
+  ohlcv_us:            { primary: yfinance,    fallback: [polygon, alphavantage, twelvedata, marketstack, eodhd] }
+  breadth_us:          { primary: yfinance,    fallback: [polygon, alphavantage] }
+  ohlcv_asia:          { primary: moomoo,      fallback: [yfinance], note: "moomoo needs OpenD running" }
+
+  # Factor S — sentiment / vol / flow
+  news_sentiment:      { primary: alphavantage, fallback: [finnhub, tavily, serper] }
+  options_chain:       { primary: polygon,      fallback: [tradier], note: "polygon key = Massive" }
+  options_flow:        { primary: unusual_whales, fallback: [polygon], optional: true }
+  crypto_sentiment:    { primary: coingecko,    fallback: [tessa, glassnode] }
+
+  # Factor V — valuation
+  fundamentals:        { primary: eodhd,       fallback: [fmp, finnhub, alphavantage] }
+  index_levels:        { primary: yfinance,    fallback: [twelvedata, finnhub] }
+
+  # Whale / smart money
+  insiders:            { primary: fmp,         fallback: [finnhub, eodhd], optional: true }
+  dark_pool:           { primary: unusual_whales, fallback: [], optional: true }
+
+  # Trigger C
+  fed_path:            { primary: fred,        fallback: [twelvedata], manual: [cme_fedwatch_scrape] }
+  earnings_transcripts:{ primary: fmp,         fallback: [finnhub], optional: true }
+  web_research:        { primary: tavily,      fallback: [serper, openbb] }
+
+# Libraries (pip install) — not all wired yet; see docs/DATA_ROUTING.md
+libraries:
+  yfinance:     { role: "US OHLCV + indices + VIX", tier: CORE, wired: true }
+  tessa:        { role: "Unified yfinance + coingecko wrapper", tier: FALLBACK, wired: false }
+  bandl:        { role: "India NSE + crypto Binance/CoinDCX", tier: OPTIONAL, wired: false }
+  openbb:       { role: "Multi-provider aggregator / MCP", tier: OPTIONAL, wired: false }

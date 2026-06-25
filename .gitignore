@@ -1,33 +1,71 @@
-# Secrets and local config
+# ═══ SECRETS — never commit ════════════════════════════════
 .env
+.env.*
+!.env.example
 config/settings.yaml
 
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
-.env.local
-
-# Runtime data
+# ═══ Local database (stays on your machine) ════════════════
 store/*.sqlite
+store/*.sqlite3
+store/*.db
+store/*.sqlite-wal
+store/*.sqlite-shm
+store/*.sqlite-journal
+store/ohlcv/
+store/cache/
 store/evidence/**/*
 !store/.gitkeep
 !store/evidence/.gitkeep
+
+# ═══ Cached market data ════════════════════════════════════
+data/
+*.csv
+
+# ═══ Claude drop zone (archive only — not source) ═════════
+others/
+*.zip
+
+# ═══ Python ════════════════════════════════════════════════
+__pycache__/
+*.py[cod]
+*.pyo
+.eggs/
+*.egg-info/
+build/
+dist/
+
+# ═══ Virtual environments ══════════════════════════════════
+.venv/
+venv/
+env/
+
+# ═══ Reports output (generated, not source) ════════════════
 reports/*
 !reports/.gitkeep
+*.md.out
 
-# IDE
-.idea/
+# ═══ Tooling ═══════════════════════════════════════════════
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ═══ Editor / OS ═══════════════════════════════════════════
 .vscode/
-*.swp
-
-# OS
+.idea/
+.cursor/*
+!.cursor/rules/
+!.cursor/skills/
+!.cursor/agents/
 .DS_Store
 Thumbs.db
 
-# UI (Phase 8)
+# ═══ Logs ══════════════════════════════════════════════════
+*.log
+logs/
+
+# ═══ UI build artifacts ════════════════════════════════════
 ui/node_modules/
 ui/.next/
 ui/out/

@@ -15,8 +15,9 @@ arithmetic; fragility ≠ trigger; no crash-date prediction; decision-support ne
 system can say NO.
 
 **Claude ↔ Cursor gate:** read `status.md` before starting; update it after each gate. For `[REVIEW]`
-phases, fill `handoff.md` and wait for Claude verification before advancing. Skills and subagent roles
-live in `.cursor/skills/` and `.cursor/agents/`; specs live in `docs/`.
+phases, fill `handoff.md` per `docs/PROTOCOL.md` and wait for Claude verification. Skills and subagent
+roles live in `.cursor/skills/` and `.cursor/agents/`; specs live in `docs/`. Claude root drops → copy
+to target → archive in `others/`.
 
 ---
 
@@ -36,7 +37,7 @@ pip install exchange_calendars   # for accurate market-calendar awareness
 
 ---
 
-## Phase 1 — Data clients (free-first)
+## Phase 1 — Data clients (free-first)  ✅ code · ⏳ live keys
 
 **Build:** implement `src/tools/*.py`, one source at a time, in this order: `fred.py` (done as the
 pattern) → `finra.py` (margin debt CSV) → `alphavantage.py` (price + news) → then paid:

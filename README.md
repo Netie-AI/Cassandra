@@ -63,21 +63,21 @@ cassandra/
   README.md                 <- you are here
   BUILD.md                  <- sequential build plan (Cursor follows this)
   status.md                 <- current phase, gates, blockers
-  handoff.md                <- Claude ↔ Cursor review contract
+  handoff.md                <- Claude ↔ Cursor review (docs/PROTOCOL.md)
   requirements.txt
   .env.example
   config/
     settings.example.yaml   <- copy to settings.yaml
   docs/
-    ARCHITECTURE.md         <- agent topology, DAG, data flow, cost
-    CRASH_SCORE_SPEC.md     <- THE MATH — verify first
-    DATA_SOURCES.md         <- API map, env vars, free vs paid
+    DATA_SOURCES.md         <- API map, env vars, labels
+    DATA_ROUTING.md         <- what to use for what (priority matrix)
     NEWS_PIPELINE_SPEC.md
     SENTIMENT_ANALOG_SPEC.md
     OPTIONS_ENGINE_SPEC.md
     METHODS_REGISTRY.md
     UI_SPEC.md
     EVENT_MODULE_SPEC.md    <- Part 2 (deferred)
+    PROTOCOL.md             <- Claude ↔ Cursor message format
   agents/
     orchestrator.md         <- Opus synthesis prompt
     subagents.md            <- 5 specialist prompts

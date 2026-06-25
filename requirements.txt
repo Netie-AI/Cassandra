@@ -6,3 +6,7 @@ numpy>=1.26
 pyyaml>=6.0
 apscheduler>=3.10
 exchange_calendars>=4.5
+python-dotenv>=1.0
+yfinance>=0.2.40
+fastapi>=0.115
+uvicorn[standard]>=0.32

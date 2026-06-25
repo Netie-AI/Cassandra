@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>CASSANDRA — Crash Risk</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0a0e17; color: #e2e8f0; font-family: ui-monospace, monospace; }
+    .gauge { background: conic-gradient(from 180deg, #22c55e 0%, #eab308 35%, #ef4444 70%, #7f1d1d 100%); }
+  </style>
+</head>
+<body class="min-h-screen p-6">
+  <header class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
+    <div>
+      <h1 class="text-2xl font-bold tracking-widest">CASSANDRA</h1>
+      <p class="text-slate-400 text-sm">Crash Risk Score — decision support only · no execution</p>
+    </div>
+    <button id="runBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm">Run cycle</button>
+  </header>
+
+  <main id="app" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <section class="lg:col-span-1 p-6 rounded-lg bg-slate-900 border border-slate-700">
+      <p class="text-slate-400 text-xs uppercase mb-2">Crash Risk Score</p>
+      <p id="crs" class="text-5xl font-bold text-amber-400">—</p>
+      <p id="band" class="text-lg mt-1">—</p>
+      <p id="conf" class="text-sm text-slate-400 mt-2">± — · confidence —</p>
+      <p id="asof" class="text-xs text-slate-500 mt-4"></p>
+    </section>
+
+    <section class="lg:col-span-2 p-6 rounded-lg bg-slate-900 border border-slate-700">
+      <p class="text-slate-400 text-xs uppercase mb-4">Fragility vs Trigger</p>
+      <div class="grid grid-cols-2 gap-4">
+        <div><span class="text-slate-500">F (fragility)</span><p id="f" class="text-2xl">—</p></div>
+        <div><span class="text-slate-500">T (trigger)</span><p id="t" class="text-2xl">—</p></div>
+        <div><span class="text-slate-500">Phase</span><p id="phase" class="text-lg">—</p></div>
+        <div><span class="text-slate-500">Momentum</span><p id="mom" class="text-lg">—</p></div>
+      </div>
+    </section>
+
+    <section class="lg:col-span-3 p-6 rounded-lg bg-slate-900 border border-slate-700">
+      <p class="text-slate-400 text-xs uppercase mb-4">Factors · hover source in note</p>
+      <div id="factors" class="grid grid-cols-5 gap-2 text-center text-sm"></div>
+    </section>
+
+    <section class="lg:col-span-3 p-6 rounded-lg bg-slate-900 border border-slate-700 max-h-96 overflow-auto">
+      <p class="text-slate-400 text-xs uppercase mb-4">Live metrics (source-attributable)</p>
+      <table class="w-full text-xs">
+        <thead><tr class="text-slate-500"><th class="text-left p-1">Metric</th><th>F</th><th>Raw</th><th>Source</th></tr></thead>
+        <tbody id="metrics"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <p class="text-center text-slate-600 text-xs mt-8">Personal research tooling — not financial advice</p>
+  <script src="/static/app.js"></script>
+</body>
+</html>
