@@ -3,21 +3,22 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="description" content="CASSANDRA — AI sector crash risk score. Decision support only. By netie.ai"/>
+  <meta name="description" content="CASSANDRA — AI sector crash risk score by netie.ai"/>
   <title>CASSANDRA — Crash Risk Score · netie.ai</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/styles.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
 </head>
 <body>
   <div class="top-bar">
     <nav class="nav-links">
       <a href="/pricing" data-i18n="pricing">Pricing</a>
-      <a href="/newspaper-report" data-i18n="shareView">Read newspaper</a>
-      <a href="/stocks/NOW" data-i18n="stocks">Stock demos</a>
+      <a href="/newspaper-report" data-i18n="shareView">Newspaper</a>
+      <a href="/stocks/NOW" data-i18n="stocks">Demos</a>
     </nav>
-    <div class="toolbar" role="toolbar" aria-label="Display controls">
+    <div class="toolbar" role="toolbar">
       <button type="button" class="ctrl-btn lang-btn active" data-lang="en">EN</button>
       <button type="button" class="ctrl-btn lang-btn" data-lang="zh">中文</button>
       <button type="button" class="ctrl-btn lang-btn" data-lang="ms">BM</button>
@@ -26,20 +27,20 @@
     </div>
   </div>
 
-  <header class="site-header">
+  <header class="site-header fu">
     <div class="brand-block">
-      <div class="logo glow">CASSANDRA</div>
-      <p class="tagline" data-i18n="tagline">Crash Risk Score · decision support only · no execution</p>
+      <div class="logo-sub">CASSANDRA</div>
+      <h1 class="logo-title">AI sector crash monitor</h1>
+      <p class="tagline" data-i18n="tagline">Fragility × trigger · decision support only · no execution</p>
       <p class="brand-credit">
         <span data-i18n="credit">Built by</span>
         <a href="https://netie.ai" target="_blank" rel="noopener">netie.ai</a>
-        ·
-        <a href="https://github.com/Netie-AI/Cassandra" target="_blank" rel="noopener">GitHub</a>
+        · <a href="https://github.com/Netie-AI/Cassandra" target="_blank" rel="noopener">GitHub</a>
       </p>
     </div>
     <div class="header-actions">
       <div class="countdown">
-        <span data-i18n="nextUpdate">Next score update</span>
+        <span id="countdown-label" data-i18n="nextUpdate">Next score update</span>
         <strong id="countdown">—</strong>
         <span id="countdown-slot" class="mono"></span>
       </div>
@@ -48,34 +49,28 @@
   </header>
 
   <main>
-    <section class="hero edge-glow">
-      <div class="crs-panel">
-        <div class="crs-label" data-i18n="crsLabel">Crash Risk Score</div>
-        <div id="crs">—</div>
-        <div id="band-label">—</div>
-        <div id="distance-mania"></div>
-        <div id="coverage-note"></div>
-        <div id="asof"></div>
+    <!-- CRS Hero -->
+    <section class="crs-hero fu d1">
+      <div class="crs-hero-label" data-i18n="crsLabel">Crash Risk Score</div>
+      <div id="crs" class="crs-mega">—</div>
+      <div class="crs-band-row">
+        <span id="band-label" class="band-name">—</span>
+        <span id="band-range" class="band-range mono">± —</span>
       </div>
-      <div class="zone-panel">
-        <div class="zone-title" data-i18n="zoneTitle">Risk zone</div>
-        <div class="zone-track">
-          <div id="zone-needle" class="zone-needle"></div>
-        </div>
-        <div class="zone-labels">
-          <span>Benign</span>
-          <span>Awareness</span>
-          <span>Mania</span>
-          <span>Danger</span>
-          <span>Blow-off</span>
-        </div>
+      <p id="distance-mania" class="distance-line"></p>
+      <div class="zone-track zone-track-slim">
+        <div id="zone-needle" class="zone-needle zone-needle-slim"></div>
+      </div>
+      <div class="zone-labels zone-labels-slim">
+        <span>Stable</span><span>Complace</span><span>Aware</span><span>Mania</span><span>Danger</span><span>Crisis</span>
       </div>
     </section>
 
-    <section class="share-panel">
+    <!-- Share -->
+    <section class="share-panel fu d2">
       <div>
         <h3 data-i18n="shareTitle">Share today's report</h3>
-        <p data-i18n="shareBody">Copy a link or download the NYT-style edition for subscribers.</p>
+        <p data-i18n="shareBody">Copy link or download the NYT-style edition — same format emailed to subscribers.</p>
       </div>
       <div class="share-actions">
         <button type="button" id="btn-share" class="btn btn-secondary" data-i18n="shareCopy">Copy link</button>
@@ -84,64 +79,90 @@
       </div>
     </section>
 
-    <section class="grid-4">
-      <div class="stat-card">
-        <div class="label" data-i18n="fragility">Fragility (F)</div>
-        <div id="f" class="value">—</div>
+    <!-- Metrics -->
+    <section class="grid-4 fu d2">
+      <div class="metric-card">
+        <div class="metric-label" data-i18n="fragility">Fragility (F)</div>
+        <div id="f" class="metric-value">—</div>
+        <div class="metric-bar"><div id="bar-f" class="metric-fill"></div></div>
+        <div id="f-sub" class="metric-sub mono"></div>
       </div>
-      <div class="stat-card">
-        <div class="label" data-i18n="trigger">Trigger (T)</div>
-        <div id="t" class="value">—</div>
+      <div class="metric-card">
+        <div class="metric-label" data-i18n="trigger">Trigger (T)</div>
+        <div id="t" class="metric-value">—</div>
+        <div class="metric-bar"><div id="bar-t" class="metric-fill"></div></div>
+        <div id="t-sub" class="metric-sub mono"></div>
       </div>
-      <div class="stat-card">
-        <div class="label" data-i18n="phase">Phase</div>
-        <div id="phase" class="value value-sm">—</div>
+      <div class="metric-card">
+        <div class="metric-label" data-i18n="phase">Phase</div>
+        <div id="phase" class="metric-value metric-value-sm">—</div>
+        <div class="metric-bar"><div id="bar-phase" class="metric-fill"></div></div>
+        <div id="phase-sub" class="metric-sub mono"></div>
       </div>
-      <div class="stat-card">
-        <div class="label" data-i18n="confidence">Confidence</div>
-        <div id="conf" class="value value-sm">—</div>
-      </div>
-    </section>
-
-    <section class="factors-section">
-      <div class="section-title" data-i18n="factorsTitle">Factor breakdown · L/V live · S/B/C for subscribers</div>
-      <div id="factors" class="factors-grid"></div>
-    </section>
-
-    <section class="cta-panel">
-      <div class="cta-box referral-box" id="referral-cta">
-        <h3 data-i18n="referralTitle">Refer & earn 7 days free API</h3>
-        <p data-i18n="referralBody">When someone subscribes with your link, activate a 7-day API trial in your account vouchers.</p>
-        <button type="button" id="btn-referral" class="btn btn-primary" data-i18n="referralCopy">Copy referral link</button>
-        <p class="referral-code mono" id="referral-display"></p>
-      </div>
-      <div class="cta-box" id="sub-cta">
-        <h3 data-i18n="subTitle">Full factor access</h3>
-        <p data-i18n="subBody">Unlock S, B, C factors + daily newspaper report.</p>
-        <div id="sub-buttons"></div>
+      <div class="metric-card">
+        <div class="metric-label" data-i18n="coverage">Coverage</div>
+        <div id="cov-pct" class="metric-value">—</div>
+        <div class="metric-bar"><div id="bar-cov" class="metric-fill metric-fill-warn"></div></div>
+        <div id="coverage-note" class="metric-sub metric-sub-warn"></div>
       </div>
     </section>
 
-    <section class="cta-panel">
-      <div class="cta-box" id="donate-cta">
-        <h3 data-i18n="donateTitle">Support the research</h3>
-        <p data-i18n="donateBody">One-off contribution — routed to your local payment method.</p>
-        <div id="donate-buttons"></div>
+    <!-- Factors -->
+    <section class="factors-section fu d3">
+      <div class="section-head">
+        <span class="section-title" data-i18n="factorsTitle">Factor breakdown</span>
+        <span class="section-hint">🔒 S · B · C <span data-i18n="subTitle">for subscribers</span></span>
       </div>
+      <div id="factors" class="factors-grid factors-grid-rich"></div>
+      <p class="formula-footnote mono">CRS = 100 · (0.35·F + 0.20·T + 0.45·F·T) · freshness · coverage</p>
+    </section>
+
+    <!-- History -->
+    <section class="history-section fu d3">
+      <div class="section-title">30-DAY CRS HISTORY</div>
+      <div class="chart-wrap">
+        <canvas id="histChart" role="img" aria-label="CRS history chart"></canvas>
+      </div>
+    </section>
+
+    <!-- CTAs -->
+    <section class="cta-grid fu d4">
       <div class="cta-box">
-        <h3 data-i18n="digestTitle">Daily thesis digest</h3>
-        <p data-i18n="digestBody">Newspaper-style report emailed 3× on trading days.</p>
+        <div class="cta-kicker" data-i18n="digestTitle">Free daily report</div>
+        <p data-i18n="digestBody">Newspaper-style score in your inbox · 3× on trading days.</p>
         <form id="newsletter-form" class="newsletter-form" action="#" method="post">
           <input type="email" name="email" placeholder="you@example.com" required aria-label="Email"/>
           <button type="submit" class="btn btn-primary">Subscribe</button>
         </form>
       </div>
+      <div class="cta-box cta-box-highlight">
+        <div class="cta-badge">API ACCESS</div>
+        <div class="cta-kicker">$4.99 / month</div>
+        <p data-i18n="subBody">All 5 factors · newspaper report · JSON history.</p>
+        <div id="sub-buttons"></div>
+      </div>
+    </section>
+
+    <section class="referral-strip fu d5">
+      <div>
+        <strong data-i18n="referralTitle">Refer & earn 7 days free API</strong>
+        <p data-i18n="referralBody">When a referral subscribes, activate trial in account vouchers.</p>
+      </div>
+      <button type="button" id="btn-referral" class="btn btn-secondary" data-i18n="referralCopy">Copy referral link</button>
+    </section>
+
+    <section class="donate-strip fu d5">
+      <div>
+        <strong data-i18n="donateTitle">Support the research</strong>
+        <p data-i18n="donateBody">Keep CASSANDRA free for everyone.</p>
+      </div>
+      <div id="donate-buttons" class="donate-actions"></div>
     </section>
   </main>
 
   <footer>
     <p data-i18n="footerLegal">Personal research tooling — not financial advice.</p>
-    <p class="disclaimer" data-i18n="footerDisclaimer">CRS is a composite index with confidence bands. Low coverage widens uncertainty. No crash-date predictions.</p>
+    <p class="disclaimer" data-i18n="footerDisclaimer">No crash-date predictions. Low coverage widens bands.</p>
     <p class="footer-credits">
       <a href="https://crash.netie.ai">crash.netie.ai</a>
       · <a href="https://netie.ai">netie.ai</a>
