@@ -5,18 +5,15 @@
 
 ---
 
-## Phase 2 ✅ APPROVED · Phase 3 🔓 orchestrator unblocked · UI + Worker delivered
-
-Claude REVIEW_RESPONSE 2026-06-25: Phase 2 deploy scaffold APPROVED. Phase 3 LLM wiring unblocked.
+## Phase 2 ✅ · Phase 3 dashboard ✅ · Phase 4 UI + report 🔄
 
 | Phase | Status | Gate |
 |-------|--------|------|
-| 0 Scaffold | ✅ | CRS=56.9 self-tests |
-| 1 Data clients | ✅ | All clients import; core live |
-| 2 Config weights | ✅ | `python -m src.config` CRS=56.9 |
-| 3 Agents | 🔄 | Orchestrator + capex grader + DailyReport |
-| 8 UI | 🔄 | Palantir dashboard + geo payments |
-| 9 Deploy | 🔄 | CF Worker spec + `publish_score()` |
+| 3 Dashboard | ✅ | Claude APPROVED 2026-06-25 |
+| 4 UI + report | 🔄 | Newspaper, pricing, stocks, Gemini report.py |
+| 4 Orchestrator | ⬜ | OpenRouter `# WIRE:` next |
+| 8 UI | 🔄 | Main + newspaper + pricing |
+| 9 Deploy | 🔄 | CF Worker + Pages |
 
 ---
 

@@ -1,46 +1,26 @@
 # HANDOFF → Next Cursor session
 
-**Read this first.** Protocol: `.cursor/rules/600-protocol.mdc` · Full format: `docs/PROTOCOL.md`
+## Phase 4 — delivered
 
-## Phase 3 — IN PROGRESS
+- `web/static/newspaper-report.html` — NYT layout, share/download/print, live `/api/latest`
+- Main dashboard — EN/ZH/MS, dark/light, share panel, referral stub, netie.ai credits
+- `web/static/pricing.html` — 4 tiers
+- `/stocks/NOW`, `/stocks/MU` — static demos
+- `src/report.py` — Gemini 2.5 Flash (uses `GEMINI_API_KEY`)
+- `api/auth.py` — tier gating stub (`X-Tier` header for dev)
+- `tests/test_scoring_band.py` — coverage widens band
+- `PARKING_LOT.md`, `TIER_SPEC.md` at repo root
 
-Claude **APPROVED** Phase 2 deploy scaffold (2026-06-25). Orchestrator LLM wiring **unblocked**.
+## Next
 
-| Done this session | Next |
-|-------------------|------|
-| Palantir-grade dashboard (`web/static/`) | Wire `# WIRE:` orchestrator (OpenRouter) |
-| Geo payment routing (MY/CN/intl) | Capex-cut grader ← tavily |
-| Cloudflare Worker spec + `worker.js` | `src/report.py` DailyReport renderer |
-| `/api/latest`, `/api/geo`, `PIPELINE_KEY` on `/api/run` | REVIEW_REQUEST with scoring.py |
-
----
-
-## Deployment model
-
-```
-Laptop: pipeline 3×/day → scores.sqlite → publish_score() PUT → CF Worker KV
-Pages:  web/static/ → GET /api/latest + /api/geo → render dashboard
-```
-
-Configure checkout URLs in `web/static/config.js`. Set `PIPELINE_KEY` before public launch.
-
----
-
-## Git hygiene
+1. Wire orchestrator `# WIRE:` (OpenRouter)
+2. Supabase auth when ready (PARKING_LOT)
+3. Set payment URLs in `config.js`
+4. Deploy CF Worker + Pages
 
 ```bash
-git status   # no .env, *.sqlite, store/ohlcv, others/, *.zip
-git push -u origin <branch>   # after every significant diff
-```
-
----
-
-## Quick verify
-
-```bash
-python -m src.scoring      # CRS=56.9
-python -m src.pipeline     # live CRS
-uvicorn api.main:app --port 8080   # open dashboard
+python -m pytest tests/test_scoring_band.py
+uvicorn api.main:app --port 8080
 ```
 
 ═══ END HANDOFF CURSOR ═══

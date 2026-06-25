@@ -1,6 +1,11 @@
-/** Public dashboard config — override URLs before Pages deploy. No secrets here. */
+/** CASSANDRA — public dashboard config (no secrets). */
 window.CASSANDRA_CONFIG = {
-  newsletterAction: "", // ConvertKit/Beehiiv form POST URL
+  brand: {
+    site: "https://crash.netie.ai",
+    org: "https://netie.ai",
+    github: "https://github.com/Netie-AI/Cassandra",
+  },
+  newsletterAction: "",
   payments: {
     international: {
       stripeSubscribe: "https://buy.stripe.com/PLACEHOLDER",
