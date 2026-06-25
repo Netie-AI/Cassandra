@@ -36,7 +36,7 @@ intra_weights:
   B: {pct_above_200dma: 0.30, new_high_low: 0.25, divergence: 0.30, ad_slope: 0.15}
   V: {cohort_fwd_ps: 0.35, mktcap_gdp: 0.25, top10_concentration: 0.20, erp_inv: 0.20}
   S: {put_call_inv: 0.25, retail_call_streak: 0.25, iv_skew: 0.20, survey: 0.15, crypto_mvrv: 0.15}
-  C: {fed_path: 0.30, supply_tells: 0.25, capex_cut_nlp: 0.25, capex_rev_gap_slope: 0.10, net_liquidity: 0.10}
+  C: {fed_path: 0.25, supply_tells: 0.20, capex_cut_nlp: 0.35, capex_rev_gap_slope: 0.10, net_liquidity: 0.10}
 
 # Fragility composition + CRS interaction (§4–§5)
 factor_weights: {L: 0.30, B: 0.25, V: 0.25, S: 0.20}

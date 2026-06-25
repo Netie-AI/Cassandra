@@ -1,52 +1,69 @@
 # HANDOFF → Next Cursor session
 
-**Read first:** `HANDOFF_CLAUDE.md` (orchestrator architecture + capex calibration) · `docs/PROMPT_ENGINEERING.md`
+**Read first:** `status.md` · `files4/POLISH_FIXES.md` · `files4/GOLDEN_TRANSLATION_REFERENCE.md` · `files4/DEBUG_REASONING_LOG.md`
 
-## Phase 5 — Orchestrator wiring (UNBLOCKED)
+---
 
-Claude APPROVED Phase 4 (2026-06-25). Wire `# WIRE:` in `src/orchestrator.py` on branch **`phase5-orchestrator`**.
+## Current state (2026-06-25, UI deploy prep)
 
-### Do in order
+### Fixed this round
 
-1. **Calendar gate** — `calendar_guard.should_run()` before dispatch; skip if None
-2. **5 subagents parallel** — `asyncio.gather(..., return_exceptions=True)`; failure → None
-3. **Coverage** — `subagents_ok / 5` passed to `compute_crs`
-4. **Normalize** — reuse `pipeline.normalize_metrics` pattern + `store.history_lookup`
-5. **Score** — `scoring.compute_crs()` only; `phase.classify()` on OHLCV
-6. **Report** — `report.generate_report_sections()` → Gemini (already wired)
-7. **Persist** — `save_score` + `save_metrics` + `publish_score` (fail-safe)
-8. **capex grader** — `src/tools/capex_nlp.py` + calibration from HANDOFF_CLAUDE.md
+| Issue | Root cause | Fix |
+|-------|------------|-----|
+| Homepage unstyled HTML | Missing `styles.css` + broken `</head>` in `index.html` | Restored full head block |
+| Dead controls / `--` panels | Orphaned JS after `setupSignIn()` removal | Removed dangling block; guarded panel loads |
+| Mixed EN/ZH on newspaper body | Body stored English only; labels in dict | `newspaper-bodies.js` golden ZH/MS wired in `setLang()` |
+| Analog section stays English | No `setAnalogLang()` | `analog-resolution.js` i18n + homepage ids |
+| Methodology 404 / unstyled | Route pointed to missing HTML | `docs-methodology.html` with shared docs chrome |
+| Dates stay English on lang toggle | `toLocaleDateString` not re-run | `setDateLine()` / `updateReportDate()` on lang change |
 
-### LLM routing (`config/data_sources.yaml`)
+### Canonical UI paths
 
-- Subagents: OpenRouter `anthropic/claude-sonnet-4` (or Groq fallback)
-- Orchestrator pass-2: OpenRouter `anthropic/claude-opus-4`
-- Report text: `GEMINI_API_KEY` → `gemini-2.5-flash`
-- capex_cut: `capex_nlp.score_capex_cut()` → Gemini first, OpenRouter fallback
+- **Home:** `web/static/index.html` + `app.js` + `common.js`
+- **Newspaper:** `web/static/newspaper-report.html` + `newspaper-bodies.js` + `newspaper.js`
+- **Docs:** `docs-api.html`, `docs-institutional.html`, `docs-methodology.html` + `docs-chrome.js`
+- **Golden translations:** `files4/GOLDEN_TRANSLATION_REFERENCE.md` (pipeline must match)
+- **Debug discipline:** `files4/DEBUG_REASONING_LOG.md` (Cases 1–4)
 
-### Ponytail rule
-
-Smallest diff. Reuse `pipeline.py` + `store.py`. No duplicate math. JSON-only subagent outputs.
-
-### After wiring — REVIEW_REQUEST to Claude
-
-Paste `src/orchestrator.py` + gate output:
-```bash
-python -m src.orchestrator --run
-python -m pytest tests/ -q
-```
-
-### UI (this session)
-
-Dashboard upgraded from `cassandra_dashboard_ui_mockup.html` — centered CRS hero, factor bars, 30-day chart.
-
-### Verify anytime
+### Verify before deploy
 
 ```bash
 uvicorn api.main:app --port 8080
-python -m pytest tests/test_scoring_band.py -q
+python -m pytest tests/ -q
 ```
 
-**GitHub:** push `phase5-orchestrator` after significant diff.
+Hard refresh `http://localhost:8080/` — expect styled grid, zero console errors, lang cycle EN→文→MS swaps dates + narrative + analog section.
+
+---
+
+## Short-term goals (next session)
+
+1. **Pricing page i18n** — wire or keep lang button hidden (currently hidden per POLISH_FIXES)
+2. **Live `/api/movers`** — Finnhub/Polygon feed; demo already leads MU/WDC in `demo-data.js`
+3. **Pipeline translation storage** — store `(asof, lang)` bodies from `src/report.py`; frontend swaps API body when present, falls back to `newspaper-bodies.js`
+4. **Platform card playgrounds** — link to docs/stock desk; do NOT ship ungated agent chat (see PARKING_LOT)
+5. **Payment URLs** — set Stripe placeholders in `web/static/config.js`
+
+---
+
+## Long-term goals
+
+| Goal | Phase |
+|------|-------|
+| Orchestrator `# WIRE:` end-to-end `--run` | Phase 5 |
+| Supabase auth + tier webhooks | PARKING_LOT |
+| Live analog archive (not illustrative demo) | Phase 5+ |
+| Gated RAG agent chat on stock desk | Phase 5+ |
+| Deploy crash.netie.ai (CF Worker + Pages) | Phase 9 |
+
+---
+
+## Phase 5 orchestrator (parallel track)
+
+Claude APPROVED Phase 4. Wire `# WIRE:` in `src/orchestrator.py` on branch **`phase5-orchestrator`**.
+
+See prior orchestrator checklist in git history / `HANDOFF_CLAUDE.md`.
+
+**Ponytail rule:** smallest diff. LLM never computes CRS. No execution features.
 
 ═══ END HANDOFF CURSOR ═══

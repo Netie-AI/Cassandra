@@ -130,7 +130,7 @@ $4.99/month
 [Subscribe →]
 
 The Briefing  ← MOST POPULAR badge
-$10/month
+$9.99/month
 - Everything in Report
 - 10-page deep analysis
 - AI-generated insights
@@ -139,7 +139,7 @@ $10/month
 [Subscribe →]
 
 The Agent
-$50/month
+$49.99/month
 - Everything in Briefing
 - Custom stock watchlist
 - Stock-specific crash scores

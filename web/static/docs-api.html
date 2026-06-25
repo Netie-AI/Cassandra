@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Cassandra API — Technical Reference</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="/static/tokens.css"/>
+  <link rel="stylesheet" href="/static/styles.css"/>
+  <link rel="stylesheet" href="/static/docs.css"/>
+</head>
+<body class="home-page docs-page">
+  <div class="home-wrap">
+    <header class="home-header home-header-v3">
+      <div class="home-header-top">
+        <div class="home-header-brand">
+          <a href="/" class="home-logo cp">Cassandra</a>
+          <nav class="home-header-nav"><a href="/">Home</a><a href="/newspaper-report">Newspaper</a><a href="/pricing">Plans</a></nav>
+        </div>
+        <div class="home-toolbar">
+          <button type="button" id="theme-toggle" class="icon-btn" aria-label="Toggle theme"><i class="ti ti-moon" aria-hidden="true"></i><span class="icon-tip">Theme</span></button>
+          <div class="acct-wrap">
+            <button type="button" id="acct-btn" class="icon-btn" aria-label="Account menu" aria-expanded="false"><i class="ti ti-user" aria-hidden="true"></i><span class="icon-tip">Account</span></button>
+            <div id="acct-menu" class="acct-menu" hidden></div>
+          </div>
+        </div>
+      </div>
+      <div class="home-header-meta">
+        <a href="/" class="home-link">← Home</a>
+        <span class="cm">API REFERENCE</span>
+      </div>
+    </header>
+
+    <article class="docs-article">
+      <header class="docs-head">
+        <div class="sh docs-kicker">Technical whitepaper</div>
+        <h1 class="cp docs-title">Cassandra JSON API</h1>
+        <p class="docs-lead">Machine-readable CRS scores, factor readings, analog resolution payloads, and edition metadata. Decision-support data only. No execution endpoints.</p>
+      </header>
+
+      <section class="docs-section">
+        <h2 class="cp docs-h2">Authentication</h2>
+        <p>API tier subscribers receive an API key via account settings. Pass it on every request:</p>
+        <pre class="docs-code"><code>Authorization: Bearer &lt;api_key&gt;
+X-Cassandra-Tier: agent</code></pre>
+        <p>Unauthenticated requests receive the free tier: CRS + band with a two-day delay. Keys are rate-limited per plan.</p>
+      </section>
+
+      <section class="docs-section">
+        <h2 class="cp docs-h2">Base URL</h2>
+        <pre class="docs-code"><code>https://crash.netie.ai/api</code></pre>
+        <p>Local development: <code class="cm">http://localhost:8080/api</code></p>
+      </section>
+
+      <section class="docs-section">
+        <h2 class="cp docs-h2">Endpoints</h2>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="cm docs-method">GET</span> <code>/latest</code></div>
+          <p>Current CRS score, band, fragility, trigger, phase, coverage, and as-of date.</p>
+          <pre class="docs-code"><code>{
+  "crs": 39.2,
+  "band": "Aware",
+  "fragility": 0.58,
+  "trigger": 0.41,
+  "phase": "distribution",
+  "phase_confidence": 0.72,
+  "coverage": 0.8,
+  "asof": "2026-06-24",
+  "band_halfwidth": 1.2,
+  "confidence": 0.65,
+  "factors": { "L": 0.44, "V": 0.51, "S": 0.38, "B": 0.62, "C": 0.47 }
+}</code></pre>
+        </div>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="cm docs-method">GET</span> <code>/scores/history?limit=30</code></div>
+          <p>Trailing daily CRS rows for charting and backtests.</p>
+        </div>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="cm docs-method">GET</span> <code>/report/highlights</code></div>
+          <p>Edition headline, direction, sentiment, analog date, and sourced news snippets.</p>
+        </div>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="cm docs-method">GET</span> <code>/report/edition?asof=YYYY-MM-DD</code></div>
+          <p>Full persisted edition snapshot for a trading day.</p>
+        </div>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="cm docs-method">GET</span> <code>/analog/resolution?ticker=MU</code></div>
+          <p>API tier: up to five historical analogs (1990–2026) with next-day/week/month outcomes and source URLs. One ticker per day.</p>
+        </div>
+      </section>
+
+      <section class="docs-section">
+        <h2 class="cp docs-h2">Rate limits</h2>
+        <table class="docs-table">
+          <thead><tr><th>Tier</th><th>Requests</th><th>Refresh</th></tr></thead>
+          <tbody>
+            <tr><td>Free (delayed)</td><td>60 / hour</td><td>2-day lag</td></tr>
+            <tr><td>Report</td><td>120 / hour</td><td>Edition cadence</td></tr>
+            <tr><td>Pro</td><td>300 / hour</td><td>Intraday on trading days</td></tr>
+            <tr><td>API</td><td>1,000 / hour</td><td>3× daily + webhook</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="docs-section">
+        <h2 class="cp docs-h2">Example request</h2>
+        <pre class="docs-code"><code>curl -s -H "Authorization: Bearer $CASSANDRA_API_KEY" \
+  "https://crash.netie.ai/api/latest" | jq .crs, .band, .asof</code></pre>
+        <p>Expected: numeric CRS, band label, and ISO date string. Missing fields mean thin coverage. Check <code>coverage</code> before acting.</p>
+      </section>
+
+      <section class="docs-section docs-disclaimer">
+        <p>CRS is computed in Python, never by an LLM. Analog outcomes are historical records with linked sources, not forecasts. This API does not place trades.</p>
+      </section>
+    </article>
+
+    <footer class="docs-footer footer-tools">
+      <span>Cassandra Research Desk · crash.netie.ai</span>
+      <nav class="docs-footer-nav">
+        <a href="/pricing">Subscription plans</a>
+        <a href="/docs/institutional">Institutional feed</a>
+        <a href="/docs/methodology">Methodology</a>
+      </nav>
+    </footer>
+  </div>
+  <script src="/static/common.js"></script>
+  <script src="/static/docs-chrome.js"></script>
+</body>
+</html>

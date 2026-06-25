@@ -14,7 +14,7 @@ import yaml
 from . import scoring, phase
 from .config import load_settings, load_weights
 from .schemas import DailyScore, FactorBreakdown, MomentumState, Phase
-from .store import fragility_history, history_lookup, latest_score, save_metrics, save_score
+from .store import fragility_history, history_lookup, latest_score, save_metrics, save_report_graph, save_score
 from .tools._env import load_env
 
 load_env()
@@ -55,6 +55,10 @@ def collect_metrics(cfg: dict) -> list:
     return metrics
 
 
+# Metrics already on 0–1 scale (LLM grader output) — skip z-score when history sparse
+PRE_NORMALIZED = frozenset({"capex_cut_nlp", "supply_tells"})
+
+
 def normalize_metrics(metrics: list) -> tuple[dict, float, float]:
     by_factor: dict[str, dict] = {k: {} for k in "LVSBC"}
     present = total = 0
@@ -67,12 +71,15 @@ def normalize_metrics(metrics: list) -> tuple[dict, float, float]:
             by_factor[m.factor][m.name] = None
             continue
         present += 1
-        hist = history_lookup(m.name)
-        if m.use_percentile:
-            n = scoring.normalize_percentile(
-                m.raw_value, hist, int(m.direction), m.hard_threshold)
+        if m.name in PRE_NORMALIZED:
+            n = max(0.0, min(1.0, float(m.raw_value)))
         else:
-            n = scoring.normalize_zscore(m.raw_value, hist, int(m.direction))
+            hist = history_lookup(m.name)
+            if m.use_percentile:
+                n = scoring.normalize_percentile(
+                    m.raw_value, hist, int(m.direction), m.hard_threshold)
+            else:
+                n = scoring.normalize_zscore(m.raw_value, hist, int(m.direction))
         by_factor[m.factor][m.name] = n
         asof = m.asof if m.asof.tzinfo else m.asof.replace(tzinfo=dt.timezone.utc)
         age_days = max((now - asof).total_seconds() / 86400, 0)
@@ -114,6 +121,27 @@ def run_pipeline() -> DailyScore:
         band_label=result.band, coverage=result.coverage,
     )
     save_score(score, extra={"metric_count": len(metrics), "coverage": coverage})
+    save_report_graph(
+        score.asof,
+        {
+            "asof": score.asof.isoformat(),
+            "crs": score.crs,
+            "band": score.band_label,
+            "fragility": score.fragility,
+            "trigger": score.trigger,
+            "phase": score.phase.value,
+            "phase_confidence": score.phase_confidence,
+            "coverage": score.coverage,
+        },
+        sections={
+            "headline": f"Market desk edition for {score.asof.isoformat()}",
+            "sub_headline": "Automated pipeline snapshot",
+            "col1_html": "",
+            "col2_html": "",
+            "col3_html": "",
+        },
+        highlights={"analog_date": "March 14, 2000", "analog_news": [], "today_news": []},
+    )
     save_metrics(score.asof, metrics)
 
     try:

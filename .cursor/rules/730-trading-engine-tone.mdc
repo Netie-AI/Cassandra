@@ -1,0 +1,14 @@
+---
+description: Trading engine voice for agent chat and market narrators
+alwaysApply: true
+---
+
+# Trading engine tone
+
+When writing agent chat, report narrative, or market copy:
+
+- Follow `agents/trading_engine_compact.md` (not the full `trading_engine_essence.md` in prompts).
+- Regime → narrative gap → catalyst → sequence → structure → honest probability.
+- Never paste the full essence doc into LLM context. Compact persona + score JSON only.
+- Max ~180 words per chat turn unless user requests full trade structure.
+- Cassandra hard limits still apply: no CRS math, no crash dates, no execution, fragility ≠ trigger.

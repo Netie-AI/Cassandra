@@ -123,6 +123,50 @@ def fetch_breadth(basket: list[str], index_symbol: str = "^GSPC") -> list[Metric
     ]
 
 
+def fetch_quotes(symbols: list[str]) -> dict[str, dict]:
+    """
+    Lightweight last-price quotes for watchlist UI.
+    Returns {SYM: {px, pct, source, asof}} — pct is 1-day change.
+    """
+    yf = _yf()
+    now = dt.datetime.utcnow()
+    out: dict[str, dict] = {}
+    for sym in symbols:
+        s = sym.strip().upper()
+        if not s:
+            continue
+        try:
+            ticker = yf.Ticker(s)
+            fi = getattr(ticker, "fast_info", None)
+            last = None
+            prev = None
+            if fi is not None:
+                last = getattr(fi, "last_price", None) or getattr(fi, "lastPrice", None)
+                prev = getattr(fi, "previous_close", None) or getattr(fi, "previousClose", None)
+            if last is None:
+                hist = ticker.history(period="5d", interval="1d", auto_adjust=True)
+                if hist is not None and not hist.empty:
+                    closes = hist["Close"]
+                    last = float(closes.iloc[-1])
+                    if len(closes) >= 2:
+                        prev = float(closes.iloc[-2])
+            if last is None:
+                continue
+            last_f = float(last)
+            pct = 0.0
+            if prev is not None and float(prev) > 0:
+                pct = (last_f - float(prev)) / float(prev) * 100.0
+            out[s] = {
+                "px": f"{last_f:,.2f}",
+                "pct": round(pct, 2),
+                "source": f"yfinance:{s}",
+                "asof": now.isoformat(),
+            }
+        except Exception:
+            continue
+    return out
+
+
 def get_index_ohlcv_path(index_symbol: str = "^GSPC") -> Optional[str]:
     """Return the CSV path for the index, pulling fresh if needed. Used by phase.py."""
     data = fetch_ohlcv(index_symbol)

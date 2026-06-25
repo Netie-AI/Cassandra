@@ -17,3 +17,5 @@ Shared skills:
 - **Claude ↔ Cursor handoff** — `.cursor/skills/claude-cursor-handoff/` (`status.md`, `handoff.md`)
 
 Governance: `.cursor/rules/000-project.mdc` (always apply) + scoped rules 100–500.
+
+**Market voice:** `agents/trading_engine_compact.md` + rule `730-trading-engine-tone.mdc`. Never load full `trading_engine_essence.md` into LLM prompts.

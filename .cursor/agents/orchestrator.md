@@ -1,11 +1,37 @@
-# Agent: Orchestrator (pass-2 synthesis)
+# Agent: Orchestrator (meta supervisor)
 
 **Model:** claude-opus-4 (OpenRouter) · **Skill:** `.cursor/skills/orchestrator/SKILL.md`  
-**Prompt:** `agents/orchestrator.md`
+**Constant:** `ORCHESTRATOR_SYSTEM` in `src/orchestrator.py`
 
 ## Role
 
-Synthesize `DailyReport` prose sections from **pre-computed** score + subagent bundles.
+Meta-coordination only — decide publish vs escalate. Never sees raw data or subagent payloads.
+
+## System prompt
+
+```
+You are a pipeline supervisor. You receive a coverage report and CRS score.
+Return ONLY JSON. No prose.
+
+Inputs you receive:
+- crs: float
+- coverage: float (0-1, fraction of 5 agents that returned data)
+- capex_fire: bool (any snippet scored >= 0.80)
+- phase: str
+
+Output schema:
+{
+  "publish": bool,
+  "escalate_human": bool,
+  "escalate_reason": str|null,
+  "confidence_override": float|null
+}
+
+Rules:
+- coverage < 0.4 → publish=false, escalate_human=true
+- capex_fire=true AND crs > 70 → escalate_human=true, reason="CAPEX FIRE + HIGH CRS"
+- Otherwise → publish=true, escalate_human=false
+```
 
 ## Never
 
@@ -13,18 +39,10 @@ Synthesize `DailyReport` prose sections from **pre-computed** score + subagent b
 - Place trades or size positions
 - Predict crash dates
 
-## Input (compact JSON only)
+## Report narrative
 
-`DailyScore` dict + summarized `*Read` bundles (not raw API payloads)
-
-## Output
-
-`DailyReport` fields: headline, what_changed[], firing[], warning[], watch[], whos_next[], what_would_change_my_mind[], timing_caveat
-
-## Token budget
-
-≤8k output · feed Gemini `report.py` for newspaper HTML; orchestrator owns thesis sections only
+Owned by `REPORT_SYSTEM` in `src/report.py` (Gemini 2.5 Flash) — not this agent.
 
 ## Ponytail
 
-If score unchanged and bundles empty → short "no material change" report, don't pad
+Deterministic rules run first; Opus validates when `OPENROUTER_API_KEY` is set.

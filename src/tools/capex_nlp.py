@@ -98,14 +98,19 @@ CAPEX_CUT_CALIBRATION = [
     },
 ]
 
-RUBRIC = """Score hyperscaler AI/datacenter capex-cut signal 0.0–1.0.
-0.80–1.0 FIRE: explicit guidance cut, pauses, dollar reductions
-0.55–0.79 CONCERN: pace moderation, flexible timing, demand shortfall
-0.35–0.54 AMBIGUOUS: mixed commitment + caveats
-0.15–0.34 NEUTRAL: unchanged guidance, minor caution
-0.00–0.14 GROWTH: capex raise, acceleration
-Forward-looking language only. Non-AI capex → 0.0.
-Respond ONLY: {"score":0.XX,"reason":"one sentence"}"""
+GRADER_SYSTEM = """\
+You are a capex-cut signal scorer. Return ONLY JSON. No prose.
+
+BANDS: 0.80-1.0=FIRE|0.55-0.79=CONCERN|0.35-0.54=AMBIGUOUS|0.15-0.34=NEUTRAL|0.00-0.14=GROWTH
+SCOPE: hyperscaler AI/datacenter only (MSFT Azure, AMZN AWS, GOOG GCP/TPU, META AI, ORCL Cloud, CoreWeave, xAI)
+NON-AI capex → 0.0
+FORWARD-LOOKING only: past tense reductions score lower by -0.15
+TIEBREAKER: If language contains 'flexibility in timing' OR 'data-driven deployment' \
+with NO explicit commitment reaffirmation → floor to 0.55 (CONCERN), not 0.49.
+TIEBREAKER: "flexibility"+"data-driven" with no reaffirmation → 0.55
+
+Output schema: {"score": float, "band": str, "reason": str_max_12_words}
+"""
 
 
 def _few_shot_block() -> str:
@@ -134,24 +139,25 @@ def score_capex_cut(snippet: str) -> tuple[float, str]:
     if not snippet or not snippet.strip():
         return 0.0, "empty snippet"
 
-    prompt = f"{RUBRIC}\n\nExamples:\n{_few_shot_block()}\n\nSnippet:\n{snippet.strip()}"
+    user_prompt = f"Examples:\n{_few_shot_block()}\n\nSnippet:\n{snippet.strip()}"
 
     gemini_key = os.getenv("GEMINI_API_KEY")
     if gemini_key:
-        return _call_gemini(prompt, gemini_key)
+        return _call_gemini(user_prompt, gemini_key)
 
     or_key = os.getenv("OPENROUTER_API_KEY")
     if or_key:
-        return _call_openrouter(prompt, or_key)
+        return _call_openrouter(user_prompt, or_key)
 
     return 0.5, "no LLM key — default neutral"
 
 
-def _call_gemini(prompt: str, api_key: str) -> tuple[float, str]:
+def _call_gemini(user_prompt: str, api_key: str) -> tuple[float, str]:
     model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     body = {
-        "contents": [{"parts": [{"text": prompt}]}],
+        "systemInstruction": {"parts": [{"text": GRADER_SYSTEM}]},
+        "contents": [{"parts": [{"text": user_prompt}]}],
         "generationConfig": {"temperature": 0.1, "maxOutputTokens": 120},
     }
     r = httpx.post(url, params={"key": api_key}, json=body, timeout=45)
@@ -160,13 +166,20 @@ def _call_gemini(prompt: str, api_key: str) -> tuple[float, str]:
     return _parse_score(text)
 
 
-def _call_openrouter(prompt: str, api_key: str) -> tuple[float, str]:
+def _call_openrouter(user_prompt: str, api_key: str) -> tuple[float, str]:
     model = os.getenv("OPENROUTER_SUBAGENT_MODEL", "anthropic/claude-sonnet-4")
     r = httpx.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers={"Authorization": f"Bearer {api_key}"},
-        json={"model": model, "max_tokens": 120, "temperature": 0.1,
-              "messages": [{"role": "user", "content": prompt}]},
+        json={
+            "model": model,
+            "max_tokens": 120,
+            "temperature": 0.1,
+            "messages": [
+                {"role": "system", "content": GRADER_SYSTEM},
+                {"role": "user", "content": user_prompt},
+            ],
+        },
         timeout=45,
     )
     r.raise_for_status()

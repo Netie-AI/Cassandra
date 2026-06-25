@@ -95,3 +95,14 @@ Wire orchestrator `# WIRE:` points. Capex-cut grader ← tavily. No Anthropic �
 |------|------|---------|
 | 2026-06-25 | Claude→Cursor | Phase 2 IMPLEMENT (files3) |
 | 2026-06-25 | Cursor→Claude | Phase 2 REVIEW_REQUEST + dashboard deploy scaffold |
+| 2026-06-25 | Cursor | UI deploy prep: homepage CSS fix, golden newspaper i18n, docs-methodology, analog i18n, reference docs in `files4/` |
+
+---
+
+## UI round — 2026-06-25 (deploy prep)
+
+**Delivered:** Homepage styled again (`styles.css` in head). Newspaper full-body ZH/MS via `newspaper-bodies.js`. Analog section translates with lang cycle. Methodology docs page live at `/docs/methodology`. Debug/translation reference in `files4/`.
+
+**Still open:** Pricing i18n, live movers API, pipeline-stored translated editions, gated agent chat (do not ship ungated).
+
+**Verify:** `uvicorn api.main:app --port 8080` then hard refresh. `python -m pytest tests/ -q` → 18 passed.

@@ -121,14 +121,15 @@ report_sends (id, user_id, report_date, sent_at, opened_at)
 ## 🌍 Internationalisation (Phase 4)
 
 ### Languages
-- EN (default)
-- ZH-CN (Simplified Chinese — China market)
-- MS (Bahasa Malaysia)
-- Language selector: top-right on both index.html and newspaper-report.html
-- Auto-detect: `navigator.language` → set on page load → persist in localStorage
+- EN (default), ZH-CN, MS
+- Home: single cycle button via `common.js` (`cassandra-lang` in localStorage)
+- Newspaper: golden hardcoded bodies in `newspaper-bodies.js` until pipeline stores per-lang editions
+- Pricing: English-only until wired (lang button hidden)
 
-### Right-to-left (future)
-- No Arabic/Hebrew support planned yet — note for when/if added
+### Agent / platform playgrounds
+- Platform cards link to docs or stock desk demos
+- Ungated RAG chat deferred until gate + grounding are production-ready
+- See homepage `#agent-chat` gate stub (`/api/agent/gate`)
 
 ---
 

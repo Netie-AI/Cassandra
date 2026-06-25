@@ -1,0 +1,13 @@
+---
+description: Protocol block auto-copied to clipboard via afterAgentResponse hook
+alwaysApply: true
+---
+
+# Protocol auto-copy
+
+Every response MUST use the `═══ … ═══ END ═══` wrapper (see `600-protocol.mdc`).
+
+The hook `.cursor/hooks/copy_cassandra_protocol.py` copies that block to clipboard
+automatically after each agent turn. Do not paste a second copy outside the markers.
+
+User-global hook also lives at `~/.cursor/hooks/copy_protocol_block.py` for non-Cassandra windows.

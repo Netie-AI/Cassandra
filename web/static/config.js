@@ -1,5 +1,8 @@
 /** CASSANDRA — public dashboard config (no secrets). */
-window.CASSANDRA_CONFIG = {
+window.CASSANDRA_CONFIG = window.CASSANDRA_CONFIG || {};
+Object.assign(window.CASSANDRA_CONFIG, {
+  version: "0.9.0-deploy",
+  contactTo: "desk@netie.ai",
   brand: {
     site: "https://crash.netie.ai",
     org: "https://netie.ai",
@@ -8,17 +11,23 @@ window.CASSANDRA_CONFIG = {
   newsletterAction: "",
   payments: {
     international: {
-      stripeSubscribe: "https://buy.stripe.com/PLACEHOLDER",
-      stripeDonate: "https://buy.stripe.com/PLACEHOLDER_DONATE",
-      paypalDonate: "https://www.paypal.com/donate/?hosted_button_id=PLACEHOLDER",
+      stripeSubscribe: "",   // fallback alias for Report tier
+      stripeReport: "",      // FILL: Stripe payment link, Report tier
+      stripeBriefing: "",    // FILL: Stripe payment link, Pro tier
+      stripeAgent: "",       // FILL: Stripe payment link, API tier
+      stripeDonate: "",
+      paypalDonate: "",
     },
     my: {
-      curlecSubscribe: "https://curlec.com/PLACEHOLDER",
-      billplzDonate: "https://www.billplz.com/PLACEHOLDER",
+      billplzReport: "",     // FILL: Billplz collection URL, Report
+      billplzBriefing: "",   // FILL: Billplz collection URL, Pro
+      curlecSubscribe: "",
+      billplzDonate: "",
     },
     cn: {
-      airwallexSubscribe: "https://checkout.airwallex.com/PLACEHOLDER",
-      airwallexDonate: "https://checkout.airwallex.com/PLACEHOLDER_DONATE",
+      airwallexReport: "",   // FILL: Airwallex payment URL, Report
+      airwallexSubscribe: "",
+      airwallexDonate: "",
     },
   },
-};
+});

@@ -1,0 +1,35 @@
+---
+description: Always-on UI, content, and agent quality governance
+alwaysApply: true
+---
+
+# UI, Content, and Agent Governance
+
+## 1) UI design language (always enforce)
+- Use one coherent visual system per page: shared spacing scale, border radii, typography, and color tokens.
+- Avoid "marketing wall" layouts. Prioritize information hierarchy and readability over CTA density.
+- New UI work must pass: responsive behavior, keyboard focus visibility, and sufficient contrast.
+- If a page is editorial (daily report), tone must be newsroom/analyst style, not ad copy.
+
+## 2) Report content standards (daily editions)
+- Every edition must include: `headline`, `direction`, `sentiment`, `what changed`, and `why it matters`.
+- Free tier must still be useful and readable, not empty teaser blocks.
+- Subscriber blocks may hide depth, but must provide a clear preview of what is inside.
+- Avoid em-dash-heavy writing in UI copy; use plain punctuation for natural newsroom style.
+
+## 3) Traceability and retrieval
+- Every report edition must be date-addressable (`asof`) and timestamped (`generated_at`).
+- Persist report snapshots for lookback retrieval and subscriber history views.
+- If a fact/metric/news item is shown, include source-attributable context where available.
+
+## 4) LLM and tool-call discipline
+- LLMs may summarize, extract, and narrate; they do not compute CRS, edge, EV, or distance math.
+- For extraction/scoring prompts, require structured JSON outputs and deterministic parsing guards.
+- Web-searched claims must be tied to source + as-of time before display in reports.
+- If data is missing or stale, report missingness explicitly; do not fabricate certainty.
+
+## 5) Delivery checklist for UI/report changes
+- Update page content to be useful for free users before adding upsell copy.
+- Remove outdated/duplicated disclaimers and low-trust filler language.
+- Run diagnostics and basic runtime checks after edits.
+- Keep improvements consistent across main dashboard, daily report page, and stock report pages.

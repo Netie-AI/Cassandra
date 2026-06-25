@@ -5,15 +5,31 @@
 
 ---
 
-## Phase 4 ✅ APPROVED · Phase 5 orchestrator next
+## Phase map
 
 | Phase | Status | Gate |
 |-------|--------|------|
 | 4 UI + report | ✅ | Claude APPROVED 2026-06-25 |
-| 5 Orchestrator | ⏳ | Wire `# WIRE:` orchestrator.py |
-| 5 capex grader | ✅ scaffold | `src/tools/capex_nlp.py` |
-| 8 UI v2 | ✅ | Mockup dashboard + Chart.js history |
+| 5 Orchestrator | ✅ APPROVED spec | `# WIRE:` in `src/orchestrator.py` ⏳ |
+| 5b LLM subagents | ✅ | `_llm.py` + OpenRouter extract wired |
+| 5 capex grader | ✅ | `GRADER_SYSTEM` in `src/tools/capex_nlp.py` |
+| 8 UI redesign | ✅ | Editorial home + newspaper + docs chrome |
 | 9 Deploy | 🔄 | CF Worker + Pages |
+
+---
+
+## UI deploy readiness (2026-06-25)
+
+| Surface | Status | Notes |
+|---------|--------|-------|
+| Home dashboard | ✅ | styles.css restored; lang cycle; analog i18n |
+| Newspaper | ✅ | Golden ZH/MS bodies in `newspaper-bodies.js` |
+| Pricing | ⏳ | English-only; lang button hidden until wired |
+| Docs (API / institutional / methodology) | ✅ | Shared v3 header; no dead lang button |
+| Stock desk (MU/NOW) | ✅ | Collapsible sidebar; live quote via watchlist API |
+| Agent chat on home | ⏳ | Gate stub only; do not ungate for launch |
+
+Reference docs for next agent window: `files4/DEBUG_REASONING_LOG.md`, `files4/GOLDEN_TRANSLATION_REFERENCE.md`, `files4/POLISH_FIXES.md`.
 
 ---
 
@@ -41,12 +57,12 @@ See `docs/DEPLOY.md`. Local dev: `uvicorn api.main:app --port 8080`. CF Worker +
 
 ---
 
-## Blockers for Phase 5
+## Blockers for go-live
 
-1. Wire orchestrator `# WIRE:` (OpenRouter subagents + opus pass-2)
-2. End-to-end `--run` produces DailyReport + publish
-3. Set payment URLs in `web/static/config.js` before go-live
-4. Supabase auth — PARKING_LOT.md
+1. Set payment URLs in `web/static/config.js`
+2. Wire orchestrator end-to-end `--run` (Phase 5)
+3. Supabase auth — see `PARKING_LOT.md`
+4. Live movers feed (demo OK for preview)
 
 ---
 
