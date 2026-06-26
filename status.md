@@ -1,6 +1,6 @@
 # CASSANDRA — status.md
 
-**Updated:** 2026-06-25  
+**Updated:** 2026-06-25 (deploy-ready push `82598a6`)  
 **Protocol:** `docs/PROTOCOL.md` · **Next Cursor:** `HANDOFF_CURSOR.md` · **Next Claude:** `HANDOFF_CLAUDE.md`
 
 ---
@@ -24,10 +24,12 @@
 |---------|--------|-------|
 | Home dashboard | ✅ | styles.css restored; lang cycle; analog i18n |
 | Newspaper | ✅ | Golden ZH/MS bodies in `newspaper-bodies.js` |
-| Pricing | ⏳ | English-only; lang button hidden until wired |
-| Docs (API / institutional / methodology) | ✅ | Shared v3 header; no dead lang button |
-| Stock desk (MU/NOW) | ✅ | Collapsible sidebar; live quote via watchlist API |
-| Agent chat on home | ⏳ | Gate stub only; do not ungate for launch |
+| Pricing | ✅ | I18N wired; lang cycle active |
+| Docs (API / institutional / methodology) | ✅ | Shared v3 header |
+| Stock desk (MU/NOW) | ✅ | Live quote via watchlist API |
+| Agent chat on home | ✅ | Compact chat + trading engine tone; gate + max 320 tokens |
+| Digest email signup | ✅ | Free list only — no paywall redirect |
+| Contact | ✅ | `/api/contact` + diagnostic log email |
 
 Reference docs for next agent window: `files4/DEBUG_REASONING_LOG.md`, `files4/GOLDEN_TRANSLATION_REFERENCE.md`, `files4/POLISH_FIXES.md`.
 

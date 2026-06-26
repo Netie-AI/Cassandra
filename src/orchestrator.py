@@ -115,10 +115,10 @@ async def run_news_digestor(cfg: dict) -> NewsRead | None:
         scores = []
         for s in snippets[:3]:
             if isinstance(s, dict) and s.get("text"):
-                scores.append(score_capex_cut(s["text"])[0])
+                scores.append(score_capex_cut(s["text"]))
         if not scores and hits:
             scores = [
-                score_capex_cut(getattr(h, "content", "") or "")[0]
+                score_capex_cut(getattr(h, "content", "") or "")
                 for h in hits[:3]
             ]
         capex_score = max(scores) if scores else 0.0
