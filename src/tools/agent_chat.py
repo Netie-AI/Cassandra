@@ -53,7 +53,7 @@ _STUB_REPLY = (
 def _load_persona() -> str:
     from .persona import load_cassandra_persona
 
-    parts: list[str] = [load_cassandra_persona(max_chars=700)]
+    parts: list[str] = [load_cassandra_persona(max_chars=1200)]
     if _COMPACT.exists():
         parts.append(_COMPACT.read_text(encoding="utf-8"))
     text = "\n\n".join(parts)

@@ -76,7 +76,7 @@ def generate_report_sections(
     try:
         from .tools.persona import load_cassandra_persona
 
-        system = f"{load_cassandra_persona(max_chars=600)}\n\n{REPORT_SYSTEM}"
+        system = f"{load_cassandra_persona(max_chars=1200)}\n\n{REPORT_SYSTEM}"
         if edition_context:
             system = f"{system}\n\nEdition framing:\n{edition_context}"
         text = _gemini_generate(key, prompt, system)

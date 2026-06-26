@@ -910,16 +910,15 @@ def increment_agent_usage(email: str, date: str) -> int:
     date = (date or "")[:10]
     with _conn() as c:
         _ensure_agent_usage_table(c)
+        c.execute(
+            """
+            INSERT INTO agent_usage (email, usage_date, count) VALUES (?, ?, 1)
+            ON CONFLICT(email, usage_date) DO UPDATE SET count = count + 1
+            """,
+            (email, date),
+        )
         row = c.execute(
             "SELECT count FROM agent_usage WHERE email = ? AND usage_date = ?",
             (email, date),
         ).fetchone()
-        new_count = int(row["count"]) + 1 if row else 1
-        c.execute(
-            """
-            INSERT OR REPLACE INTO agent_usage (email, usage_date, count)
-            VALUES (?, ?, ?)
-            """,
-            (email, date, new_count),
-        )
-    return new_count
+    return int(row["count"]) if row else 1

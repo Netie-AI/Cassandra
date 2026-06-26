@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 config/settings.yaml
+Cpanel.md
 
 # ═══ Local database (stays on your machine) ════════════════
 store/*.sqlite
@@ -44,6 +45,13 @@ env/
 # ═══ Reports output (generated, not source) ════════════════
 reports/*
 !reports/.gitkeep
+
+# ═══ Knowledge graph (local only) ═════════════════════════
+knowledge/**/*
+!knowledge/.gitkeep
+!knowledge/agents/.gitkeep
+!knowledge/audits/.gitkeep
+!knowledge/graph/.gitkeep
 *.md.out
 
 # ═══ Tooling ═══════════════════════════════════════════════

@@ -461,6 +461,13 @@ def api_agent_chat(
     return chat(text, tier=tier, actor_key=actor)
 
 
+def _agent_generate_limit(tier: str) -> int | None:
+    """None = unlimited; int = daily cap for non-VIP tiers."""
+    if tier_caps(tier).get("can_generate_agents"):
+        return None
+    return 1
+
+
 @app.post("/api/agent/generate")
 def api_agent_generate(
     request: Request,
@@ -472,7 +479,7 @@ def api_agent_generate(
     from datetime import datetime, timezone
 
     from src.db.supabase_auth import user_from_token
-    from src.store import increment_agent_usage
+    from src.store import get_agent_usage, increment_agent_usage
 
     caps = tier_caps(tier)
     token = authorization or ""
@@ -487,6 +494,13 @@ def api_agent_generate(
     user = user_from_token(authorization)
     email = str(user.get("email") or "anonymous").lower() if user else "anonymous"
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    limit = _agent_generate_limit(tier)
+    count = get_agent_usage(email, day)
+    if limit is not None and count >= limit:
+        return JSONResponse(
+            {"error": "daily_limit", "generated": count, "limit": limit},
+            status_code=429,
+        )
     generated = increment_agent_usage(email, day)
 
     return {
@@ -517,7 +531,7 @@ def api_agent_usage(
         else str(date)[:10]
     )
     count = get_agent_usage(email, day)
-    limit = None if tier in ("vip", "master") else 1
+    limit = _agent_generate_limit(tier)
     return {
         "generated": count,
         "limit": limit,

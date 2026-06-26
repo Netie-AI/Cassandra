@@ -107,7 +107,7 @@ function renderStock(ticker) {
               <input id="stock-chat-input" type="text" placeholder="What changed for ${d.ticker} in this run?" />
               <button type="button" onclick="stockChatSend('${d.ticker}', '${selectedDate}')">→</button>
             </div>
-            <div class="stock-chat-notice">Free: 3 questions/day · VIP: unlimited + agent generation</div>
+            <div class="stock-chat-notice">Pro Desk+ for stock chat · VIP tier: unlimited agent generation</div>
           </div>
         </div>
 

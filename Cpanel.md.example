@@ -1,0 +1,11 @@
+# cPanel access (local only — never commit tokens)
+
+Store Spaceship/cPanel shared-access JWTs in your password manager or a local file
+outside this repo. Do not commit tokens to git.
+
+If you need Cursor MCP access to cPanel, set env vars locally (not in git):
+
+```
+CPANEL_ACCESS_TOKEN=...
+CPANEL_ACCESS_URL=https://www.spaceship.com/hosting/tools/cpanel-access/
+```

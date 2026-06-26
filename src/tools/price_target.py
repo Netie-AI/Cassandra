@@ -1,6 +1,8 @@
 """Cassandra cycle-adjusted price target — pure Python, no LLM math."""
 from __future__ import annotations
 
+import json
+
 
 def compute_cassandra_target(
     morningstar_fv: float,
@@ -10,11 +12,11 @@ def compute_cassandra_target(
     """
     Phase multiplier:
     CRS < 30 (Stable/Complacent): 1.15  — ride the wave
-    CRS 30-50 (Aware):            1.00  — hold
-    CRS 50-70 (Distribution):     0.85  — trim
-    CRS > 70 (Mania/Danger):      0.65  — short candidate / exit
+    CRS 30-49 (Aware):            1.00  — hold
+    CRS 50-69 (Distribution):     0.85  — trim
+    CRS >= 70 (Mania/Danger):       0.65  — short candidate / exit
 
-    Capex adjustment: if capex_score > 0.80 (FIRE): multiply by 0.80 additional
+    Capex adjustment: if capex_score >= 0.80 (FIRE): multiply by 0.80 additional
     """
     if crs < 30:
         phase_mult = 1.15
@@ -40,34 +42,33 @@ def compute_cassandra_target(
         "stance": stance,
         "phase_mult": phase_mult,
         "capex_mult": capex_mult,
-        "methodology": f"MF={morningstar_fv} × phase({phase_mult}) × capex({capex_mult})",
+        "methodology": f"MF={morningstar_fv} x phase({phase_mult}) x capex({capex_mult})",
     }
+
+
+def _as_dict(value: object) -> dict:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
 
 
 def capex_score_from_score_dict(score: dict | None) -> float:
     """Pull capex-cut NLP signal from latest daily score payload when present."""
     if not score:
         return 0.0
-    payload = score.get("payload_json") or score.get("payload") or {}
-    if isinstance(payload, str):
-        import json
-
-        try:
-            payload = json.loads(payload)
-        except json.JSONDecodeError:
-            payload = {}
-    factors = score.get("factors") or {}
-    if isinstance(factors, str):
-        import json
-
-        try:
-            factors = json.loads(factors)
-        except json.JSONDecodeError:
-            factors = {}
-    c_factor = factors.get("C") if isinstance(factors, dict) else None
-    if isinstance(c_factor, dict):
-        raw = c_factor.get("capex_cut_nlp")
-        if raw is not None:
-            return float(raw)
-    raw = payload.get("capex_cut_nlp") if isinstance(payload, dict) else None
+    extra = _as_dict(score.get("extra"))
+    raw = extra.get("capex_cut_nlp")
+    if raw is None:
+        orch = _as_dict(extra.get("orchestrator"))
+        raw = orch.get("capex_cut_nlp")
+    if raw is not None:
+        return float(raw)
+    payload = _as_dict(score.get("payload_json") or score.get("payload"))
+    raw = payload.get("capex_cut_nlp")
     return float(raw) if raw is not None else 0.0
