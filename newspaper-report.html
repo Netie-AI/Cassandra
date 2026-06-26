@@ -251,6 +251,10 @@
     border-radius: 3px;
     white-space: nowrap;
   }
+  .locked-overlay::before {
+    content: "🔒 ";
+    font-style: normal;
+  }
   .locked-wrap { position: relative; }
 
   /* ── CTA strip ─────────────────────────────────────────────────── */
@@ -508,7 +512,7 @@
 
   <!-- Col 3: What it means + Subscribe -->
   <div class="col">
-    <div class="col-head" data-i18n="col3_head">Simple analogy and subscriber preview</div>
+    <div class="col-head" data-i18n="col3_head">What it means</div>
     <div id="col3-body"></div>
 
     <p class="caveat np-aux" data-i18n="disclaimer" hidden>
@@ -557,10 +561,10 @@ const I18N = {
     sub: 'Direction: cautious with selective rebound attempts. Sentiment: still crowded in AI leaders while macro headlines drive fast reversals.',
     crs_label: 'Crash Risk Score', frag_label: 'Fragility (F)', trig_label: 'Trigger (T)', phase_label: 'Wyckoff Phase',
     rising: 'rising · dF/dt +0.02', capex_watching: 'capex NLP 0.30', phase_val: 'Distribution',
-    col1_head: 'Headline news and what changed', col2_head: 'Direction, sentiment, and why', col3_head: 'Simple analogy and subscriber preview',
+    col1_head: 'Headline news and what changed', col2_head: 'Direction, sentiment, and why', col3_head: 'What it means',
     echo_head: 'Historical echo: March 2000', echo2_head: 'Nearest analog date',
     caveat: 'Live inputs update through the trading day; confidence bands expand when signals conflict.',
-    locked_msg: '🔒 Subscriber brief preview',
+    locked_msg: 'Subscriber preview',
     subscribe_head: 'What subscribers see', subscribe_body: '',
     sub_btn: 'Get today\'s free edition',
     cta_label: 'Continue reading:', cta_dashboard: 'Home',
@@ -579,7 +583,7 @@ const I18N = {
     col1_head: '脆弱性信号', col2_head: '触发器观察', col3_head: '含义解读',
     echo_head: '历史回声: 2000年3月', echo2_head: '最近类比日期',
     caveat: '实时输入在交易时段持续更新；当信号冲突时置信区间会扩大。',
-    locked_msg: '🔒 订阅简报预览',
+    locked_msg: '订阅简报预览',
     subscribe_head: '订阅解锁', subscribe_body: '',
     sub_btn: '免费订阅报告',
     cta_label: '阅读完整报告：', cta_dashboard: '实时仪表板',
@@ -598,7 +602,7 @@ const I18N = {
     col1_head: 'Isyarat kerapuhan', col2_head: 'Pemantauan pencetus', col3_head: 'Maksudnya',
     echo_head: 'Gema sejarah: Mac 2000', echo2_head: 'Tarikh analog terdekat',
     caveat: 'Input langsung dikemas kini sepanjang sesi dagangan; julat keyakinan melebar apabila isyarat bercanggah.',
-    locked_msg: '🔒 Pratonton ringkas pelanggan',
+    locked_msg: 'Pratonton ringkas pelanggan',
     subscribe_head: 'Langgan untuk buka kunci', subscribe_body: '',
     sub_btn: 'Langgan laporan percuma',
     cta_label: 'Baca laporan penuh:', cta_dashboard: 'Papan pemuka langsung',
@@ -699,7 +703,7 @@ function refreshPaymentCTA() {
 window.refreshPaymentCTA = refreshPaymentCTA;
 refreshPaymentCTA();
 
-/* ── Fetch live score — see newspaper.js for full update ── */
+/* ── Fetch live score  -  see newspaper.js for full update ── */
 </script>
 <script src="/static/newspaper.js"></script>
 </body>

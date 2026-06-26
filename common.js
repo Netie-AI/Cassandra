@@ -1,4 +1,4 @@
-/** Shared theme, i18n, share/download — CASSANDRA · netie.ai */
+/** Shared theme, i18n, share/download  -  CASSANDRA · netie.ai */
 window.CassandraCommon = (function () {
   const STORAGE_THEME = "cassandra-theme";
   const STORAGE_LANG = "cassandra-lang";
@@ -18,7 +18,7 @@ window.CassandraCommon = (function () {
       subTitle: "full breakdown for subscribers",
       subBody: "Unlock trigger board, watchlist levels, edition archive retrieval, and API access.",
       donateTitle: "Keep this research free",
-      donateBody: "One-off tip — thank you for supporting the work.",
+      donateBody: "One-off tip  -  thank you for supporting the work.",
       digestTitle: "Get the daily brief",
       digestBody: "Pre-market and during-session editions on trading days.",
       shareTitle: "Open today’s desk edition",
@@ -36,7 +36,7 @@ window.CassandraCommon = (function () {
       coverage: "Data coverage",
       coverageNote: "wider band when sources are thin",
       accessDelayed: "Free plan: scores are 2 days behind. Upgrade for today’s edition.",
-      accessLive: "You’re on a live plan — today’s score.",
+      accessLive: "You’re on a live plan  -  today’s score.",
       sessionPreMarket: "Pre-market · NASDAQ",
       sessionDuring: "During session · NASDAQ",
       apiFrom: "Subscriber research desk",
@@ -61,7 +61,7 @@ window.CassandraCommon = (function () {
       subTitle: "完整因子访问",
       subBody: "解锁 S/B/C 因子 + 每日报纸版报告。",
       donateTitle: "支持研究",
-      donateBody: "一次性捐赠 — 按地区路由支付方式。",
+      donateBody: "一次性捐赠  -  按地区路由支付方式。",
       digestTitle: "每日论文摘要",
       digestBody: "交易日 3 次发送报纸风格报告。",
       shareTitle: "分享今日报告",
@@ -78,7 +78,7 @@ window.CassandraCommon = (function () {
       coverageNote: "数据不足时带宽加宽",
       asof: "截至",
       noData: "暂无数据",
-      footerLegal: "个人研究工具 — 非投资建议。",
+      footerLegal: "个人研究工具  -  非投资建议。",
       footerDisclaimer: "CRS 为综合指数。低覆盖率扩大不确定性。不预测崩盘日期。",
       credit: "出品",
       pricing: "定价",
@@ -97,7 +97,7 @@ window.CassandraCommon = (function () {
       subTitle: "Akses faktor penuh",
       subBody: "Buka kunci S, B, C + laporan harian gaya akhbar.",
       donateTitle: "Sokong penyelidikan",
-      donateBody: "Sumbangan sekali — kaedah bayaran mengikut wilayah.",
+      donateBody: "Sumbangan sekali  -  kaedah bayaran mengikut wilayah.",
       digestTitle: "Ringkasan tesis harian",
       digestBody: "Laporan gaya akhbar 3× pada hari dagangan.",
       shareTitle: "Kongsi laporan hari ini",
@@ -114,7 +114,7 @@ window.CassandraCommon = (function () {
       coverageNote: "jalur lebih lebar apabila data nipis",
       asof: "setakat",
       noData: "Tiada data",
-      footerLegal: "Alat penyelidikan peribadi — bukan nasihat kewangan.",
+      footerLegal: "Alat penyelidikan peribadi  -  bukan nasihat kewangan.",
       footerDisclaimer: "CRS ialah indeks komposit. Liputan rendah meluaskan ketidakpastian. Tiada ramalan tarikh ranap.",
       credit: "Dibina oleh",
       pricing: "Harga",
@@ -276,7 +276,7 @@ window.CassandraCommon = (function () {
     if (!msg || !msg.trim()) return;
     const email = window.prompt("Your email (optional, for reply):") || "";
     sendContact(msg.trim(), email.trim())
-      .then((d) => toast(d.email_sent ? "Message sent — we'll reply soon." : "Message logged — email pending config."))
+      .then((d) => toast(d.email_sent ? "Message sent  -  we'll reply soon." : "Message logged  -  email pending config."))
       .catch(() => toast("Could not send contact. Try desk@netie.ai"));
   }
 

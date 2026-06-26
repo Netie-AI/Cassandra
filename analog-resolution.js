@@ -1,4 +1,4 @@
-/** Analog resolution tier demo — illustrative until archives wired. */
+/** Analog resolution tier demo  -  illustrative until archives wired. */
 const ANALOG_UI = {
   en: {
     section: "Analog resolution",

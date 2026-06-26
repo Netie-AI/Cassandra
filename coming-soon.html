@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title id="page-title">Coming Soon — Cassandra</title>
+  <title id="page-title">Coming Soon  -  Cassandra</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -53,7 +53,7 @@
        border-top:3px solid var(--border-hvy); background:var(--bg-inset);
        padding:1.25rem; margin-bottom:1.5rem; border-radius:2px;">
     <div style="font-size:10px; letter-spacing:0.1em; text-transform:uppercase;
-         color:var(--ink-3); margin-bottom:0.75rem;">Demo — static snapshot</div>
+         color:var(--ink-3); margin-bottom:0.75rem;">Demo  -  static snapshot</div>
     <div id="demo-content"></div>
   </div>
 
@@ -97,35 +97,35 @@ function toggleTheme() {
 
 const PAGE_CONFIGS = {
   'agent-chat': {
-    title:    'Agent Chat — Cassandra',
+    title:    'Agent Chat  -  Cassandra',
     badge:    'Under Development',
     headline: 'AI research agent is coming.',
     body:     'The Cassandra agent will answer questions about the current CRS, factor breakdown, and historical analogs using live pipeline data. Available to Pro and API subscribers at launch. Ungated access is not available in this build.',
     mode:     'dev',
   },
   'platform': {
-    title:    'Platform — Cassandra',
+    title:    'Platform  -  Cassandra',
     badge:    'Under Development',
     headline: 'Platform tools are being wired.',
     body:     'Scenario grids, watchlist price levels, and custom basket configuration are coming to Pro Desk and API tiers. These features depend on live data feeds being connected.',
     mode:     'dev',
   },
   'stock-agent': {
-    title:    'Stock Agent — Cassandra',
+    title:    'Stock Agent  -  Cassandra',
     badge:    'Demo Mode',
     headline: 'Stock-level risk reports.',
     body:     'The stock agent scores individual tickers against the macro CRS. Below is a static demo snapshot. Live scoring requires an API subscription.',
     mode:     'demo',
   },
   'docs-api': {
-    title:    'API Reference — Cassandra',
+    title:    'API Reference  -  Cassandra',
     badge:    'Under Development',
     headline: 'API documentation is being written.',
     body:     'Endpoints, authentication, response schemas, and webhook configuration will be documented here. Current available endpoint: GET /api/score (no auth, 2-day delay). Full feed on API tier.',
     mode:     'dev',
   },
   'docs-institutional': {
-    title:    'Institutional Feed — Cassandra',
+    title:    'Institutional Feed  -  Cassandra',
     badge:    'Under Development',
     headline: 'Institutional data feed.',
     body:     'White-label CRS feed, custom basket scoring, and bulk historical export. Contact us via the API tier to discuss institutional access.',
@@ -166,7 +166,7 @@ function stockDemoHtml(ticker) {
     document.getElementById('status-badge').style.borderColor = 'var(--border-hvy)';
     document.getElementById('status-badge').style.color = 'var(--ink)';
     if (ticker) {
-      document.getElementById('page-title').textContent = `${ticker.toUpperCase()} — Stock Agent Demo`;
+      document.getElementById('page-title').textContent = `${ticker.toUpperCase()}  -  Stock Agent Demo`;
     }
   }
 })();

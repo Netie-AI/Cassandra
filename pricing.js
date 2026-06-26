@@ -122,11 +122,24 @@ let currentHighlight = null;
 function payUrl(tierId) {
   const p = cfg.payments?.international || {};
   const map = {
-    report: p.stripeReport || p.stripeSubscribe || "/subscribe?tier=report",
-    briefing: p.stripeBriefing || "/subscribe?tier=briefing",
-    agent: p.stripeAgent || "/subscribe?tier=agent",
+    report: cfg.stripe_report_url || p.stripeReport || p.stripeSubscribe || "",
+    briefing: cfg.stripe_pro_url || p.stripeBriefing || "",
+    agent: cfg.stripe_api_url || p.stripeAgent || "",
   };
-  return map[tierId] || "/pricing";
+  return map[tierId] || "";
+}
+
+function payReady(tierId) {
+  return Boolean(payUrl(tierId));
+}
+
+function ctaHtml(tier, ref, ctaText, extraClass) {
+  const url = payUrl(tier.id);
+  const cls = `pricing-cta${extraClass || ""}`;
+  if (!url) {
+    return `<span class="${cls} pricing-cta-disabled" title="Coming soon" aria-disabled="true">${ctaText}</span>`;
+  }
+  return `<a class="${cls}" href="${url}?ref=${ref}&trial=1">${ctaText}</a>`;
 }
 
 function featHtml(features) {
@@ -142,14 +155,19 @@ function renderGrid(ref, highlight, t) {
     const name = loc.name || tier.name;
     const trial = loc.trial || tier.trial;
     const cta = loc.cta !== undefined ? loc.cta : tier.cta;
-    const href = tier.href || `${payUrl(tier.id)}?ref=${ref}&trial=1`;
+    const href = tier.href || (payReady(tier.id) ? `${payUrl(tier.id)}?ref=${ref}&trial=1` : "");
     const colClass = `pricing-col${tier.rec ? " pricing-col-rec" : ""}${highlight === tier.id ? " pricing-highlight" : ""}`;
+    const ctaBlock = cta
+      ? (tier.href
+        ? `<a class="pricing-cta" href="${href}">${cta}</a>`
+        : ctaHtml(tier, ref, cta))
+      : `<a class="pricing-cta" href="${href || "/"}">${t.home_cta || "Home →"}</a>`;
     return `<div class="${colClass}">
       <div class="sh${tier.rec ? " pricing-rec-label" : ""}">${name}</div>
       <div class="cm pricing-price">${tier.price}${tier.period ? `<span class="pricing-period">${tier.period}</span>` : ""}</div>
       <div class="pricing-freq">${trial}</div>
       <div class="pricing-feats">${featHtml(tier.features)}</div>
-      ${cta ? `<a class="pricing-cta" href="${href}">${cta}</a>` : `<a class="pricing-cta" href="${href}">${t.home_cta || "Home →"}</a>`}
+      ${ctaBlock}
     </div>`;
   }).join("");
 }
@@ -167,14 +185,14 @@ function renderCompare(ref, t) {
   const body = COMPARE_ROWS.map((row, idx) => {
     const label = t.compare_rows[idx] || row.label;
     const cells = [row.report, row.briefing, row.agent]
-      .map((v) => `<span>${v ? "✓" : "—"}</span>`)
+      .map((v) => `<span>${v ? "✓" : "-"}</span>`)
       .join("");
     return `<div class="compare-row"><span>${label}</span>${cells}</div>`;
   }).join("");
   const ctas = `<div class="compare-row compare-cta"><span></span>${paid.map((tier) => {
     const loc = t.tiers[tier.id] || {};
     const cta = loc.cta !== undefined ? loc.cta : tier.cta;
-    return `<span><a class="pricing-cta" href="${payUrl(tier.id)}?ref=${ref}&trial=1">${cta}</a></span>`;
+    return `<span>${ctaHtml(tier, ref, cta)}</span>`;
   }).join("")}</div>`;
   el.innerHTML = head + body + ctas;
 }

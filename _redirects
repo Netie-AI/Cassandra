@@ -1,0 +1,7 @@
+# Cloudflare Pages — replace YOUR_WORKER_URL before deploy (see docs/DEPLOY.md)
+/api/*    https://YOUR_WORKER_URL/api/:splat    200
+/backtest /static/coming-soon.html?page=backtest  200
+/portfolio /static/coming-soon.html?page=portfolio  200
+/alerts   /static/coming-soon.html?page=alerts    200
+/stocks/* /index.html                              200
+/*        /index.html                              200

@@ -1,4 +1,4 @@
-/** CASSANDRA home dashboard v3 — watchlist, score inputs, volatility, fear/greed */
+/** CASSANDRA home dashboard v3  -  watchlist, score inputs, volatility, fear/greed */
 
 const BCOLORS = ["#15803D", "#4D7C0F", "#92400E", "#C2410C", "#B91C1C", "#7F1D1D"];
 const BTHRESH = [0, 20, 35, 50, 65, 80, 100];
@@ -15,7 +15,7 @@ const FDATA = {
     { t: "API as Ground Truth", d: "Integrate CRS score and factor feeds directly into your models, screeners, and alerts.", cta: "View API docs →", href: "/docs/api" },
     { t: "Build Your AI Agent", d: "Deploy a dedicated agent scoped to your watchlist, a specific sector, or a macro scenario.", cta: "Start building →", href: "/stocks/NOW" },
     { t: "Institutional Data Feed", d: "Real-time options flow, on-chain signals, and dark pool access. Full-tier subscribers only.", cta: "See what's included →", href: "/docs/institutional" },
-    { t: "Talk with Our Agents", d: "RAG-grounded chat using today's knowledge graph. Gated — only meaningful market questions get through.", cta: "Try the agent →", href: "/agent", chat: true },
+    { t: "Talk with Our Agents", d: "RAG-grounded chat using today's knowledge graph. Gated  -  only meaningful market questions get through.", cta: "Try the agent →", href: "/agent", chat: true },
   ],
   zh: [
     { t: "API作为基础数据", d: "将CRS评分和因子数据流直接集成到您的模型、筛选器和预警系统中。", cta: "查看API文档 →", href: "/docs/api" },
@@ -213,7 +213,7 @@ function renderWatchlist(rows) {
       const { color, text } = fmtPct(Number(r.pct) || 0);
       el.innerHTML += `<div class="rb home-pt-row">
         <a href="/stocks/${r.sym}" class="cm home-pt-sym home-ticker-link">${r.sym}</a>
-        <span class="cm home-pt-px">${r.px ?? "—"}</span>
+        <span class="cm home-pt-px">${r.px ?? "-"}</span>
         <span class="cm home-pt-pct" style="color:${color}">${text}</span>
       </div>`;
     } catch (_) { /* skip */ }
@@ -225,9 +225,9 @@ function renderScoreInputs(score) {
   if (!el || !score) return;
   const capex = score.capex_cut_nlp ?? score.extra?.capex_cut_nlp;
   const rows = [
-    { n: tx("siTrigger"), v: score.trigger?.toFixed(2) ?? "—", lbl: labelLevel(score.trigger) },
-    { n: tx("siFrag"), v: score.fragility?.toFixed(2) ?? "—", lbl: labelLevel(score.fragility) },
-    { n: tx("siCapex"), v: capex != null ? Number(capex).toFixed(2) : "—", lbl: capex != null && Number(capex) > 0.5 ? tx("lvlCut") : tx("lvlNoCut") },
+    { n: tx("siTrigger"), v: score.trigger?.toFixed(2) ?? "-", lbl: labelLevel(score.trigger) },
+    { n: tx("siFrag"), v: score.fragility?.toFixed(2) ?? "-", lbl: labelLevel(score.fragility) },
+    { n: tx("siCapex"), v: capex != null ? Number(capex).toFixed(2) : "-", lbl: capex != null && Number(capex) > 0.5 ? tx("lvlCut") : tx("lvlNoCut") },
   ];
   el.innerHTML = rows.map((r) => `<div class="rb home-si-row">
     <span class="home-si-name">${r.n}</span>
@@ -237,7 +237,7 @@ function renderScoreInputs(score) {
 }
 
 function labelLevel(v) {
-  if (v == null) return "—";
+  if (v == null) return "-";
   const n = Number(v);
   if (n >= 0.65) return tx("lvlHigh");
   if (n >= 0.45) return tx("lvlElevated");
@@ -277,7 +277,7 @@ function renderIndices(indices) {
       const { color, text } = fmtPct(Number(r.pct) || 0);
       ie.innerHTML += `<div class="home-idx-row">
         <span class="cm home-idx-sym">${r.sym}</span>
-        <span class="cm home-idx-val">${r.val ?? "—"}</span>
+        <span class="cm home-idx-val">${r.val ?? "-"}</span>
         ${spark(r.spark || r.d, 42, 15, color, r.sym)}
         <span class="cm home-idx-pct" style="color:${color}">${text}</span>
       </div>`;
@@ -301,21 +301,55 @@ function renderFearGreed(fg) {
   if (sp) sp.innerHTML = spark(fg.spark || [], 62, 18, fg.color || DOWN, "Fear greed");
 }
 
+function phaseColor(raw) {
+  const p = String(raw || "").toLowerCase();
+  if (p.includes("distribution") || p.includes("markdown") || p.includes("climax")) return "var(--color-danger)";
+  if (p.includes("aware") || p.includes("upthrust") || p.includes("undetermined")) return "var(--color-warn)";
+  if (p.includes("accumulation") || p.includes("secondary")) return "var(--color-neutral)";
+  if (p.includes("markup")) return "var(--color-ok)";
+  return "var(--color-warn)";
+}
+
+function phaseEmoji(raw) {
+  const p = String(raw || "").toLowerCase();
+  if (p.includes("distribution") || p.includes("markdown") || p.includes("climax")) return "📉";
+  if (p.includes("markup")) return "📈";
+  if (p.includes("accumulation") || p.includes("secondary")) return "🔄";
+  return "⚠️";
+}
+
+function renderPhase(score) {
+  const labelEl = document.getElementById("phase-label");
+  const confEl = document.getElementById("phase-conf");
+  if (!labelEl || !confEl) return;
+  if (!score?.phase) {
+    labelEl.textContent = "";
+    confEl.textContent = "";
+    return;
+  }
+  const raw = score.phase;
+  const label = String(raw).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  labelEl.textContent = `${phaseEmoji(raw)} ${label}`;
+  labelEl.style.color = phaseColor(raw);
+  const conf = score.phase_confidence;
+  confEl.textContent = conf != null ? `(${Math.round(conf * 100)}% conf)` : "";
+}
+
 function populateScore(score) {
   if (!score) {
-    setText("crs", "—");
+    setText("crs", "-");
+    renderPhase(null);
     return;
   }
   lastAsof = score.asof;
   setText("crs", Number(score.crs).toFixed(1));
+  renderPhase(score);
   const band = score.band || T.en.bands[bandIndex(score.crs)];
   setText("bname", band.toUpperCase());
   const bEl = document.getElementById("bname");
   if (bEl) bEl.style.color = bandColor(score.crs);
   const hw = score.band_halfwidth != null ? score.band_halfwidth : 1;
-  const phase = (score.phase || "distribution").replace(/_/g, " ");
-  const phaseTxt = currentLang === "en" ? phase : tx("phaseDist");
-  setText("band-range", `${(score.crs - hw).toFixed(1)} – ${(score.crs + hw).toFixed(1)} · ${phaseTxt}`);
+  setText("band-range", `${(score.crs - hw).toFixed(1)} – ${(score.crs + hw).toFixed(1)}`);
   const scale = document.getElementById("bscale");
   if (scale) scale.innerHTML = renderScale(score.crs, T[currentLang].bands);
   const cov = score.coverage != null ? `${(score.coverage * 100).toFixed(0)}%` : "100%";

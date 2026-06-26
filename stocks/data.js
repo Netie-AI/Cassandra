@@ -18,7 +18,7 @@ window.STOCK_DEMO = {
       "China demand / export controls",
       "DRAM spot price rollover risk",
     ],
-    analog: "Micron Q2 2018 — 5 months before the -45% memory-cycle drawdown",
+    analog: "Micron Q2 2018  -  5 months before the -45% memory-cycle drawdown",
     premium: {
       frag_quant: [
         { n: "P/S ratio", v: "4.8×", d: "vs 3.1× median" },
@@ -68,7 +68,7 @@ window.STOCK_DEMO = {
       "Azure/AWS growth deceleration as demand proxy",
       "Fed rate path impact on SaaS multiples",
     ],
-    analog: "Salesforce Q2 2022 — 6 weeks before -55% drawdown",
+    analog: "Salesforce Q2 2022  -  6 weeks before -55% drawdown",
     premium: {
       frag_quant: [
         { n: "P/S ratio", v: "18.1×", d: "vs 14× median" },
