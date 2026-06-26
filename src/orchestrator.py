@@ -153,10 +153,12 @@ async def run_market_structure(cfg: dict) -> StructureRead | None:
         from .tools import yfinance_client
         from .tools._llm import llm_extract, summarize_metrics
         from .tools.metric_map import merge_metric
+        from .tools.movers import fetch_watchlist_movers
         from .tools.subagent_prompts import STRUCTURE_FALLBACK, STRUCTURE_SYSTEM
 
         metrics = yfinance_client.fetch_breadth(_basket(cfg))
         path = yfinance_client.get_index_ohlcv_path("^GSPC") or ""
+        live_movers = fetch_watchlist_movers()
         payload = json.dumps({"raw_metrics": summarize_metrics(metrics)})
         extracted = llm_extract(STRUCTURE_SYSTEM, payload, STRUCTURE_FALLBACK)
 
@@ -174,6 +176,7 @@ async def run_market_structure(cfg: dict) -> StructureRead | None:
             new_lows=extracted.get("new_lows_52w"),
             index_breadth_divergence=_metric_val(metrics, "divergence"),
             ad_line_slope=extracted.get("advance_decline_ratio"),
+            live_movers=live_movers,
             metrics=metrics,
         )
 

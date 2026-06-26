@@ -165,7 +165,7 @@ async function fetchLiveQuote(ticker, demo) {
     if (!r.ok) return;
     const data = await r.json();
     const row = (data.rows || []).find((x) => x.sym === ticker.toUpperCase());
-    if (!row?.px || row.px === "—") return;
+    if (!row?.px || row.px === "-") return;
     const up = Number(row.pct) >= 0;
     const color = up ? "#15803D" : "#B91C1C";
     const pctStr = `${up ? "+" : ""}${Number(row.pct).toFixed(2)}%`;

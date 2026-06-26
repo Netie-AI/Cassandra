@@ -154,8 +154,8 @@ def stock_demo(ticker: str):
 
 @app.get("/api/health")
 def health():
-    from src.store import DB
-    return {"status": "ok", "store": str(DB), "store_exists": DB.exists()}
+    from src.diagnostics import health_check
+    return health_check()
 
 
 @app.get("/api/geo")
@@ -323,22 +323,50 @@ def api_agent_chat(
 
 @app.post("/api/digest/signup")
 def digest_signup(body: dict = Body(...)):
-    """Free daily digest — no payment redirect."""
-    from src.store import save_digest_subscriber
+    """Free daily digest — auto-confirmed at signup (no double-opt-in)."""
+    from src.store import count_confirmed_digest_subscribers, save_digest_subscriber
 
     email = str(body.get("email") or "").strip()
     if not email or "@" not in email:
         raise HTTPException(400, "Valid email required")
     source = str(body.get("source") or "newspaper")[:32]
-    is_new = save_digest_subscriber(email, source)
+    is_new, confirmed = save_digest_subscriber(email, source)
+    count = count_confirmed_digest_subscribers()
     return {
         "ok": True,
         "new": is_new,
+        "confirmed": confirmed,
+        "subscriber_count": count,
         "message": (
             "You're on the free daily list. Check your inbox on the next trading-day edition."
             if is_new
             else "You're already on the free daily list."
         ),
+    }
+
+
+@app.get("/api/digest/confirm")
+def digest_confirm(token: str = Query(..., min_length=8)):
+    """Double opt-in confirm — returns 501 until DIGEST_DOUBLE_OPTIN=true."""
+    import os
+
+    from src.store import confirm_digest_subscriber
+
+    if os.getenv("DIGEST_DOUBLE_OPTIN", "false").lower() != "true":
+        raise HTTPException(501, "Double opt-in not enabled")
+    if confirm_digest_subscriber(token):
+        return {"ok": True, "confirmed": True}
+    raise HTTPException(400, "Invalid or expired confirmation token")
+
+
+@app.get("/api/digest/subscribers")
+def digest_subscribers(_: None = Depends(_require_pipeline_key)):
+    """Ops visibility — confirmed subscribers only (PIPELINE_KEY gated)."""
+    from src.store import count_confirmed_digest_subscribers, recent_digest_subscribers
+
+    return {
+        "count": count_confirmed_digest_subscribers(),
+        "recent": recent_digest_subscribers(5),
     }
 
 
@@ -402,6 +430,32 @@ def vouchers(ref: str | None = Query(default=None)):
         "vouchers": [],
         "activate_url": "/subscribe?voucher=pending",
     }
+
+
+@app.get("/api/backtest")
+def api_backtest(
+    start: str = Query(..., description="YYYY-MM-DD"),
+    end: str = Query(..., description="YYYY-MM-DD"),
+    _: None = Depends(_require_pipeline_key),
+):
+    from src.backtest import run_backtest
+
+    return run_backtest(start, end).model_dump()
+
+
+@app.post("/api/newsletter/dispatch")
+def newsletter_dispatch(
+    body: dict = Body(default={}),
+    _: None = Depends(_require_pipeline_key),
+):
+    """Internal batch dispatch — PIPELINE_KEY gated only."""
+    from src.newsletter.send import dispatch_digest
+
+    dry_run = bool(body.get("dry_run"))
+    try:
+        return dispatch_digest(dry_run=dry_run)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
 
 
 @app.post("/api/run")

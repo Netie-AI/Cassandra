@@ -1,4 +1,4 @@
-/** Golden edition bodies — see files4/GOLDEN_TRANSLATION_REFERENCE.md */
+/** Golden edition bodies  -  see files4/GOLDEN_TRANSLATION_REFERENCE.md */
 window.NEWSPAPER_BODIES = {
   en: {
     dateline_feels: "Today feels like March 14, 2000",
@@ -14,7 +14,7 @@ window.NEWSPAPER_BODIES = {
     col2_html: `<p><strong>Direction now:</strong> base case is choppy to lower unless market breadth improves. Price can bounce, but durable upside usually needs more sectors joining the move.</p>
 <p><strong>Sentiment read:</strong> optimistic headlines still dominate positioning even as internals soften. In plain terms, the crowd is still near the front of the boat.</p>
 <p><strong>Why this matters:</strong> when a crowded market meets a fresh macro shock, moves can gap before fundamentals catch up. We track trigger headlines so readers react with context, not panic.</p>
-<div class="locked-wrap"><p class="locked">Subscriber section includes the intraday trigger board: policy surprise scorecards, capex-language downticks, futures breadth decay, and cross-asset stress flags with timestamps. You also get what changed since the prior edition and what would invalidate the current view.</p><div class="locked-overlay">🔒 Subscriber brief preview</div></div>
+<div class="locked-wrap"><p class="locked">Subscriber section includes the intraday trigger board: policy surprise scorecards, capex-language downticks, futures breadth decay, and cross-asset stress flags with timestamps. You also get what changed since the prior edition and what would invalidate the current view.</p><div class="locked-overlay">Subscriber preview</div></div>
 <div class="echo-box" style="margin-top:0.75rem;"><div class="echo-box-head">Nearest analog date</div>
 <p style="font-size:12px;color:var(--ink-2);margin:0;"><strong>March 6-14, 2000</strong> | 18 days before the NASDAQ peak. CRS analogue: 41.2. The trigger fired on March 11 (Cisco capex warning). Separation between today and analog: <em>±22 days. Timing humility required.</em></p></div>`,
     col3_html: `<p><strong>Simple analogy:</strong> this market behaves like dry grass in hot weather. Most days are quiet. But if wind picks up and one spark lands, fire spreads fast. Fragility is the dryness; trigger is the spark.</p>
@@ -38,7 +38,7 @@ window.NEWSPAPER_BODIES = {
     col2_html: `<p><strong>当前方向：</strong>除非市场广度改善，否则基准情形是震荡偏弱。价格可以反弹，但持续的上行通常需要更多板块加入。</p>
 <p><strong>情绪解读：</strong>尽管市场内部结构正在走弱，乐观的头条仍主导着持仓。说白了，人群仍然挤在船头。</p>
 <p><strong>为何重要：</strong>当拥挤的市场遇上新的宏观冲击，价格可能在基本面跟上之前出现跳空。我们追踪触发性头条，让读者带着背景理性应对，而非恐慌。</p>
-<div class="locked-wrap"><p class="locked">订阅板块包含盘中触发板：政策意外评分卡、资本支出措辞下调、期货广度衰减，以及带时间戳的跨资产压力标记。还可查看自上一版以来的变化，以及哪些情形会推翻当前判断。</p><div class="locked-overlay">🔒 订阅简报预览</div></div>
+<div class="locked-wrap"><p class="locked">订阅板块包含盘中触发板：政策意外评分卡、资本支出措辞下调、期货广度衰减，以及带时间戳的跨资产压力标记。还可查看自上一版以来的变化，以及哪些情形会推翻当前判断。</p><div class="locked-overlay">订阅简报预览</div></div>
 <div class="echo-box" style="margin-top:0.75rem;"><div class="echo-box-head">最近类比日期</div>
 <p style="font-size:12px;color:var(--ink-2);margin:0;"><strong>2000 年 3 月 6-14 日</strong> | 距纳斯达克峰值还有 18 天。CRS 类比值：41.2。触发器于 3 月 11 日触发（思科资本支出预警）。今日与类比窗口的间隔：<em>±22 天。时间判断需保持谦逊。</em></p></div>`,
     col3_html: `<p><strong>简单类比：</strong>这个市场就像炎热天气下的干草。大多数日子都很平静。但如果风力加大，一颗火星落下，火势就会迅速蔓延。脆弱性是干燥；触发器是火星。</p>
@@ -62,7 +62,7 @@ window.NEWSPAPER_BODIES = {
     col2_html: `<p><strong>Hala tuju kini:</strong> senario asas adalah tidak menentu ke bawah melainkan keluasan pasaran bertambah baik. Harga boleh melantun, tetapi kenaikan yang berkekalan biasanya memerlukan lebih banyak sektor menyertai pergerakan.</p>
 <p><strong>Bacaan sentimen:</strong> tajuk optimis masih menguasai kedudukan walaupun struktur dalaman semakin lemah. Secara ringkas, orang ramai masih berada di hadapan bot.</p>
 <p><strong>Mengapa ini penting:</strong> apabila pasaran yang sesak bertemu kejutan makro baharu, pergerakan boleh melonjak sebelum asas menyusul. Kami menjejaki tajuk pencetus supaya pembaca bertindak dengan konteks, bukan panik.</p>
-<div class="locked-wrap"><p class="locked">Bahagian pelanggan termasuk papan pencetus intraday: kad skor kejutan dasar, penurunan bahasa capex, kemerosotan keluasan niaga hadapan, dan bendera tekanan rentas aset dengan cap masa. Anda juga mendapat perubahan sejak edisi terdahulu dan apa yang akan membatalkan pandangan semasa.</p><div class="locked-overlay">🔒 Pratonton ringkas pelanggan</div></div>
+<div class="locked-wrap"><p class="locked">Bahagian pelanggan termasuk papan pencetus intraday: kad skor kejutan dasar, penurunan bahasa capex, kemerosotan keluasan niaga hadapan, dan bendera tekanan rentas aset dengan cap masa. Anda juga mendapat perubahan sejak edisi terdahulu dan apa yang akan membatalkan pandangan semasa.</p><div class="locked-overlay">Pratonton ringkas pelanggan</div></div>
 <div class="echo-box" style="margin-top:0.75rem;"><div class="echo-box-head">Tarikh analog terdekat</div>
 <p style="font-size:12px;color:var(--ink-2);margin:0;"><strong>6-14 Mac 2000</strong> | 18 hari sebelum puncak NASDAQ. Analog CRS: 41.2. Pencetus diaktifkan pada 11 Mac (amaran capex Cisco). Pemisahan antara hari ini dan analog: <em>±22 hari. Kerendahan hati masa diperlukan.</em></p></div>`,
     col3_html: `<p><strong>Analogi ringkas:</strong> pasaran ini berkelakuan seperti rumput kering dalam cuaca panas. Kebanyakan hari tenang. Tetapi jika angin kencang dan satu percikan api mendarat, api merebak dengan cepat. Kerapuhan ialah kekeringan; pencetus ialah percikan api.</p>

@@ -57,6 +57,13 @@ class NewsRead(BaseModel):
     metrics: list[MetricReading] = []
 
 
+class MoverRead(BaseModel):
+    symbol: str
+    price: Optional[float] = None
+    pct_change: Optional[float] = None
+    source: str = "finnhub"
+
+
 class StructureRead(BaseModel):
     # raw series the phase classifier needs:
     ohlcv_csv_path: str                 # path to the OHLCV the agent fetched (for phase.py)
@@ -65,6 +72,7 @@ class StructureRead(BaseModel):
     new_lows: Optional[int]
     index_breadth_divergence: Optional[float]  # 0..1, index-high-while-internals-rot
     ad_line_slope: Optional[float]
+    live_movers: list[MoverRead] = []
     metrics: list[MetricReading] = []
 
 

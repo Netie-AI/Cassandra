@@ -1,4 +1,4 @@
-/** Hardcoded demo payloads — used when /api/* is unreachable (static Pages deploy). */
+/** Hardcoded demo payloads  -  used when /api/* is unreachable (static Pages deploy). */
 window.CassandraDemo = {
   movers: {
     "1D": {

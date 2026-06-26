@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import json
+import os
+import secrets
 import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DB = ROOT / "store" / "scores.sqlite"
+
+DIGEST_DOUBLE_OPTIN = os.getenv("DIGEST_DOUBLE_OPTIN", "false").lower() == "true"
 
 
 def _conn() -> sqlite3.Connection:
@@ -47,7 +51,8 @@ def _conn() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS digest_subscribers (
             email TEXT PRIMARY KEY,
             source TEXT,
-            subscribed_at TEXT NOT NULL
+            subscribed_at TEXT NOT NULL,
+            confirmed INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS contact_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +62,14 @@ def _conn() -> sqlite3.Connection:
             logged_at TEXT NOT NULL
         );
     """)
+    try:
+        c.execute("ALTER TABLE digest_subscribers ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE digest_subscribers ADD COLUMN confirm_token TEXT")
+    except sqlite3.OperationalError:
+        pass
     return c
 
 
@@ -143,6 +156,28 @@ def score_on_or_before(asof: str) -> dict | None:
     d["factors"] = json.loads(d.pop("factors_json") or "{}")
     d["extra"] = json.loads(d.pop("payload_json") or "{}")
     return d
+
+
+def get_score_history(start: str, end: str) -> list[dict]:
+    """CRS rows between start and end (inclusive), ascending by asof."""
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT asof, crs, band, fragility, trigger, phase, phase_confidence, coverage "
+            "FROM daily_scores WHERE asof >= ? AND asof <= ? ORDER BY asof ASC",
+            (start, end),
+        ).fetchall()
+    return [
+        {
+            "date": r["asof"],
+            "crs": r["crs"],
+            "phase": r["phase"],
+            "f": r["fragility"],
+            "t": r["trigger"],
+            "band": r["band"],
+            "coverage": r["coverage"],
+        }
+        for r in rows
+    ]
 
 
 def _fallback_highlights(asof: str | None = None) -> dict:
@@ -332,18 +367,85 @@ def get_newspaper_body(asof: date | str, lang: str) -> dict | None:
     return dict(row) if row else None
 
 
-def save_digest_subscriber(email: str, source: str = "newspaper") -> bool:
-    """Insert email if new. Returns True if newly added."""
+def save_digest_subscriber(email: str, source: str = "newspaper") -> tuple[bool, bool]:
+    """Insert email if new. Returns (is_new, confirmed). Auto-confirms unless DIGEST_DOUBLE_OPTIN."""
+    from src.tools._env import load_env
+
+    load_env()
+    double_optin = os.getenv("DIGEST_DOUBLE_OPTIN", "false").lower() == "true"
     email = email.strip().lower()
     if not email or "@" not in email:
-        return False
+        return False, False
     now = datetime.now(timezone.utc).isoformat()
+    confirmed = 0 if double_optin else 1
+    token = secrets.token_urlsafe(32) if double_optin else None
     with _conn() as c:
         cur = c.execute(
-            "INSERT OR IGNORE INTO digest_subscribers (email, source, subscribed_at) VALUES (?,?,?)",
-            (email, source[:32], now),
+            "INSERT OR IGNORE INTO digest_subscribers "
+            "(email, source, subscribed_at, confirmed, confirm_token) VALUES (?,?,?,?,?)",
+            (email, source[:32], now, confirmed, token),
         )
-        return cur.rowcount > 0
+        is_new = cur.rowcount > 0
+        if not is_new:
+            if double_optin:
+                c.execute(
+                    "UPDATE digest_subscribers SET confirm_token = ? WHERE email = ? AND confirmed = 0",
+                    (token or secrets.token_urlsafe(32), email),
+                )
+            else:
+                c.execute("UPDATE digest_subscribers SET confirmed = 1 WHERE email = ?", (email,))
+        row = c.execute("SELECT confirmed FROM digest_subscribers WHERE email = ?", (email,)).fetchone()
+        return is_new, bool(row["confirmed"]) if row else False
+
+
+def confirm_digest_subscriber(token: str) -> bool:
+    """Confirm subscriber by token. Returns True if matched."""
+    token = token.strip()
+    if not token:
+        return False
+    with _conn() as c:
+        row = c.execute(
+            "SELECT email FROM digest_subscribers WHERE confirm_token = ? AND confirmed = 0",
+            (token,),
+        ).fetchone()
+        if not row:
+            return False
+        c.execute(
+            "UPDATE digest_subscribers SET confirmed = 1, confirm_token = NULL WHERE confirm_token = ?",
+            (token,),
+        )
+        return True
+
+
+def count_confirmed_digest_subscribers() -> int:
+    with _conn() as c:
+        row = c.execute("SELECT COUNT(*) AS n FROM digest_subscribers WHERE confirmed = 1").fetchone()
+    return int(row["n"]) if row else 0
+
+
+def recent_digest_subscribers(limit: int = 5) -> list[str]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT email FROM digest_subscribers WHERE confirmed = 1 ORDER BY subscribed_at DESC LIMIT ?",
+            (max(1, limit),),
+        ).fetchall()
+    return [str(r["email"]) for r in rows]
+
+
+def list_confirmed_digest_subscribers(limit: int = 10_000) -> list[str]:
+    """Return emails with confirmed=1 only."""
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT email FROM digest_subscribers WHERE confirmed = 1 ORDER BY subscribed_at LIMIT ?",
+            (max(1, limit),),
+        ).fetchall()
+    return [str(r["email"]) for r in rows]
+
+
+def log_newsletter_send(email: str, subject: str, *, ok: bool, detail: str = "") -> None:
+    """Audit trail for batch sends — stored in contact_log."""
+    msg = f"[newsletter] subject={subject!r} ok={ok} {detail}".strip()
+    log_contact(email, msg, {"type": "newsletter_dispatch"})
 
 
 def log_contact(email: str | None, message: str, client: dict | None) -> int:

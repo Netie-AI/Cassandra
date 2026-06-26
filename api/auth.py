@@ -10,6 +10,19 @@ FREE_DELAY_DAYS = 2
 FIRST_SUB_TRIAL_DAYS = 7
 
 
+def get_tier(jwt_token: str | None = None) -> str:
+    """Direct JWT tier lookup (smoke tests / CLI). Returns 'free' when auth missing or invalid."""
+    if not jwt_token:
+        return "free"
+    auth = jwt_token if jwt_token.startswith("Bearer ") else f"Bearer {jwt_token}"
+    try:
+        from src.db.supabase_client import tier_from_jwt
+        tier = tier_from_jwt(auth)
+        return tier if tier and tier in VALID_TIERS else "free"
+    except Exception:
+        return "free"
+
+
 def get_user_tier(
     authorization: str | None = Header(default=None),
     x_tier: str | None = Header(default=None, alias="X-Tier"),

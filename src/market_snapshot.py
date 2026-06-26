@@ -49,8 +49,20 @@ def _spark_seed(sym: str, n: int = 20) -> list[float]:
 def top_movers(tf: str = "1D", sector: str = "tech,semis", limit: int = 10) -> dict:
     tf = tf.upper() if tf.upper() in _TF_MAP else "1D"
     limit = max(1, min(limit, 20))
+    try:
+        from src.tools.movers import fetch_watchlist_movers
+
+        live = fetch_watchlist_movers()
+        if live:
+            rows = [
+                {"sym": m.symbol, "pct": round(m.pct_change or 0.0, 2), "px": m.price, "source": m.source}
+                for m in live[:limit]
+            ]
+            return {"tf": tf, "sector": sector, "scale": _SCALE[tf], "movers": rows, "live": True}
+    except Exception:
+        pass
     rows = sorted(_TF_MAP[tf], key=lambda r: abs(r["pct"]), reverse=True)[:limit]
-    return {"tf": tf, "sector": sector, "scale": _SCALE[tf], "movers": rows}
+    return {"tf": tf, "sector": sector, "scale": _SCALE[tf], "movers": rows, "live": False}
 
 
 def index_snapshot() -> dict:

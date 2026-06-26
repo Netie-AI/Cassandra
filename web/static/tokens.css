@@ -1,4 +1,4 @@
-/* CASSANDRA — shared editorial design tokens */
+/* CASSANDRA  -  shared editorial design tokens */
 :root,
 [data-theme="light"] {
   --font-serif: "Crimson Pro", Georgia, "Times New Roman", serif;
@@ -29,6 +29,10 @@
   --band-crisis: #7f1d1d;
   --market-up: #15803d;
   --market-down: #b91c1c;
+  --color-danger: #b91c1c;
+  --color-warn: #92400e;
+  --color-neutral: #6b6b6b;
+  --color-ok: #15803d;
 }
 
 [data-theme="dark"] {
