@@ -82,3 +82,22 @@ create policy "watchlists_all_own" on public.watchlists
 
 create policy "subscriptions_select_own" on public.subscriptions
   for select using (auth.uid() = user_id);
+
+-- Auto-create profile row when Supabase Auth registers a user
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, tier)
+  values (new.id, coalesce(new.email, ''), 'free')
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();

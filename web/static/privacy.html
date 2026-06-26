@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Cassandra - Privacy Policy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/tokens.css"/>
+  <style>
+    body {
+      background: var(--color-background-secondary, #f3f1ed);
+      color: var(--color-text-primary, #1a1a1a);
+      font-family: "DM Sans", var(--font-sans, sans-serif);
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+      line-height: 1.65;
+      font-size: 15px;
+    }
+    h1 { font-size: 1.75rem; font-weight: 500; margin: 0 0 0.25rem; }
+    .updated { font-size: 13px; color: #666; margin-bottom: 2rem; }
+    h2 { font-size: 1rem; font-weight: 500; margin: 1.75rem 0 0.5rem; }
+    p { margin: 0 0 0.75rem; color: #333; }
+    ul { margin: 0 0 0.75rem; padding-left: 1.25rem; color: #333; }
+    a { color: #1a1a1a; }
+    .back { display: inline-block; margin-top: 2rem; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: 2026-06-26 · Cassandra by Netie AI</p>
+
+  <p>Cassandra (crash.netie.ai) is a market research desk operated by Netie AI. This policy describes what we collect, why, and your choices.</p>
+
+  <h2>Data we collect</h2>
+  <ul>
+    <li>Email address (account sign-up, free digest, or contact form)</li>
+    <li>Subscription tier and payment status (via Stripe; we do not store card numbers)</li>
+    <li>Usage logs (API requests, agent chat gate events, pipeline diagnostics)</li>
+    <li>Browser/device metadata when you submit a contact form (for support only)</li>
+  </ul>
+
+  <h2>What we do not do</h2>
+  <p>We do not sell your data. We do not use third-party advertising trackers. We do not execute trades on your behalf.</p>
+
+  <h2>Where data is stored</h2>
+  <ul>
+    <li>Accounts and profiles: Supabase (EU region when configured)</li>
+    <li>Public score snapshots: Cloudflare KV</li>
+    <li>Pipeline history: local SQLite on the operator machine (not exported to third parties)</li>
+    <li>Email delivery: Resend (send-only)</li>
+    <li>Payments: Stripe (PCI-compliant; Netie AI never sees full card data)</li>
+  </ul>
+
+  <h2>Email</h2>
+  <p>We send edition digests, account messages, and support replies from Netie AI addresses. Every marketing-style email includes an unsubscribe link. Reply to <a href="mailto:hello@netie.ai">hello@netie.ai</a> for privacy questions.</p>
+
+  <h2>Your rights</h2>
+  <ul>
+    <li>Unsubscribe from the free digest anytime via the link in any email</li>
+    <li>Delete your account by contacting <a href="mailto:hello@netie.ai">hello@netie.ai</a></li>
+    <li>Request a copy or correction of data we hold about you</li>
+  </ul>
+
+  <h2>Contact</h2>
+  <p>Netie AI · <a href="mailto:hello@netie.ai">hello@netie.ai</a></p>
+
+  <a href="/" class="back">← Back to Cassandra desk</a>
+</body>
+</html>

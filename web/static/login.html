@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Cassandra - Sign in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/tokens.css"/>
+  <link rel="stylesheet" href="/static/styles.css"/>
+  <style>
+    .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--space-lg); }
+    .auth-card { width: 100%; max-width: 420px; padding: var(--space-xl); border: 0.5px solid var(--color-border-secondary); border-radius: var(--radius-md); background: var(--color-background-secondary); }
+    .auth-card h1 { font-family: var(--font-serif); font-size: clamp(28px, 5vw, 36px); font-weight: 600; margin: 0 0 var(--space-sm); color: var(--color-text-primary); }
+    .auth-lead { font-family: var(--font-sans); font-size: var(--type-body); color: var(--color-text-secondary); margin: 0 0 var(--space-lg); }
+    .auth-field { display: flex; flex-direction: column; gap: var(--space-xs); margin-bottom: var(--space-md); }
+    .auth-field label { font-family: var(--font-sans); font-size: 12px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+    .auth-field input { font-family: var(--font-sans); font-size: var(--type-body); padding: 10px 12px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--radius-sm); background: var(--color-background-primary, #fff); color: var(--color-text-primary); }
+    .auth-btn { width: 100%; font-family: var(--font-sans); font-size: var(--type-body); font-weight: 500; padding: 11px 16px; border: none; border-radius: var(--radius-sm); background: var(--color-text-primary); color: var(--color-background-secondary); cursor: pointer; margin-top: var(--space-sm); }
+    .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .auth-error { font-family: var(--font-sans); font-size: 13px; color: var(--color-danger); margin: var(--space-sm) 0 0; min-height: 1.2em; }
+    .auth-banner { font-family: var(--font-sans); font-size: 13px; color: var(--color-ok); background: color-mix(in srgb, var(--color-ok) 12%, transparent); border: 0.5px solid color-mix(in srgb, var(--color-ok) 35%, transparent); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: var(--space-md); }
+    .auth-footer { margin-top: var(--space-lg); font-family: var(--font-sans); font-size: 13px; color: var(--color-text-secondary); text-align: center; }
+    .auth-footer a { color: var(--color-text-primary); font-weight: 500; }
+    .auth-logo { display: block; font-family: var(--font-serif); font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-secondary); text-decoration: none; margin-bottom: var(--space-lg); }
+  </style>
+</head>
+<body class="home-page auth-page">
+  <div class="auth-card">
+    <a href="/" class="auth-logo">Cassandra</a>
+    <div id="registered-banner" class="auth-banner" hidden>Check your inbox to confirm your account.</div>
+    <h1>Sign in to Cassandra</h1>
+    <p class="auth-lead">Research desk access. Decision support only - we never trade for you.</p>
+    <form id="login-form" novalidate>
+      <div class="auth-field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required/>
+      </div>
+      <div class="auth-field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required minlength="8"/>
+      </div>
+      <p id="login-error" class="auth-error" role="alert" aria-live="polite"></p>
+      <button type="submit" class="auth-btn" id="login-submit">Sign in</button>
+    </form>
+    <p class="auth-footer">New? <a href="/signup.html">Start free →</a></p>
+  </div>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get("registered") === "1") {
+        document.getElementById("registered-banner").hidden = false;
+      }
+      var form = document.getElementById("login-form");
+      var errEl = document.getElementById("login-error");
+      var btn = document.getElementById("login-submit");
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        errEl.textContent = "";
+        btn.disabled = true;
+        fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: document.getElementById("email").value.trim(),
+            password: document.getElementById("password").value
+          })
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+          .then(function (res) {
+            if (res.data.access_token || res.data.token) {
+              var token = res.data.access_token || res.data.token;
+              sessionStorage.setItem("cassandra_jwt", token);
+              fetch("/api/auth/me", { headers: { Authorization: "Bearer " + token } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                  if (data && window.CassandraCommon) {
+                    var name = data.display_name || (data.email || "User").split("@")[0];
+                    window.CassandraCommon.setSession({
+                      name: name,
+                      email: data.email,
+                      tier: data.tier_label || data.tier || "Free",
+                      tierId: data.tier || "free",
+                      initials: name.slice(0, 2).toUpperCase()
+                    });
+                  }
+                  window.location.href = "/";
+                })
+                .catch(function () { window.location.href = "/"; });
+              return;
+            }
+            errEl.textContent = res.data.error === "auth_not_configured"
+              ? "Sign-in is not configured yet. Contact the desk or try again after setup."
+              : (res.data.message || res.data.error || "Sign-in failed. Check your credentials.");
+          })
+          .catch(function () {
+            errEl.textContent = "Could not reach the server. Try again in a moment.";
+          })
+          .finally(function () { btn.disabled = false; });
+      });
+    })();
+  </script>
+</body>
+</html>

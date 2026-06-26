@@ -8,7 +8,12 @@ _client: Any = None
 
 
 def is_configured() -> bool:
-    return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+    """True when URL + service role + JWT secret are all set (live auth path)."""
+    return bool(
+        os.getenv("SUPABASE_URL")
+        and os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        and os.getenv("SUPABASE_JWT_SECRET")
+    )
 
 
 def get_client():
@@ -30,29 +35,8 @@ def get_client():
 
 
 def tier_from_jwt(authorization: str | None) -> str | None:
-    """Resolve tier from Supabase JWT. Returns None if not configured or invalid."""
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    if not os.getenv("SUPABASE_JWT_SECRET"):
-        return None
-    token = authorization.removeprefix("Bearer ").strip()
-    try:
-        import jwt
-        payload = jwt.decode(
-            token,
-            os.environ["SUPABASE_JWT_SECRET"],
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
-        user_id = payload.get("sub")
-        if not user_id:
-            return None
-        sb = get_client()
-        if sb is None:
-            return None
-        row = sb.table("profiles").select("tier").eq("id", user_id).maybe_single().execute()
-        data = getattr(row, "data", None) or {}
-        tier = data.get("tier") if isinstance(data, dict) else None
-        return str(tier).lower() if tier else "free"
-    except Exception:
-        return None
+    """Resolve tier from Supabase JWT (subscriptions + profile). Returns None if invalid."""
+    from .supabase_auth import user_from_token
+
+    user = user_from_token(authorization)
+    return user.get("tier") if user else None

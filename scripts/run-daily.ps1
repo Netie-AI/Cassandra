@@ -1,4 +1,5 @@
 # Cassandra daily runner — call from Task Scheduler
+# API + ops desk: .\scripts\start.ps1
 # Set OPS_PRERUN_MINUTES in .env or override here
 param([string]$Run = "now")
 Set-Location (Join-Path $PSScriptRoot "..")

@@ -1,0 +1,25 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [master]
+    paths: ['web/static/**']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch _redirects
+        run: |
+          sed -i "s|YOUR_WORKER_URL|${{ secrets.CF_WORKER_URL }}|g" web/static/_redirects
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          projectName: cassandra
+          directory: web/static
+          branch: master

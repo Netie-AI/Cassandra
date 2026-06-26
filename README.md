@@ -124,11 +124,22 @@ Phases 4–9: news pipeline, analog data, methods, options live wire, UI, deploy
 
 ## Run
 
+**Local API (recommended):**
+
+```powershell
+.\scripts\start.ps1          # API at http://localhost:8080
+.\scripts\start.ps1 -Run       # pipeline run, then start API
+```
+
+**Pipeline only:**
+
 ```bash
 python -m src.orchestrator --run        # one full daily cycle now ("start")
 python -m src.orchestrator --backtest   # replay over historical fixtures to calibrate weights
 python -m src.orchestrator --schedule   # start the daily cron
 ```
+
+Ops review desk: `http://localhost:8080/ops` (localhost or `PIPELINE_KEY`).
 
 Then send the generated report (and any weight changes) back for review — the scoring spec is
 designed to be argued with.

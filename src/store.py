@@ -61,6 +61,18 @@ def _conn() -> sqlite3.Connection:
             client_json TEXT,
             logged_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS pipeline_runs (
+            run_id TEXT PRIMARY KEY,
+            asof TEXT NOT NULL,
+            completed_at TEXT NOT NULL,
+            crs REAL, band TEXT, phase TEXT, phase_confidence REAL,
+            fragility REAL, trigger REAL, coverage REAL,
+            capex_cut_nlp REAL,
+            analog_match TEXT,
+            newsletter_sent INTEGER NOT NULL DEFAULT 0,
+            newsletter_sent_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_pipeline_runs_completed ON pipeline_runs(completed_at DESC);
     """)
     try:
         c.execute("ALTER TABLE digest_subscribers ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0")
@@ -68,6 +80,14 @@ def _conn() -> sqlite3.Connection:
         pass
     try:
         c.execute("ALTER TABLE digest_subscribers ADD COLUMN confirm_token TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE digest_subscribers ADD COLUMN unsub_token TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE digest_subscribers ADD COLUMN last_sent_at TEXT")
     except sqlite3.OperationalError:
         pass
     return c
@@ -367,23 +387,24 @@ def get_newspaper_body(asof: date | str, lang: str) -> dict | None:
     return dict(row) if row else None
 
 
-def save_digest_subscriber(email: str, source: str = "newspaper") -> tuple[bool, bool]:
-    """Insert email if new. Returns (is_new, confirmed). Auto-confirms unless DIGEST_DOUBLE_OPTIN."""
+def save_digest_subscriber(email: str, source: str = "newspaper") -> tuple[bool, bool, str | None]:
+    """Insert email if new. Returns (is_new, confirmed, unsub_token)."""
     from src.tools._env import load_env
 
     load_env()
     double_optin = os.getenv("DIGEST_DOUBLE_OPTIN", "false").lower() == "true"
     email = email.strip().lower()
     if not email or "@" not in email:
-        return False, False
+        return False, False, None
     now = datetime.now(timezone.utc).isoformat()
     confirmed = 0 if double_optin else 1
     token = secrets.token_urlsafe(32) if double_optin else None
+    unsub = secrets.token_urlsafe(16)
     with _conn() as c:
         cur = c.execute(
             "INSERT OR IGNORE INTO digest_subscribers "
-            "(email, source, subscribed_at, confirmed, confirm_token) VALUES (?,?,?,?,?)",
-            (email, source[:32], now, confirmed, token),
+            "(email, source, subscribed_at, confirmed, confirm_token, unsub_token) VALUES (?,?,?,?,?,?)",
+            (email, source[:32], now, confirmed, token, unsub),
         )
         is_new = cur.rowcount > 0
         if not is_new:
@@ -394,8 +415,17 @@ def save_digest_subscriber(email: str, source: str = "newspaper") -> tuple[bool,
                 )
             else:
                 c.execute("UPDATE digest_subscribers SET confirmed = 1 WHERE email = ?", (email,))
-        row = c.execute("SELECT confirmed FROM digest_subscribers WHERE email = ?", (email,)).fetchone()
-        return is_new, bool(row["confirmed"]) if row else False
+            row = c.execute(
+                "SELECT unsub_token FROM digest_subscribers WHERE email = ?", (email,)
+            ).fetchone()
+            if row and not row["unsub_token"]:
+                c.execute(
+                    "UPDATE digest_subscribers SET unsub_token = ? WHERE email = ?",
+                    (secrets.token_urlsafe(16), email),
+                )
+        row = c.execute("SELECT confirmed, unsub_token FROM digest_subscribers WHERE email = ?", (email,)).fetchone()
+        unsub_out = str(row["unsub_token"]) if row and row["unsub_token"] else unsub
+        return is_new, bool(row["confirmed"]) if row else False, unsub_out
 
 
 def confirm_digest_subscriber(token: str) -> bool:
@@ -434,12 +464,75 @@ def recent_digest_subscribers(limit: int = 5) -> list[str]:
 
 def list_confirmed_digest_subscribers(limit: int = 10_000) -> list[str]:
     """Return emails with confirmed=1 only."""
+    return [r["email"] for r in list_digest_recipients(limit)]
+
+
+def list_digest_recipients(limit: int = 10_000) -> list[dict]:
+    """Confirmed subscribers with unsubscribe tokens."""
     with _conn() as c:
         rows = c.execute(
-            "SELECT email FROM digest_subscribers WHERE confirmed = 1 ORDER BY subscribed_at LIMIT ?",
+            "SELECT email, unsub_token FROM digest_subscribers WHERE confirmed = 1 ORDER BY subscribed_at LIMIT ?",
             (max(1, limit),),
         ).fetchall()
-    return [str(r["email"]) for r in rows]
+    out: list[dict] = []
+    for row in rows:
+        email = str(row["email"])
+        token = row["unsub_token"]
+        if not token:
+            token = secrets.token_urlsafe(16)
+            with _conn() as c2:
+                c2.execute(
+                    "UPDATE digest_subscribers SET unsub_token = ? WHERE email = ?",
+                    (token, email),
+                )
+        out.append({"email": email, "unsub_token": token})
+    return out
+
+
+def unsubscribe_digest(token: str) -> str | None:
+    """Unsubscribe by token. Returns email when successful, else None."""
+    token = token.strip()
+    if not token:
+        return None
+    with _conn() as c:
+        row = c.execute(
+            "SELECT email FROM digest_subscribers WHERE unsub_token = ? AND confirmed = 1",
+            (token,),
+        ).fetchone()
+        if not row:
+            return None
+        email = str(row["email"])
+        c.execute(
+            "UPDATE digest_subscribers SET confirmed = 0 WHERE unsub_token = ?",
+            (token,),
+        )
+        return email
+
+
+def mark_digest_sent(emails: list[str]) -> None:
+    if not emails:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    with _conn() as c:
+        for email in emails:
+            c.execute(
+                "UPDATE digest_subscribers SET last_sent_at = ? WHERE email = ?",
+                (now, email),
+            )
+
+
+def get_last_pipeline_completed_at() -> datetime | None:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT completed_at FROM pipeline_runs ORDER BY completed_at DESC LIMIT 1"
+        ).fetchone()
+    if not row or not row["completed_at"]:
+        return None
+    try:
+        raw = str(row["completed_at"]).replace("Z", "+00:00")
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return None
 
 
 def log_newsletter_send(email: str, subject: str, *, ok: bool, detail: str = "") -> None:
@@ -486,3 +579,192 @@ def log_agent_gate_block(message: str, score: float, reason: str) -> None:
             "INSERT INTO agent_gate_log (logged_at, message, score, reason) VALUES (?,?,?,?)",
             (datetime.now(timezone.utc).isoformat(), message[:2000], score, reason),
         )
+
+
+def _run_summary(row: dict) -> dict:
+    return {
+        "run_id": row["run_id"],
+        "timestamp": row["completed_at"],
+        "asof": row["asof"],
+        "crs": row.get("crs"),
+        "phase": row.get("phase"),
+        "phase_conf": row.get("phase_confidence"),
+        "f": row.get("fragility"),
+        "t": row.get("trigger"),
+        "coverage": row.get("coverage"),
+        "capex_cut_nlp": row.get("capex_cut_nlp"),
+        "analog_match": row.get("analog_match"),
+        "newsletter_sent": bool(row.get("newsletter_sent")),
+    }
+
+
+def record_pipeline_run(score: dict) -> str:
+    """Append ops run log entry; returns run_id."""
+    from .analog import cosine_match
+
+    asof = str(score.get("asof") or date.today().isoformat())
+    completed_at = datetime.now(timezone.utc).isoformat()
+    run_id = f"{asof}T{completed_at[11:19].replace(':', '')}Z"
+    extra = score.get("extra") or {}
+    capex = extra.get("capex_cut_nlp")
+    if capex is None:
+        capex = (extra.get("orchestrator") or {}).get("capex_cut_nlp")
+    key, _sim = cosine_match(
+        float(score.get("crs") or 0),
+        float(score.get("fragility") or 0),
+        float(score.get("trigger") or 0),
+    )
+    with _conn() as c:
+        c.execute(
+            """
+            INSERT OR REPLACE INTO pipeline_runs
+            (run_id, asof, completed_at, crs, band, phase, phase_confidence,
+             fragility, trigger, coverage, capex_cut_nlp, analog_match,
+             newsletter_sent, newsletter_sent_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,NULL)
+            """,
+            (
+                run_id,
+                asof,
+                completed_at,
+                score.get("crs"),
+                score.get("band"),
+                score.get("phase"),
+                score.get("phase_confidence"),
+                score.get("fragility"),
+                score.get("trigger"),
+                score.get("coverage"),
+                capex,
+                key,
+            ),
+        )
+    return run_id
+
+
+def get_run_history(limit: int = 30) -> list[dict]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM pipeline_runs ORDER BY completed_at DESC LIMIT ?",
+            (max(1, limit),),
+        ).fetchall()
+    if rows:
+        return [_run_summary(dict(r)) for r in rows]
+    from .analog import cosine_match
+
+    with _conn() as c:
+        scores = c.execute(
+            "SELECT asof, crs, band, fragility, trigger, coverage, phase, phase_confidence, payload_json "
+            "FROM daily_scores ORDER BY asof DESC LIMIT ?",
+            (max(1, limit),),
+        ).fetchall()
+    out: list[dict] = []
+    for r in scores:
+        d = dict(r)
+        extra = json.loads(d.pop("payload_json") or "{}")
+        ts = f"{d['asof']}T16:00:00+00:00"
+        with _conn() as c2:
+            rg = c2.execute(
+                "SELECT generated_at FROM report_graph WHERE asof = ?", (d["asof"],)
+            ).fetchone()
+        if rg and rg["generated_at"]:
+            ts = rg["generated_at"]
+        key, _ = cosine_match(
+            float(d.get("crs") or 0),
+            float(d.get("fragility") or 0),
+            float(d.get("trigger") or 0),
+        )
+        out.append({
+            "run_id": d["asof"],
+            "timestamp": ts,
+            "asof": d["asof"],
+            "crs": d.get("crs"),
+            "phase": d.get("phase"),
+            "phase_conf": d.get("phase_confidence"),
+            "f": d.get("fragility"),
+            "t": d.get("trigger"),
+            "coverage": d.get("coverage"),
+            "capex_cut_nlp": extra.get("capex_cut_nlp"),
+            "analog_match": key,
+            "newsletter_sent": False,
+        })
+    return out
+
+
+def get_run_detail(run_id: str) -> dict | None:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM pipeline_runs WHERE run_id = ?", (run_id,)).fetchone()
+    if not row:
+        hist = get_run_history(90)
+        match = next((h for h in hist if h["run_id"] == run_id), None)
+        if not match:
+            match = next((h for h in hist if h["asof"] == run_id), None)
+        if not match:
+            return None
+        asof = match["asof"]
+        with _conn() as c2:
+            score_row = c2.execute(
+                "SELECT * FROM daily_scores WHERE asof = ?", (asof,)
+            ).fetchone()
+        if not score_row:
+            return None
+        score = dict(score_row)
+        extra = json.loads(score.pop("payload_json") or "{}")
+        score["extra"] = extra
+        score["factors"] = json.loads(score.pop("factors_json") or "{}")
+        bodies = {}
+        for lang in ("en", "zh", "ms"):
+            b = get_newspaper_body(asof, lang)
+            if b:
+                bodies[lang] = b
+        return {
+            **match,
+            "band": score.get("band"),
+            "newspaper": bodies,
+            "last_newsletter_sent": get_last_newsletter_sent(),
+            "subscriber_count": count_confirmed_digest_subscribers(),
+        }
+    summary = _run_summary(dict(row))
+    asof = summary["asof"]
+    bodies = {}
+    for lang in ("en", "zh", "ms"):
+        b = get_newspaper_body(asof, lang)
+        if b:
+            bodies[lang] = b
+    return {
+        **summary,
+        "band": row["band"],
+        "newspaper": bodies,
+        "last_newsletter_sent": get_last_newsletter_sent(),
+        "subscriber_count": count_confirmed_digest_subscribers(),
+    }
+
+
+def mark_newsletter_sent(run_id: str) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    with _conn() as c:
+        c.execute(
+            "UPDATE pipeline_runs SET newsletter_sent = 1, newsletter_sent_at = ? WHERE run_id = ?",
+            (now, run_id),
+        )
+
+
+def was_newsletter_sent(run_id: str) -> bool:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT newsletter_sent FROM pipeline_runs WHERE run_id = ?", (run_id,)
+        ).fetchone()
+    return bool(row and row["newsletter_sent"])
+
+
+def get_last_newsletter_sent() -> str | None:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT newsletter_sent_at FROM pipeline_runs "
+            "WHERE newsletter_sent = 1 ORDER BY newsletter_sent_at DESC LIMIT 1"
+        ).fetchone()
+    return row["newsletter_sent_at"] if row else None
+
+
+def latest_run_id() -> str | None:
+    runs = get_run_history(1)
+    return runs[0]["run_id"] if runs else None

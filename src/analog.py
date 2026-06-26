@@ -27,9 +27,11 @@ CORPUS = {
     },
 }
 
+MIN_SIM_THRESHOLD = 0.82  # below this → no match claimed
+
 
 def cosine_match(crs: float, f: float, t: float) -> tuple[str | None, float]:
-    """Return (regime_key, similarity_score 0-1)."""
+    """Return (regime_key, similarity_score 0-1). None key when similarity is weak."""
     vec = [crs / 100, f, t]
     best_key: str | None = None
     best_sim = -1.0
@@ -40,4 +42,7 @@ def cosine_match(crs: float, f: float, t: float) -> tuple[str | None, float]:
         sim = dot / mag if mag else 0.0
         if sim > best_sim:
             best_key, best_sim = key, sim
-    return best_key, round(best_sim, 3)
+    best_sim = round(best_sim, 3)
+    if best_sim < MIN_SIM_THRESHOLD:
+        return None, best_sim
+    return best_key, best_sim

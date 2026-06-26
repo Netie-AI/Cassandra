@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Cassandra - Start free trial</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/tokens.css"/>
+  <link rel="stylesheet" href="/static/styles.css"/>
+  <style>
+    .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--space-lg); }
+    .auth-card { width: 100%; max-width: 420px; padding: var(--space-xl); border: 0.5px solid var(--color-border-secondary); border-radius: var(--radius-md); background: var(--color-background-secondary); }
+    .auth-card h1 { font-family: var(--font-serif); font-size: clamp(28px, 5vw, 36px); font-weight: 600; margin: 0 0 var(--space-sm); color: var(--color-text-primary); }
+    .auth-lead { font-family: var(--font-sans); font-size: var(--type-body); color: var(--color-text-secondary); margin: 0 0 var(--space-lg); }
+    .auth-field { display: flex; flex-direction: column; gap: var(--space-xs); margin-bottom: var(--space-md); }
+    .auth-field label { font-family: var(--font-sans); font-size: 12px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+    .auth-field input { font-family: var(--font-sans); font-size: var(--type-body); padding: 10px 12px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--radius-sm); background: var(--color-background-primary, #fff); color: var(--color-text-primary); }
+    .auth-btn { width: 100%; font-family: var(--font-sans); font-size: var(--type-body); font-weight: 500; padding: 11px 16px; border: none; border-radius: var(--radius-sm); background: var(--color-text-primary); color: var(--color-background-secondary); cursor: pointer; margin-top: var(--space-sm); }
+    .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .auth-error { font-family: var(--font-sans); font-size: 13px; color: var(--color-danger); margin: var(--space-sm) 0 0; min-height: 1.2em; }
+    .auth-footer { margin-top: var(--space-lg); font-family: var(--font-sans); font-size: 13px; color: var(--color-text-secondary); text-align: center; }
+    .auth-footer a { color: var(--color-text-primary); font-weight: 500; }
+    .auth-logo { display: block; font-family: var(--font-serif); font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-secondary); text-decoration: none; margin-bottom: var(--space-lg); }
+  </style>
+</head>
+<body class="home-page auth-page">
+  <div class="auth-card">
+    <a href="/" class="auth-logo">Cassandra</a>
+    <h1>Start your free trial</h1>
+    <p class="auth-lead">7-day trial on first paid subscription. Cancel anytime before renewal.</p>
+    <form id="signup-form" novalidate>
+      <div class="auth-field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required/>
+      </div>
+      <div class="auth-field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8"/>
+      </div>
+      <div class="auth-field">
+        <label for="confirm">Confirm password</label>
+        <input id="confirm" name="confirm" type="password" autocomplete="new-password" required minlength="8"/>
+      </div>
+      <p id="signup-error" class="auth-error" role="alert" aria-live="polite"></p>
+      <button type="submit" class="auth-btn" id="signup-submit">Create account</button>
+    </form>
+    <p class="auth-footer">Already have an account? <a href="/login.html">Sign in →</a></p>
+  </div>
+  <script>
+    (function () {
+      var form = document.getElementById("signup-form");
+      var errEl = document.getElementById("signup-error");
+      var btn = document.getElementById("signup-submit");
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        errEl.textContent = "";
+        var pw = document.getElementById("password").value;
+        var confirm = document.getElementById("confirm").value;
+        if (pw !== confirm) {
+          errEl.textContent = "Passwords do not match.";
+          return;
+        }
+        btn.disabled = true;
+        fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: document.getElementById("email").value.trim(),
+            password: pw
+          })
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+          .then(function (res) {
+            if (res.data.access_token) {
+              sessionStorage.setItem("cassandra_jwt", res.data.access_token);
+              window.location.href = "/";
+              return;
+            }
+            if (res.ok && !res.data.error) {
+              window.location.href = "/login.html?registered=1";
+              return;
+            }
+            errEl.textContent = res.data.error === "auth_not_configured"
+              ? "Account creation is not configured yet. Try again after setup."
+              : (res.data.message || res.data.error || "Could not create account.");
+          })
+          .catch(function () {
+            errEl.textContent = "Could not reach the server. Try again in a moment.";
+          })
+          .finally(function () { btn.disabled = false; });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,22 +1,50 @@
 """FastAPI backend for crash.netie.ai dashboard."""
 from __future__ import annotations
 
+import logging
 import os
 import secrets
+import subprocess
+import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import FREE_DELAY_DAYS, FIRST_SUB_TRIAL_DAYS, gate_score, get_user_tier, resolve_score_dict, subscription_checkout_options
+from .rate_limit import check as rate_limit_check
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web" / "static"
 
-app = FastAPI(title="CASSANDRA", version="0.2.0")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from src.tools._env import load_env
+    from .startup import log_activation_state
+
+    load_env()
+    log_activation_state()
+    yield
+
+
+app = FastAPI(title="CASSANDRA", version="0.2.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/"):
+        ip = request.client.host if request.client else "unknown"
+        if not rate_limit_check(path, ip):
+            return JSONResponse({"error": "rate_limited"}, status_code=429)
+    return await call_next(request)
 
 if WEB.exists():
     app.mount("/static", StaticFiles(directory=WEB), name="static")
@@ -28,6 +56,26 @@ def _require_pipeline_key(x_pipeline_key: str | None = Header(default=None)) -> 
         return
     if x_pipeline_key != expected:
         raise HTTPException(401, "Invalid or missing X-Pipeline-Key")
+
+
+def _require_ops(
+    request: Request,
+    x_pipeline_key: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
+) -> None:
+    """Ops routes: localhost always allowed; remote needs PIPELINE_KEY."""
+    host = request.client.host if request.client else ""
+    if host in ("127.0.0.1", "::1"):
+        return
+    expected = os.getenv("PIPELINE_KEY")
+    if not expected:
+        raise HTTPException(403, "Set PIPELINE_KEY for remote ops access")
+    if x_pipeline_key == expected:
+        return
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    if token == expected:
+        return
+    raise HTTPException(401, "Unauthorized")
 
 
 def _compact_score(score: dict) -> dict:
@@ -141,6 +189,41 @@ def newspaper_report():
 @app.get("/subscribe")
 def pricing():
     return _static_page("pricing.html")
+
+
+@app.get("/privacy")
+def privacy_page():
+    return _static_page("privacy.html")
+
+
+@app.get("/terms")
+def terms_page():
+    return _static_page("terms.html")
+
+
+@app.get("/login")
+def login_page():
+    return _static_page("login.html")
+
+
+@app.get("/signup")
+def signup_page():
+    return _static_page("signup.html")
+
+
+@app.get("/404")
+def page_not_found():
+    return _static_page("404.html")
+
+
+@app.get("/500")
+def page_server_error():
+    return _static_page("500.html")
+
+
+@app.get("/ops")
+def ops_page():
+    return _static_page("ops.html")
 
 
 @app.get("/stocks/{ticker}")
@@ -321,22 +404,170 @@ def api_agent_chat(
     return chat(text, tier=tier)
 
 
+@app.post("/api/auth/login")
+def auth_login(body: dict = Body(default={})):
+    from src.db.supabase_auth import sign_in
+
+    email = str(body.get("email") or "").strip()
+    password = str(body.get("password") or "")
+    if not email or not password:
+        raise HTTPException(400, "Email and password required")
+    result = sign_in(email, password)
+    if result.get("error"):
+        code = 503 if result["error"] == "auth_not_configured" else 401
+        return JSONResponse(result, status_code=code)
+    return result
+
+
+@app.post("/api/auth/signup")
+def auth_signup(body: dict = Body(default={})):
+    from src.db.supabase_auth import sign_up
+
+    email = str(body.get("email") or "").strip()
+    password = str(body.get("password") or "")
+    if not email or not password:
+        raise HTTPException(400, "Email and password required")
+    if len(password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
+    result = sign_up(email, password)
+    if result.get("error"):
+        code = 503 if result["error"] == "auth_not_configured" else 400
+        return JSONResponse(result, status_code=code)
+    return result
+
+
+@app.get("/api/auth/me")
+def auth_me(authorization: str | None = Header(default=None)):
+    from src.db.supabase_client import is_configured
+    from src.db.supabase_auth import user_from_token
+
+    if not is_configured():
+        return {"auth_configured": False, "tier": "free"}
+    user = user_from_token(authorization)
+    if not user:
+        raise HTTPException(401, "Not signed in")
+    return {"auth_configured": True, **user}
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    """Clear client session — always 200."""
+    return {"ok": True}
+
+
+@app.post("/api/webhooks/stripe")
+async def stripe_webhook(request: Request):
+    """Stripe checkout/subscription events → Supabase tier sync."""
+    from src.db.supabase_auth import apply_subscription, find_user_id_by_email
+
+    secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    if not secret:
+        raise HTTPException(503, "Stripe webhook not configured")
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        import stripe
+
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+        event = stripe.Webhook.construct_event(payload, sig, secret)
+    except ImportError as exc:
+        raise HTTPException(503, "Install stripe package for webhook verification") from exc
+    except Exception as exc:
+        raise HTTPException(400, "Invalid Stripe signature") from exc
+
+    etype = event.get("type", "")
+    obj = (event.get("data") or {}).get("object") or {}
+
+    def _is_cassandra_event(meta: dict) -> bool:
+        line = str((meta or {}).get("product_line") or "").lower()
+        return not line or line == "cassandra"
+
+    def _normalize_tier(raw: str | None) -> str | None:
+        if not raw:
+            return None
+        key = str(raw).lower()
+        mapping = {
+            "report": "report",
+            "pro": "briefing",
+            "briefing": "briefing",
+            "api": "agent",
+            "agent": "agent",
+        }
+        return mapping.get(key)
+
+    def _tier_from_metadata(meta: dict) -> str | None:
+        return _normalize_tier((meta or {}).get("tier") or (meta or {}).get("plan"))
+
+    def _tier_from_price(price_id: str) -> str | None:
+        mapping = {
+            os.getenv("STRIPE_PRICE_REPORT", ""): "report",
+            os.getenv("STRIPE_PRICE_PRO", ""): "briefing",
+            os.getenv("STRIPE_PRICE_BRIEFING", ""): "briefing",
+            os.getenv("STRIPE_PRICE_API", ""): "agent",
+            os.getenv("STRIPE_PRICE_AGENT", ""): "agent",
+        }
+        return mapping.get(price_id or "")
+
+    if etype in ("checkout.session.completed", "customer.subscription.created", "customer.subscription.updated"):
+        meta = obj.get("metadata") or {}
+        if not _is_cassandra_event(meta):
+            return {"received": True, "skipped": "not_cassandra"}
+        tier = _tier_from_metadata(meta)
+        if not tier and obj.get("items", {}).get("data"):
+            price_id = obj["items"]["data"][0].get("price", {}).get("id", "")
+            tier = _tier_from_price(price_id)
+        if not tier and obj.get("display_items"):
+            price_id = obj["display_items"][0].get("price", {}).get("id", "")
+            tier = _tier_from_price(price_id)
+        email = obj.get("customer_email") or meta.get("email")
+        user_id = meta.get("user_id") or meta.get("supabase_user_id")
+        if not user_id and email:
+            user_id = find_user_id_by_email(str(email))
+        if user_id and tier:
+            status = "active"
+            if etype == "customer.subscription.updated" and obj.get("status") in ("canceled", "unpaid", "past_due"):
+                status = str(obj.get("status"))
+            apply_subscription(
+                user_id=str(user_id),
+                tier=tier,
+                provider="stripe",
+                external_id=str(obj.get("id") or obj.get("subscription") or ""),
+                status=status,
+            )
+    elif etype == "customer.subscription.deleted":
+        meta = obj.get("metadata") or {}
+        user_id = meta.get("user_id") or meta.get("supabase_user_id")
+        if user_id:
+            apply_subscription(
+                user_id=str(user_id),
+                tier=str(meta.get("tier") or "report"),
+                provider="stripe",
+                external_id=str(obj.get("id") or ""),
+                status="canceled",
+            )
+    return {"received": True}
+
+
 @app.post("/api/digest/signup")
 def digest_signup(body: dict = Body(...)):
     """Free daily digest — auto-confirmed at signup (no double-opt-in)."""
+    from src.newsletter.resend_contacts import add_contact
     from src.store import count_confirmed_digest_subscribers, save_digest_subscriber
 
     email = str(body.get("email") or "").strip()
     if not email or "@" not in email:
         raise HTTPException(400, "Valid email required")
     source = str(body.get("source") or "newspaper")[:32]
-    is_new, confirmed = save_digest_subscriber(email, source)
+    is_new, confirmed, unsub_token = save_digest_subscriber(email, source)
+    if confirmed and unsub_token:
+        add_contact(email, unsub_token, source=source)
     count = count_confirmed_digest_subscribers()
     return {
         "ok": True,
         "new": is_new,
         "confirmed": confirmed,
         "subscriber_count": count,
+        "resend_synced": confirmed and bool(unsub_token),
         "message": (
             "You're on the free daily list. Check your inbox on the next trading-day edition."
             if is_new
@@ -357,6 +588,36 @@ def digest_confirm(token: str = Query(..., min_length=8)):
     if confirm_digest_subscriber(token):
         return {"ok": True, "confirmed": True}
     raise HTTPException(400, "Invalid or expired confirmation token")
+
+
+_UNSUB_HTML = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Unsubscribed — Cassandra</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+<style>body{{font-family:'DM Sans',sans-serif;max-width:480px;margin:4rem auto;padding:0 1.25rem;color:#1a1a1a;line-height:1.6;}}
+h1{{font-size:1.5rem;font-weight:500;}}p{{color:#444;}}a{{color:#1a1a1a;}}</style></head>
+<body><h1>{title}</h1><p>{body}</p><p><a href="/">← Back to desk</a></p></body></html>"""
+
+
+@app.get("/unsubscribe")
+@app.get("/api/digest/unsubscribe")
+def digest_unsubscribe(token: str = Query(..., min_length=8)):
+    from src.newsletter.resend_contacts import remove_contact
+    from src.store import unsubscribe_digest
+
+    email = unsubscribe_digest(token)
+    if email:
+        remove_contact(email)
+        html = _UNSUB_HTML.format(
+            title="Unsubscribed ✓",
+            body="You will no longer receive the Cassandra free daily edition at this address.",
+        )
+        return HTMLResponse(html)
+    html = _UNSUB_HTML.format(
+        title="Link not found",
+        body="This unsubscribe link is invalid or was already used.",
+    )
+    return HTMLResponse(html, status_code=400)
 
 
 @app.get("/api/digest/subscribers")
@@ -398,6 +659,7 @@ def api_contact(body: dict = Body(...)):
             html=html,
             text=plain,
             tags={"type": "contact"},
+            purpose="contact",
         )
         sent = True
     except Exception:
@@ -507,3 +769,85 @@ def report_edition(
             "lang": lang,
         }
     return out
+
+
+@app.get("/api/ops/runs")
+def ops_runs(
+    request: Request,
+    _: None = Depends(_require_ops),
+):
+    from src.store import get_run_history
+
+    return {"runs": get_run_history(30)}
+
+
+@app.get("/api/ops/run/{run_id}")
+def ops_run_detail(
+    run_id: str,
+    request: Request,
+    _: None = Depends(_require_ops),
+):
+    from src.store import get_run_detail
+
+    detail = get_run_detail(run_id)
+    if not detail:
+        raise HTTPException(404, "Run not found")
+    return detail
+
+
+@app.post("/api/ops/pipeline/trigger")
+def ops_pipeline_trigger(
+    request: Request,
+    body: dict = Body(default={}),
+    _: None = Depends(_require_ops),
+):
+    """Start orchestrator --run in background subprocess."""
+    from datetime import datetime, timedelta, timezone
+
+    from src.store import get_last_pipeline_completed_at
+
+    last = get_last_pipeline_completed_at()
+    if last and not body.get("force"):
+        if datetime.now(timezone.utc) - last < timedelta(hours=2):
+            raise HTTPException(
+                409,
+                detail={
+                    "error": "recent_run",
+                    "message": "Last pipeline run was less than 2 hours ago. Pass force:true to override.",
+                    "last_completed_at": last.isoformat(),
+                },
+            )
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "src.orchestrator", "--run"],
+        cwd=str(ROOT),
+        env=os.environ.copy(),
+    )
+    return {"status": "started", "run_id": None, "pid": proc.pid}
+
+
+@app.post("/api/ops/newsletter/send")
+def ops_newsletter_send(
+    request: Request,
+    _: None = Depends(_require_ops),
+):
+    from src.newsletter.send import dispatch_digest
+    from src.store import get_run_history, latest_run_id, mark_newsletter_sent, was_newsletter_sent
+
+    runs = get_run_history(1)
+    if not runs:
+        raise HTTPException(404, "No pipeline runs yet")
+    latest = runs[0]
+    run_id = latest["run_id"]
+    latest_id = latest_run_id()
+    if latest_id and run_id != latest_id:
+        return JSONResponse({"error": "can_only_send_latest_edition"}, status_code=409)
+    if latest_id and was_newsletter_sent(latest_id):
+        return JSONResponse({"error": "already_sent_this_edition"}, status_code=409)
+    if was_newsletter_sent(run_id):
+        return JSONResponse({"error": "already_sent_this_edition"}, status_code=409)
+    try:
+        result = dispatch_digest(dry_run=False)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    mark_newsletter_sent(run_id)
+    return {"sent": result.get("sent", 0), "failed": result.get("failed", 0), "run_id": run_id}

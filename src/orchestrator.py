@@ -38,7 +38,7 @@ from .schemas import (
     StructureRead,
     WhaleRead,
 )
-from .store import fragility_history, save_metrics, save_newspaper_body, save_report_graph, save_score
+from .store import fragility_history, record_pipeline_run, save_metrics, save_newspaper_body, save_report_graph, save_score
 from .tools._env import load_env
 
 load_env()
@@ -532,12 +532,13 @@ async def run_cycle(cfg: dict, *, force: bool = False) -> DailyScore | None:
             _persist_body(lang, i18n[lang])
 
     highlights = build_highlights(bundles)
-    save_score(score, extra={
+    run_extra = {
         "orchestrator": decision,
         "agent_coverage": agent_cov,
         "report_headline": sections.get("headline", ""),
         **highlights,
-    })
+    }
+    save_score(score, extra=run_extra)
     save_report_graph(
         score.asof,
         score_dict,
@@ -546,6 +547,8 @@ async def run_cycle(cfg: dict, *, force: bool = False) -> DailyScore | None:
         i18n=i18n,
     )
     save_metrics(score.asof, metrics)
+    score_dict["extra"] = run_extra
+    record_pipeline_run(score_dict)
 
     if decision.get("publish", True):
         try:

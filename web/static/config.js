@@ -12,9 +12,9 @@ Object.assign(window.CASSANDRA_CONFIG, {
   payments: {
     international: {
       stripeSubscribe: "",   // fallback alias for Report tier
-      stripeReport: "",      // FILL: Stripe payment link, Report tier
-      stripeBriefing: "",    // FILL: Stripe payment link, Pro tier
-      stripeAgent: "",       // FILL: Stripe payment link, API tier
+      stripeReport: "https://buy.stripe.com/fZu5kDchg1y35fK8D29ws00",
+      stripeBriefing: "https://buy.stripe.com/bJe14n9541y3dMgbPe9ws01",
+      stripeAgent: "https://buy.stripe.com/14AfZhbdc90v9w02eE9ws02",
       stripeDonate: "",
       paypalDonate: "",
     },
@@ -31,9 +31,9 @@ Object.assign(window.CASSANDRA_CONFIG, {
     },
   },
   // Aliases for validation (mirror payments.international)
-  stripe_report_url: "",
-  stripe_pro_url: "",
-  stripe_api_url: "",
+  stripe_report_url: "https://buy.stripe.com/fZu5kDchg1y35fK8D29ws00",
+  stripe_pro_url: "https://buy.stripe.com/bJe14n9541y3dMgbPe9ws01",
+  stripe_api_url: "https://buy.stripe.com/14AfZhbdc90v9w02eE9ws02",
 });
 
 (function syncStripeAliases() {

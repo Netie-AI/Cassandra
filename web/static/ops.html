@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Cassandra Ops</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/tokens.css"/>
+  <link rel="stylesheet" href="/static/styles.css"/>
+  <style>
+    body.ops-page { margin: 0; min-height: 100vh; background: var(--color-background-secondary); color: var(--color-text-primary); font-family: var(--font-sans); }
+    .ops-wrap { max-width: 1100px; margin: 0 auto; padding: var(--space-lg); }
+    .ops-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-md); border-bottom: 2px solid var(--color-text-primary); padding-bottom: var(--space-md); margin-bottom: var(--space-lg); }
+    .ops-head h1 { font-family: var(--font-serif); font-size: 28px; margin: 0; letter-spacing: 0.06em; text-transform: uppercase; }
+    .ops-actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+    .ops-btn { font-family: var(--font-sans); font-size: 13px; padding: 8px 14px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--radius-sm); background: var(--color-text-primary); color: var(--color-background-secondary); cursor: pointer; }
+    .ops-btn.secondary { background: transparent; color: var(--color-text-primary); }
+    .ops-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ops-btn.spinning::after { content: " …"; animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: 0.4; } }
+    .ops-grid { display: grid; grid-template-columns: 240px 1fr; gap: var(--space-lg); min-height: 480px; }
+    @media (max-width: 760px) { .ops-grid { grid-template-columns: 1fr; } }
+    .ops-panel { border: 0.5px solid var(--color-border-secondary); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-background-primary, #fff) 92%, transparent); padding: var(--space-md); }
+    .ops-panel h2 { font-family: var(--font-serif); font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 var(--space-md); color: var(--color-text-secondary); }
+    .run-list { list-style: none; margin: 0; padding: 0; max-height: 520px; overflow-y: auto; }
+    .run-item { padding: 10px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); cursor: pointer; font-size: 13px; }
+    .run-item:hover, .run-item.active { background: var(--color-background-secondary); }
+    .run-item time { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-secondary); }
+    .run-item strong { font-weight: 500; }
+    .detail-empty { color: var(--color-text-secondary); font-size: var(--type-body); padding: var(--space-xl) 0; }
+    .detail-metrics { font-family: var(--font-mono); font-size: 13px; line-height: 1.7; margin-bottom: var(--space-md); }
+    .detail-metrics span { color: var(--color-text-secondary); }
+    .preview-row { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin: var(--space-md) 0; }
+    .preview-row .ops-btn { background: transparent; color: var(--color-text-primary); font-size: 12px; }
+    .newsletter-block { margin-top: var(--space-lg); padding-top: var(--space-md); border-top: 0.5px solid var(--color-border-secondary); }
+    .newsletter-block p { margin: 0 0 var(--space-sm); font-size: 13px; color: var(--color-text-secondary); }
+    .ops-error { color: var(--color-danger); font-size: 13px; margin-top: var(--space-sm); min-height: 1.2em; }
+    .ops-home { font-size: 12px; color: var(--color-text-secondary); text-decoration: none; display: inline-block; margin-bottom: var(--space-md); }
+  </style>
+</head>
+<body class="ops-page">
+  <div class="ops-wrap">
+    <a href="/" class="ops-home">← Desk home</a>
+    <header class="ops-head">
+      <h1>Cassandra Ops</h1>
+      <div class="ops-actions">
+        <button type="button" class="ops-btn" id="btn-run">Run Pipeline Now</button>
+        <button type="button" class="ops-btn secondary" id="btn-send-top">Send Newsletter</button>
+      </div>
+    </header>
+    <p id="ops-error" class="ops-error" role="alert"></p>
+    <div class="ops-grid">
+      <aside class="ops-panel">
+        <h2>Run history</h2>
+        <ul class="run-list" id="run-list"></ul>
+      </aside>
+      <main class="ops-panel" id="run-detail">
+        <p class="detail-empty">Select a run to review CRS, analog match, and newsletter status.</p>
+      </main>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var selectedRunId = null;
+      var latestRunId = null;
+      var pollTimer = null;
+      var errEl = document.getElementById("ops-error");
+      var listEl = document.getElementById("run-list");
+      var detailEl = document.getElementById("run-detail");
+      var btnRun = document.getElementById("btn-run");
+      var btnSendTop = document.getElementById("btn-send-top");
+
+      function confirmOpsAction(label, actionFn) {
+        var key = prompt("Enter pipeline key to " + label + ":");
+        if (!key) return Promise.resolve();
+        var h = {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + key,
+          "X-Pipeline-Key": key
+        };
+        return actionFn(h);
+      }
+
+      function headers(extra) {
+        var h = Object.assign({ "Content-Type": "application/json" }, extra || {});
+        return h;
+      }
+
+      function fmtTime(iso) {
+        if (!iso) return "unknown";
+        try {
+          return new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+        } catch (e) { return iso; }
+      }
+
+      function phaseLabel(p) {
+        return p ? String(p).replace(/_/g, " ") : "n/a";
+      }
+
+      function analogLabel(match) {
+        return match ? match : "- (no match above 0.82)";
+      }
+
+      function showError(msg) {
+        errEl.textContent = msg || "";
+      }
+
+      function loadRuns(extraHeaders) {
+        return fetch("/api/ops/runs", { headers: headers(extraHeaders) })
+          .then(function (r) {
+            if (r.status === 401 || r.status === 403) {
+              throw new Error("Ops access denied - use Run/Send to enter pipeline key");
+            }
+            if (!r.ok) throw new Error("Could not load runs");
+            return r.json();
+          })
+          .then(function (data) {
+            var runs = data.runs || [];
+            if (runs.length) latestRunId = runs[0].run_id;
+            listEl.innerHTML = runs.map(function (run) {
+              var active = run.run_id === selectedRunId ? " active" : "";
+              return '<li class="run-item' + active + '" data-id="' + run.run_id + '">' +
+                '<time>' + fmtTime(run.timestamp) + '</time>' +
+                '<strong>CRS ' + (run.crs != null ? Number(run.crs).toFixed(1) : "-") + '</strong> · ' +
+                phaseLabel(run.phase) +
+                (run.newsletter_sent ? ' · sent' : '') +
+                '</li>';
+            }).join("") || '<li class="detail-empty">No runs yet. Click Run Pipeline Now.</li>';
+            listEl.querySelectorAll(".run-item[data-id]").forEach(function (el) {
+              el.addEventListener("click", function () {
+                selectRun(el.getAttribute("data-id"));
+              });
+            });
+            if (!selectedRunId && runs.length) selectRun(runs[0].run_id);
+          })
+          .catch(function (e) { showError(e.message); });
+      }
+
+      function renderDetail(d) {
+        var conf = d.phase_conf != null ? Math.round(d.phase_conf * 100) + "% conf" : "";
+        var cov = d.coverage != null ? Number(d.coverage).toFixed(2) : "-";
+        var capex = d.capex_cut_nlp != null ? Number(d.capex_cut_nlp).toFixed(2) : "-";
+        var isLatest = d.run_id === latestRunId;
+        var sentLabel = d.last_newsletter_sent ? fmtTime(d.last_newsletter_sent) : "never";
+        if (d.newsletter_sent) sentLabel = "this edition";
+        detailEl.innerHTML =
+          '<h2 style="font-family:var(--font-serif);font-size:22px;margin:0 0 12px;">' + fmtTime(d.timestamp) + '</h2>' +
+          '<div class="detail-metrics">' +
+          'CRS: <strong>' + (d.crs != null ? Number(d.crs).toFixed(1) : "-") + '</strong> · ' +
+          phaseLabel(d.phase) + (conf ? " · " + conf : "") + '<br/>' +
+          'F: ' + (d.f != null ? Number(d.f).toFixed(2) : "-") +
+          '  T: ' + (d.t != null ? Number(d.t).toFixed(2) : "-") +
+          '  Coverage: ' + cov + '<br/>' +
+          'capex_cut_nlp: ' + capex + '<br/>' +
+          'Analog: ' + analogLabel(d.analog_match) +
+          '</div>' +
+          '<div class="preview-row">' +
+          '<button type="button" class="ops-btn preview-btn" data-lang="en">Preview EN</button>' +
+          '<button type="button" class="ops-btn preview-btn" data-lang="zh">Preview ZH</button>' +
+          '<button type="button" class="ops-btn preview-btn" data-lang="ms">Preview MS</button>' +
+          '</div>' +
+          '<div class="newsletter-block">' +
+          '<h2>Newsletter</h2>' +
+          '<p>Subscribers: <strong>' + (d.subscriber_count || 0) + '</strong> confirmed</p>' +
+          '<p>Last sent: ' + sentLabel + '</p>' +
+          (isLatest
+            ? '<button type="button" class="ops-btn" id="btn-send-edition"' +
+              (d.newsletter_sent ? ' disabled>Sent</button>' : '>Send this edition</button>')
+            : '<p>Send available for latest run only.</p>') +
+          '</div>';
+        detailEl.querySelectorAll(".preview-btn").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var lang = btn.getAttribute("data-lang");
+            window.open("/newspaper-report?run_id=" + encodeURIComponent(d.run_id) + "&lang=" + lang, "_blank");
+          });
+        });
+        var sendBtn = document.getElementById("btn-send-edition");
+        if (sendBtn && !d.newsletter_sent) {
+          sendBtn.addEventListener("click", function () {
+            confirmOpsAction("send newsletter", sendNewsletter);
+          });
+        }
+      }
+
+      function selectRun(runId) {
+        selectedRunId = runId;
+        listEl.querySelectorAll(".run-item").forEach(function (el) {
+          el.classList.toggle("active", el.getAttribute("data-id") === runId);
+        });
+        fetch("/api/ops/run/" + encodeURIComponent(runId), { headers: headers() })
+          .then(function (r) { if (!r.ok) throw new Error("Run not found"); return r.json(); })
+          .then(renderDetail)
+          .catch(function (e) { showError(e.message); });
+      }
+
+      function sendNewsletter(extraHeaders) {
+        showError("");
+        var h = headers(extraHeaders);
+        return fetch("/api/ops/newsletter/send", { method: "POST", headers: h })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+          .then(function (res) {
+            if (res.data.error === "already_sent_this_edition") {
+              showError("Already sent for this edition.");
+              return loadRuns();
+            }
+            if (res.data.error === "can_only_send_latest_edition") {
+              showError("Can only send the latest edition.");
+              return;
+            }
+            if (!res.ok) throw new Error(res.data.detail?.message || res.data.detail || "Send failed");
+            showError("");
+            alert("Sent: " + res.data.sent + ", failed: " + res.data.failed);
+            return loadRuns().then(function () { if (selectedRunId) selectRun(selectedRunId); });
+          })
+          .catch(function (e) { showError(e.message); });
+      }
+
+      function triggerPipeline(extraHeaders, force) {
+        showError("");
+        btnRun.disabled = true;
+        btnRun.classList.add("spinning");
+        var before = latestRunId;
+        var body = force ? { force: true } : {};
+        return fetch("/api/ops/pipeline/trigger", { method: "POST", headers: headers(extraHeaders), body: JSON.stringify(body) })
+          .then(function (r) {
+            return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; });
+          })
+          .then(function (res) {
+            if (res.status === 409 && res.data.detail && res.data.detail.error === "recent_run") {
+              btnRun.disabled = false;
+              btnRun.classList.remove("spinning");
+              if (window.confirm("Last run was less than 2 hours ago. Run again anyway?")) {
+                return triggerPipeline(extraHeaders, true);
+              }
+              showError("Pipeline run skipped - recent run exists.");
+              return;
+            }
+            if (!res.ok) throw new Error(res.data.detail?.message || res.data.detail || "Could not start pipeline");
+            pollTimer = setInterval(function () {
+              loadRuns().then(function () {
+                if (latestRunId && latestRunId !== before) {
+                  clearInterval(pollTimer);
+                  btnRun.disabled = false;
+                  btnRun.classList.remove("spinning");
+                  selectRun(latestRunId);
+                }
+              });
+            }, 5000);
+            setTimeout(function () {
+              if (pollTimer) {
+                clearInterval(pollTimer);
+                btnRun.disabled = false;
+                btnRun.classList.remove("spinning");
+              }
+            }, 600000);
+          })
+          .catch(function (e) {
+            btnRun.disabled = false;
+            btnRun.classList.remove("spinning");
+            showError(e.message);
+          });
+      }
+
+      btnRun.addEventListener("click", function () {
+        confirmOpsAction("run pipeline", function (h) { return triggerPipeline(h, false); });
+      });
+      btnSendTop.addEventListener("click", function () {
+        confirmOpsAction("send newsletter", sendNewsletter);
+      });
+      loadRuns();
+    })();
+  </script>
+</body>
+</html>

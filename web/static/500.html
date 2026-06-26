@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Cassandra - Server error</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/tokens.css"/>
+  <style>
+    body {
+      background: var(--color-background-secondary, #f3f1ed);
+      color: var(--color-text-primary);
+      font-family: var(--font-sans);
+      max-width: 680px;
+      margin: 0 auto;
+      padding: var(--space-xl) var(--space-lg) 4rem;
+      line-height: 1.6;
+    }
+    .err-masthead {
+      font-family: var(--font-serif);
+      font-size: clamp(32px, 7vw, 48px);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin: 0 0 var(--space-md);
+      padding-bottom: var(--space-sm);
+      border-bottom: 2px solid var(--color-text-primary);
+    }
+    .err-code { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-secondary); margin-bottom: var(--space-lg); }
+    .err-lead { font-size: var(--type-body); color: var(--color-text-secondary); margin: 0 0 var(--space-md); }
+    .err-status { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-tertiary); margin-top: var(--space-lg); }
+    .err-home {
+      display: inline-block;
+      margin-top: var(--space-lg);
+      font-family: var(--font-sans);
+      font-size: var(--type-body);
+      color: var(--color-text-primary);
+      text-decoration: none;
+      border-bottom: 1px solid var(--color-border-secondary);
+    }
+  </style>
+</head>
+<body>
+  <p class="err-code">500</p>
+  <h1 class="err-masthead">Cassandra</h1>
+  <p class="err-lead"><strong>Something went wrong on our end.</strong></p>
+  <p class="err-lead">The pipeline may be updating - try again in a few minutes.</p>
+  <p id="health-status" class="err-status">Checking desk health…</p>
+  <a href="/" class="err-home">← Return to desk home</a>
+  <script>
+    (function () {
+      var statusEl = document.getElementById("health-status");
+      var redirected = false;
+      function poll() {
+        fetch("/api/health")
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.status === "ok" && !redirected) {
+              redirected = true;
+              statusEl.textContent = "Desk is back online - redirecting home in 10 seconds…";
+              setTimeout(function () { window.location.href = "/"; }, 10000);
+            } else {
+              statusEl.textContent = "Desk still updating. Retrying…";
+              setTimeout(poll, 5000);
+            }
+          })
+          .catch(function () {
+            statusEl.textContent = "Could not reach health check. Retrying…";
+            setTimeout(poll, 5000);
+          });
+      }
+      poll();
+    })();
+  </script>
+</body>
+</html>
