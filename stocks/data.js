@@ -3,8 +3,8 @@ window.STOCK_DEMO = {
     ticker: "MU",
     name: "Micron Technology",
     sector: "semis / hardware",
-    px: "94.18",
-    pct: 2.04,
+    px: "1,013.80",
+    pct: -13.2,
     crs_stock: 63.4,
     band: "Danger",
     band_color: "#C2410C",
@@ -19,6 +19,12 @@ window.STOCK_DEMO = {
       "DRAM spot price rollover risk",
     ],
     analog: "Micron Q2 2018  -  5 months before the -45% memory-cycle drawdown",
+    targets: {
+      updated: "24 Jun 2026",
+      jpmorgan: { price: 1100, stance: "Overweight", date: "Jun 2026" },
+      morningstar: { fv: 890, stance: "Fair Value", date: "Jun 2026" },
+      capex_score: 0.35,
+    },
     premium: {
       frag_quant: [
         { n: "P/S ratio", v: "4.8×", d: "vs 3.1× median" },
@@ -47,14 +53,19 @@ window.STOCK_DEMO = {
       },
     },
     note: "Demo only. Premium unlocks sourced comparables and live change-log.",
-    editions: ["2026-06-24", "2026-06-20", "2026-06-17", "2026-06-12"],
+    editions: [
+      { date: "2026-06-24", available: false },
+      { date: "2026-06-20", available: true },
+      { date: "2026-06-17", available: false },
+      { date: "2026-06-12", available: false },
+    ],
   },
   NOW: {
     ticker: "NOW",
     name: "ServiceNow",
-    sector: "software / enterprise",
-    px: "812.40",
-    pct: -1.12,
+    sector: "enterprise software",
+    px: "946.20",
+    pct: -2.48,
     crs_stock: 51.2,
     band: "Mania",
     band_color: "#C2410C",
@@ -69,6 +80,12 @@ window.STOCK_DEMO = {
       "Fed rate path impact on SaaS multiples",
     ],
     analog: "Salesforce Q2 2022  -  6 weeks before -55% drawdown",
+    targets: {
+      updated: "24 Jun 2026",
+      jpmorgan: { price: 920, stance: "Neutral", date: "Jun 2026" },
+      morningstar: { fv: 780, stance: "Fair Value", date: "Jun 2026" },
+      capex_score: 0.42,
+    },
     premium: {
       frag_quant: [
         { n: "P/S ratio", v: "18.1×", d: "vs 14× median" },
@@ -97,6 +114,11 @@ window.STOCK_DEMO = {
       },
     },
     note: "Demo only. Premium unlocks sourced comparables and live change-log.",
-    editions: ["2026-06-24", "2026-06-21", "2026-06-18", "2026-06-11"],
+    editions: [
+      { date: "2026-06-24", available: false },
+      { date: "2026-06-20", available: true },
+      { date: "2026-06-17", available: false },
+      { date: "2026-06-12", available: false },
+    ],
   },
 };

@@ -53,6 +53,8 @@
 }
 
 .sd-date-btn.on { color: var(--color-text-primary); font-weight: 600; }
+.sd-date-btn.locked { opacity: 0.45; cursor: not-allowed; }
+.sd-symbol-buttons { display: grid; gap: 4px; }
 
 .sd-main { flex: 1; min-width: 0; }
 
@@ -283,6 +285,58 @@
   line-height: 1.5;
 }
 
+.analyst-targets-panel {
+  margin: 14px 0;
+  border: 0.5px solid var(--color-border-secondary);
+  padding: 10px;
+}
+
+.analyst-targets-panel .panel-head {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--color-text-primary);
+}
+
+.target-updated {
+  font-size: 9px;
+  color: var(--color-text-tertiary);
+  margin-bottom: 8px;
+}
+
+.target-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1fr 0.7fr;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 10px;
+  padding: 5px 0;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+
+.target-row:last-of-type {
+  border-bottom: none;
+}
+
+.target-source { color: var(--color-text-secondary); }
+.target-price { font-family: var(--font-mono, monospace); color: var(--color-text-primary); }
+.target-stance { font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; }
+.jpm-stance { color: #15803D; }
+.neutral-stance { color: var(--color-text-secondary); }
+.cassandra-row .target-source { font-weight: 600; color: var(--color-text-primary); }
+
+.target-methodology {
+  margin-top: 8px;
+  font-size: 9px;
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+}
+
+.target-disclaimer {
+  display: block;
+  margin-top: 4px;
+}
+
 .sd-footer {
   margin-top: 1.5rem;
   padding-top: 8px;
@@ -296,6 +350,72 @@
   color: var(--color-text-secondary);
   text-decoration: none;
   border-bottom: 1px solid var(--color-border-tertiary);
+}
+
+.stock-chat-panel {
+  margin-top: 14px;
+  border: 0.5px solid var(--color-border-secondary);
+  padding: 10px;
+}
+
+.stock-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+.agent-counter {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+}
+
+.stock-chat-log {
+  min-height: 80px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 0.5px solid var(--color-border-tertiary);
+  padding: 6px;
+  margin-bottom: 6px;
+}
+
+.stock-chat-msg {
+  font-size: 10px;
+  margin-bottom: 6px;
+}
+
+.stock-chat-msg.user { color: var(--color-text-primary); }
+.stock-chat-msg.assistant { color: var(--color-text-secondary); }
+.stock-chat-msg.system { color: #b91c1c; }
+
+.stock-chat-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.stock-chat-input-row input {
+  flex: 1;
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  font-size: 11px;
+  padding: 6px 8px;
+}
+
+.stock-chat-input-row button {
+  border: 0.5px solid var(--color-border-secondary);
+  background: none;
+  color: var(--color-text-primary);
+  width: 36px;
+  cursor: pointer;
+}
+
+.stock-chat-notice {
+  margin-top: 7px;
+  font-size: 9px;
+  color: var(--color-text-tertiary);
 }
 
 @media (max-width: 600px) {
