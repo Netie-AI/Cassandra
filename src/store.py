@@ -768,3 +768,158 @@ def get_last_newsletter_sent() -> str | None:
 def latest_run_id() -> str | None:
     runs = get_run_history(1)
     return runs[0]["run_id"] if runs else None
+
+
+def save_report_markdown(edition: str, lang: str, body: str, run_id: str) -> Path:
+    """Persist dated edition markdown under reports/ (local only, gitignored)."""
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    slot = "0600" if edition == "morning" else "1800"
+    path = ROOT / "reports" / f"{date}-{slot}-{lang.upper()}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    front = (
+        f"---\nrun_id: {run_id}\ndate: {date}\nedition: {edition}\nlang: {lang}\n---\n\n"
+    )
+    path.write_text(front + body, encoding="utf-8")
+    return path
+
+
+def list_report_markdown(*, date: str, edition: str) -> list[str]:
+    slot = "0600" if edition == "morning" else "1800"
+    folder = ROOT / "reports"
+    if not folder.exists():
+        return []
+    prefix = f"{date}-{slot}-"
+    return sorted(p.name for p in folder.glob(f"{prefix}*.md"))
+
+
+def read_report_markdown(filename: str) -> str | None:
+    safe = Path(filename).name
+    path = ROOT / "reports" / safe
+    if not path.exists() or path.suffix != ".md":
+        return None
+    return path.read_text(encoding="utf-8")
+
+
+def append_signal_history(score_obj: dict) -> None:
+    path = ROOT / "knowledge" / "graph" / "signal-history.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(score_obj) + "\n")
+
+
+def save_agent_outputs(edition: str, bundles: list, run_id: str) -> Path:
+    """Structured subagent reads for audit + knowledge graph."""
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    slot = "0600" if edition == "morning" else "1800"
+    path = ROOT / "knowledge" / "agents" / f"{date}-{slot}-agent-outputs.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "---",
+        f"run_id: {run_id}",
+        f"date: {date}",
+        f"edition: {edition}",
+        "---",
+        "",
+        f"# Agent outputs · {date} · {edition}",
+        "",
+    ]
+    for bundle in bundles:
+        name = type(bundle).__name__
+        lines.append(f"## {name}")
+        try:
+            payload = bundle.model_dump(mode="json") if hasattr(bundle, "model_dump") else {}
+            lines.append("```json")
+            lines.append(json.dumps(payload, indent=2)[:12000])
+            lines.append("```")
+        except Exception as exc:
+            lines.append(f"_serialize error: {exc}_")
+        lines.append("")
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+_ABUSE_LIMIT = 10
+
+
+def record_agent_abuse(actor_key: str, reason: str) -> int:
+    """Increment suspicious-attempt counter; returns new strike count."""
+    actor_key = (actor_key or "unknown")[:128]
+    now = datetime.now(timezone.utc).isoformat()
+    with _conn() as c:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS agent_abuse_log (
+                actor_key TEXT PRIMARY KEY,
+                strikes INTEGER NOT NULL DEFAULT 0,
+                last_reason TEXT,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        row = c.execute(
+            "SELECT strikes FROM agent_abuse_log WHERE actor_key = ?", (actor_key,)
+        ).fetchone()
+        strikes = int(row["strikes"]) + 1 if row else 1
+        c.execute(
+            """
+            INSERT OR REPLACE INTO agent_abuse_log (actor_key, strikes, last_reason, updated_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (actor_key, strikes, reason[:200], now),
+        )
+    return strikes
+
+
+def is_agent_banned(actor_key: str) -> bool:
+    actor_key = (actor_key or "unknown")[:128]
+    with _conn() as c:
+        try:
+            row = c.execute(
+                "SELECT strikes FROM agent_abuse_log WHERE actor_key = ?", (actor_key,)
+            ).fetchone()
+        except sqlite3.OperationalError:
+            return False
+    return bool(row and int(row["strikes"]) >= _ABUSE_LIMIT)
+
+
+def _ensure_agent_usage_table(c: sqlite3.Connection) -> None:
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS agent_usage (
+            email TEXT NOT NULL,
+            usage_date TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (email, usage_date)
+        )
+    """)
+
+
+def get_agent_usage(email: str, date: str) -> int:
+    """How many agents has this user generated today."""
+    email = (email or "anonymous").strip().lower()[:256]
+    date = (date or "")[:10]
+    with _conn() as c:
+        _ensure_agent_usage_table(c)
+        row = c.execute(
+            "SELECT count FROM agent_usage WHERE email = ? AND usage_date = ?",
+            (email, date),
+        ).fetchone()
+    return int(row["count"]) if row else 0
+
+
+def increment_agent_usage(email: str, date: str) -> int:
+    """Increment counter, return new count."""
+    email = (email or "anonymous").strip().lower()[:256]
+    date = (date or "")[:10]
+    with _conn() as c:
+        _ensure_agent_usage_table(c)
+        row = c.execute(
+            "SELECT count FROM agent_usage WHERE email = ? AND usage_date = ?",
+            (email, date),
+        ).fetchone()
+        new_count = int(row["count"]) + 1 if row else 1
+        c.execute(
+            """
+            INSERT OR REPLACE INTO agent_usage (email, usage_date, count)
+            VALUES (?, ?, ?)
+            """,
+            (email, date, new_count),
+        )
+    return new_count

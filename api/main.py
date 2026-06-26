@@ -8,14 +8,26 @@ import subprocess
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import quote_plus
 
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .auth import FREE_DELAY_DAYS, FIRST_SUB_TRIAL_DAYS, gate_score, get_user_tier, resolve_score_dict, subscription_checkout_options
+from .auth import (
+    FREE_DELAY_DAYS,
+    FIRST_SUB_TRIAL_DAYS,
+    gate_score,
+    get_user_tier,
+    is_master,
+    normalize_tier,
+    resolve_score_dict,
+    subscription_checkout_options,
+    tier_caps,
+)
 from .rate_limit import check as rate_limit_check
+from .middleware.ip_guard import check_ip as ip_guard_check, log_ip_event
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web" / "static"
@@ -42,6 +54,15 @@ async def rate_limit_middleware(request: Request, call_next):
     path = request.url.path
     if path.startswith("/api/"):
         ip = request.client.host if request.client else "unknown"
+        action = "api_default"
+        if path.startswith("/api/auth/"):
+            action = "auth_attempt"
+        elif path == "/api/agent/generate":
+            action = "agent_generate"
+        allowed, reason = ip_guard_check(ip, action)
+        log_ip_event(ip, action, allowed, reason)
+        if not allowed:
+            return JSONResponse({"error": reason}, status_code=429)
         if not rate_limit_check(path, ip):
             return JSONResponse({"error": "rate_limited"}, status_code=429)
     return await call_next(request)
@@ -149,7 +170,7 @@ def methodology_doc():
 @app.get("/agent")
 @app.get("/agent-chat")
 def agent_page():
-    return _coming_soon("agent-chat")
+    return RedirectResponse("/agents")
 
 
 @app.get("/platform")
@@ -183,6 +204,12 @@ def index():
 @app.get("/newspaper-report")
 def newspaper_report():
     return _static_page("newspaper-report.html")
+
+
+@app.get("/agents")
+@app.get("/agents.html")
+def agents_page():
+    return _static_page("agents.html")
 
 
 @app.get("/pricing")
@@ -373,15 +400,32 @@ def api_fear_greed():
 
 
 @app.post("/api/agent/gate")
-def api_agent_gate(body: dict = Body(...)):
+def api_agent_gate(
+    request: Request,
+    body: dict = Body(...),
+    authorization: str | None = Header(default=None),
+):
     """Pre-LLM relevance gate for chat widget."""
-    from src.store import log_agent_gate_block
+    from src.store import is_agent_banned, log_agent_gate_block, record_agent_abuse
     from src.tools.agent_gate import gate_message
+
+    actor = _agent_actor(request, authorization)
+    if is_agent_banned(actor):
+        return JSONResponse(
+            {"allowed": False, "score": 0.0, "reason": "banned", "response": "Chat suspended."},
+            status_code=403,
+        )
 
     text = str(body.get("message") or "")
     result = gate_message(text)
     if not result.allowed:
         log_agent_gate_block(text, result.score, result.reason)
+        strikes = record_agent_abuse(actor, result.reason)
+        if strikes >= 10:
+            return JSONResponse(
+                {"allowed": False, "score": result.score, "reason": "banned", "response": "Chat suspended."},
+                status_code=403,
+            )
     return {
         "allowed": result.allowed,
         "score": result.score,
@@ -390,10 +434,22 @@ def api_agent_gate(body: dict = Body(...)):
     }
 
 
+def _agent_actor(request: Request, authorization: str | None) -> str:
+    from src.db.supabase_auth import user_from_token
+
+    user = user_from_token(authorization)
+    if user and user.get("id"):
+        return str(user["id"])
+    ip = request.client.host if request.client else "unknown"
+    return f"ip:{ip}"
+
+
 @app.post("/api/agent/chat")
 def api_agent_chat(
+    request: Request,
     body: dict = Body(...),
     tier: str = Depends(get_user_tier),
+    authorization: str | None = Header(default=None),
 ):
     """Compact-context desk chat — trading engine tone, max ~320 tokens."""
     from src.tools.agent_chat import chat
@@ -401,7 +457,86 @@ def api_agent_chat(
     text = str(body.get("message") or "")
     if not text.strip():
         raise HTTPException(400, "message required")
-    return chat(text, tier=tier)
+    actor = _agent_actor(request, authorization)
+    return chat(text, tier=tier, actor_key=actor)
+
+
+@app.post("/api/agent/generate")
+def api_agent_generate(
+    request: Request,
+    body: dict = Body(default={}),
+    authorization: str | None = Header(default=None),
+    tier: str = Depends(get_user_tier),
+):
+    """VIP-only agent generation scaffold — master always allowed."""
+    from datetime import datetime, timezone
+
+    from src.db.supabase_auth import user_from_token
+    from src.store import increment_agent_usage
+
+    caps = tier_caps(tier)
+    token = authorization or ""
+    if not is_master(token) and not caps.get("can_generate_agents"):
+        return JSONResponse({"error": "agent_generation_vip_only"}, status_code=403)
+    scope = str(body.get("scope") or "watchlist")[:64]
+    tickers = body.get("tickers") or []
+    if not isinstance(tickers, list):
+        tickers = []
+    tickers = [str(t).upper()[:8] for t in tickers[:20]]
+
+    user = user_from_token(authorization)
+    email = str(user.get("email") or "anonymous").lower() if user else "anonymous"
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    generated = increment_agent_usage(email, day)
+
+    return {
+        "status": "queued",
+        "scope": scope,
+        "tickers": tickers,
+        "generated": generated,
+        "message": "Agent generation request accepted. Outputs appear on your desk when the next pipeline completes.",
+    }
+
+
+@app.get("/api/agent/usage")
+def api_agent_usage(
+    date: str = Query(default="today"),
+    tier: str = Depends(get_user_tier),
+    authorization: str | None = Header(default=None),
+):
+    from datetime import datetime, timezone
+
+    from src.db.supabase_auth import user_from_token
+    from src.store import get_agent_usage
+
+    user = user_from_token(authorization)
+    email = str(user.get("email") or "anonymous").lower() if user else "anonymous"
+    day = (
+        datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if date == "today"
+        else str(date)[:10]
+    )
+    count = get_agent_usage(email, day)
+    limit = None if tier in ("vip", "master") else 1
+    return {
+        "generated": count,
+        "limit": limit,
+        "can_generate": limit is None or count < limit,
+    }
+
+
+@app.get("/api/stock/cassandra-target")
+def api_stock_cassandra_target(
+    crs: float = Query(..., ge=0, le=100),
+    morningstar_fv: float = Query(..., gt=0),
+    capex_score: float | None = Query(default=None, ge=0, le=1),
+):
+    from src.store import latest_score
+    from src.tools.price_target import capex_score_from_score_dict, compute_cassandra_target
+
+    score = latest_score()
+    capex = capex_score if capex_score is not None else capex_score_from_score_dict(score)
+    return compute_cassandra_target(morningstar_fv, crs, capex)
 
 
 @app.post("/api/auth/login")
@@ -453,6 +588,35 @@ def auth_me(authorization: str | None = Header(default=None)):
 def auth_logout():
     """Clear client session — always 200."""
     return {"ok": True}
+
+
+@app.get("/api/auth/oauth/{provider}")
+def auth_oauth(provider: str, request: Request):
+    from src.db.supabase_auth import get_oauth_url
+
+    redirect_back = f"{request.base_url}api/auth/callback"
+    try:
+        url = get_oauth_url(provider, redirect_back)
+    except RuntimeError:
+        return JSONResponse({"error": "auth_not_configured"}, status_code=503)
+    except ValueError:
+        raise HTTPException(400, "Unsupported provider")
+    return RedirectResponse(url)
+
+
+@app.get("/api/auth/callback")
+def auth_callback(
+    request: Request,
+    access_token: str | None = Query(default=None),
+    refresh_token: str | None = Query(default=None),
+):
+    parts: list[str] = []
+    if access_token:
+        parts.append(f"access_token={quote_plus(access_token)}")
+    if refresh_token:
+        parts.append(f"refresh_token={quote_plus(refresh_token)}")
+    hash_q = "#" + "&".join(parts) if parts else ""
+    return RedirectResponse(f"/{hash_q}")
 
 
 @app.post("/api/webhooks/stripe")
@@ -748,6 +912,16 @@ def report_archive(limit: int = 90):
     return {"editions": report_archive(limit=max(1, min(limit, 365)))}
 
 
+@app.get("/api/quote/{symbol}")
+def api_quote(symbol: str):
+    from src.tools.movers import verified_quote
+
+    q = verified_quote(symbol)
+    if not q:
+        raise HTTPException(404, "Quote unavailable")
+    return q
+
+
 @app.get("/api/report/edition")
 def report_edition(
     asof: str = Query(..., description="YYYY-MM-DD"),
@@ -793,6 +967,26 @@ def ops_run_detail(
     if not detail:
         raise HTTPException(404, "Run not found")
     return detail
+
+
+@app.get("/api/ops/run/latest")
+def ops_run_latest():
+    from src.store import get_run_history, get_run_detail
+
+    runs = get_run_history(1)
+    if not runs:
+        return {"run": None, "agent_outputs": []}
+    run_id = runs[0]["run_id"]
+    detail = get_run_detail(run_id) or {}
+    agents_file = ROOT / "knowledge" / "agents"
+    latest = sorted(agents_file.glob("*.md"), reverse=True)
+    outputs: list[str] = []
+    if latest:
+        text = latest[0].read_text(encoding="utf-8", errors="ignore")
+        for line in text.splitlines():
+            if line.startswith("## "):
+                outputs.append(line.removeprefix("## ").strip())
+    return {"run": detail, "agent_outputs": outputs[:12]}
 
 
 @app.post("/api/ops/pipeline/trigger")
@@ -851,3 +1045,33 @@ def ops_newsletter_send(
         raise HTTPException(503, str(exc)) from exc
     mark_newsletter_sent(run_id)
     return {"sent": result.get("sent", 0), "failed": result.get("failed", 0), "run_id": run_id}
+
+
+@app.get("/api/ops/reports")
+def ops_reports_list(
+    request: Request,
+    date: str = Query(..., description="YYYY-MM-DD"),
+    edition: str = Query(default="morning", description="morning or evening"),
+    _: None = Depends(_require_ops),
+):
+    from src.store import list_report_markdown
+
+    edition = edition.lower()
+    if edition not in ("morning", "evening"):
+        raise HTTPException(400, "edition must be morning or evening")
+    files = list_report_markdown(date=date, edition=edition)
+    return {"date": date, "edition": edition, "files": files}
+
+
+@app.get("/api/ops/reports/{filename}")
+def ops_reports_get(
+    filename: str,
+    request: Request,
+    _: None = Depends(_require_ops),
+):
+    from src.store import read_report_markdown
+
+    content = read_report_markdown(filename)
+    if content is None:
+        raise HTTPException(404, "Report file not found")
+    return {"filename": Path(filename).name, "markdown": content}

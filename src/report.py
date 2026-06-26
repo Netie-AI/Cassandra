@@ -58,7 +58,12 @@ def _lint_sections(sections: dict[str, Any]) -> dict[str, Any]:
     return lint_dict_strings(dict(sections), _SECTION_KEYS)
 
 
-def generate_report_sections(score: dict[str, Any], tier: str = "report") -> dict[str, Any]:
+def generate_report_sections(
+    score: dict[str, Any],
+    tier: str = "report",
+    *,
+    edition_context: str | None = None,
+) -> dict[str, Any]:
     """
     Return structured report sections for newspaper HTML / email (English canonical).
     Score dict must come from pipeline/store. LLM only narrates pre-computed numbers.
@@ -67,9 +72,14 @@ def generate_report_sections(score: dict[str, Any], tier: str = "report") -> dic
     if not key:
         return _lint_sections(_template_sections(score, tier))
 
-    prompt = _build_prompt(score, tier)
+    prompt = _build_prompt(score, tier, edition_context=edition_context)
     try:
-        text = _gemini_generate(key, prompt, REPORT_SYSTEM)
+        from .tools.persona import load_cassandra_persona
+
+        system = f"{load_cassandra_persona(max_chars=600)}\n\n{REPORT_SYSTEM}"
+        if edition_context:
+            system = f"{system}\n\nEdition framing:\n{edition_context}"
+        text = _gemini_generate(key, prompt, system)
         return _lint_sections(_parse_sections(text, score))
     except Exception as exc:
         sections = _template_sections(score, tier)
@@ -78,10 +88,13 @@ def generate_report_sections(score: dict[str, Any], tier: str = "report") -> dic
 
 
 def generate_report_multilingual(
-    score: dict[str, Any], tier: str = "report",
+    score: dict[str, Any],
+    tier: str = "report",
+    *,
+    edition_context: str | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Generate EN canonical edition, then ZH + MS translations. All linted."""
-    en = generate_report_sections(score, tier)
+    en = generate_report_sections(score, tier, edition_context=edition_context)
     out: dict[str, dict[str, Any]] = {"en": en}
     api_key = os.getenv("GEMINI_API_KEY")
     for lang, lang_name in (("zh", "Simplified Chinese"), ("ms", "Malay")):
@@ -95,8 +108,13 @@ def generate_report_multilingual(
     return out
 
 
-def _build_prompt(score: dict[str, Any], tier: str) -> str:
-    payload = json.dumps({
+def _build_prompt(
+    score: dict[str, Any],
+    tier: str,
+    *,
+    edition_context: str | None = None,
+) -> str:
+    payload = {
         "band": score.get("band"),
         "fragility": score.get("fragility"),
         "trigger": score.get("trigger"),
@@ -105,8 +123,10 @@ def _build_prompt(score: dict[str, Any], tier: str) -> str:
         "factors": score.get("factors"),
         "asof": score.get("asof"),
         "tier": tier,
-    }, indent=2)
-    return payload
+        "edition": score.get("edition"),
+        "edition_context": edition_context or score.get("edition_context"),
+    }
+    return json.dumps(payload, indent=2)
 
 
 def _gemini_generate(api_key: str, prompt: str, system: str) -> str:
