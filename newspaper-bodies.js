@@ -22,7 +22,7 @@ window.NEWSPAPER_BODIES = {
 <div style="border:1px solid var(--border);border-top:2px solid var(--border-hvy);padding:10px;margin:0.75rem 0;background:var(--bg-inset);">
 <div class="score-label" style="margin-bottom:6px;">What subscribers see</div>
 <p style="font-size:11px;color:var(--ink-3);margin-bottom:8px;">Free edition: full front-page narrative, top headlines, direction and sentiment.<br><strong style="color:var(--ink);">Subscriber brief:</strong> trigger board, watchlist levels, and "what changed since last edition."<br><strong style="color:var(--ink);">Pro desks:</strong> full analog map, scenario grid, and API access.</p>
-<div style="display:flex;flex-direction:column;gap:5px;"><input type="email" id="news-email" placeholder="your@email.com" style="font-family:var(--font-sans);font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--border);padding:4px 8px;border-radius:2px;width:100%;" aria-label="Email for newsletter"/><button class="cta-btn primary" onclick="handleSubscribe()">Get today's free edition</button><div id="sub-cta-payment" style="margin-top:4px;"></div></div></div>`,
+<div style="display:flex;flex-direction:column;gap:5px;"><input type="email" id="news-email" placeholder="your@email.com" style="font-family:var(--font-sans);font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--border);padding:4px 8px;border-radius:2px;width:100%;" aria-label="Email for newsletter"/><button class="cta-btn primary" onclick="openSubscribeOverlay()">Get today's free edition</button><div id="sub-cta-payment" style="margin-top:4px;"></div></div></div>`,
   },
   zh: {
     dateline_feels: "今日情势令人想起 2000 年 3 月 14 日",
@@ -46,7 +46,7 @@ window.NEWSPAPER_BODIES = {
 <div style="border:1px solid var(--border);border-top:2px solid var(--border-hvy);padding:10px;margin:0.75rem 0;background:var(--bg-inset);">
 <div class="score-label" style="margin-bottom:6px;">订阅解锁</div>
 <p style="font-size:11px;color:var(--ink-3);margin-bottom:8px;">免费版：完整头版叙事、头条、方向与情绪解读。<br><strong style="color:var(--ink);">订阅简报：</strong>触发板、自选股价位，以及「自上一版以来的变化」。<br><strong style="color:var(--ink);">专业版：</strong>完整类比图、情景网格与 API 访问。</p>
-<div style="display:flex;flex-direction:column;gap:5px;"><input type="email" id="news-email" placeholder="your@email.com" style="font-family:var(--font-sans);font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--border);padding:4px 8px;border-radius:2px;width:100%;" aria-label="Email for newsletter"/><button class="cta-btn primary" onclick="handleSubscribe()">免费订阅报告</button><div id="sub-cta-payment" style="margin-top:4px;"></div></div></div>`,
+<div style="display:flex;flex-direction:column;gap:5px;"><input type="email" id="news-email" placeholder="your@email.com" style="font-family:var(--font-sans);font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--border);padding:4px 8px;border-radius:2px;width:100%;" aria-label="Email for newsletter"/><button class="cta-btn primary" onclick="openSubscribeOverlay()">免费订阅报告</button><div id="sub-cta-payment" style="margin-top:4px;"></div></div></div>`,
   },
   ms: {
     dateline_feels: "Hari ini terasa seperti 14 Mac 2000",
@@ -70,6 +70,6 @@ window.NEWSPAPER_BODIES = {
 <div style="border:1px solid var(--border);border-top:2px solid var(--border-hvy);padding:10px;margin:0.75rem 0;background:var(--bg-inset);">
 <div class="score-label" style="margin-bottom:6px;">Langgan untuk buka kunci</div>
 <p style="font-size:11px;color:var(--ink-3);margin-bottom:8px;">Edisi percuma: naratif muka depan penuh, tajuk utama, arah dan sentimen.<br><strong style="color:var(--ink);">Ringkasan pelanggan:</strong> papan pencetus, tahap senarai pantau, dan "perubahan sejak edisi terakhir."<br><strong style="color:var(--ink);">Meja Pro:</strong> peta analog penuh, grid senario, dan akses API.</p>
-<div style="display:flex;flex-direction:column;gap:5px;"><input type="email" id="news-email" placeholder="your@email.com" style="font-family:var(--font-sans);font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--border);padding:4px 8px;border-radius:2px;width:100%;" aria-label="Email for newsletter"/><button class="cta-btn primary" onclick="handleSubscribe()">Langgan laporan percuma</button><div id="sub-cta-payment" style="margin-top:4px;"></div></div></div>`,
+<div style="display:flex;flex-direction:column;gap:5px;"><input type="email" id="news-email" placeholder="your@email.com" style="font-family:var(--font-sans);font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--border);padding:4px 8px;border-radius:2px;width:100%;" aria-label="Email for newsletter"/><button class="cta-btn primary" onclick="openSubscribeOverlay()">Langgan laporan percuma</button><div id="sub-cta-payment" style="margin-top:4px;"></div></div></div>`,
   },
 };

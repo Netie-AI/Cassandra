@@ -285,6 +285,57 @@ window.CassandraCommon = (function () {
   }
 
   const SESSION_KEY = "cassandra-session";
+  const JWT_KEY = "cassandra_jwt";
+
+  function getJwt() {
+    try {
+      return sessionStorage.getItem(JWT_KEY) || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function authHeaders(extra) {
+    const h = Object.assign({}, extra || {});
+    const jwt = getJwt();
+    if (jwt) h.Authorization = "Bearer " + jwt;
+    return h;
+  }
+
+  function clearAuth() {
+    try {
+      sessionStorage.removeItem(JWT_KEY);
+    } catch (_) { /* ignore */ }
+    setSession(null);
+  }
+
+  function bootstrapAuth() {
+    const jwt = getJwt();
+    if (!jwt) return Promise.resolve(null);
+    return fetch("/api/auth/me", { headers: authHeaders() })
+      .then(function (r) {
+        if (!r.ok) {
+          clearAuth();
+          return null;
+        }
+        return r.json();
+      })
+      .then(function (data) {
+        if (!data || !data.email) return null;
+        const name = data.display_name || data.email.split("@")[0];
+        setSession({
+          name: name,
+          email: data.email,
+          tier: data.tier_label || data.tier || "Free",
+          tierId: data.tier || "free",
+          initials: name.slice(0, 2).toUpperCase(),
+        });
+        return data;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
 
   function getSession() {
     try {
@@ -304,7 +355,8 @@ window.CassandraCommon = (function () {
   }
 
   function signOut() {
-    setSession(null);
+    fetch("/api/auth/logout", { method: "POST" }).catch(function () { /* ignore */ });
+    clearAuth();
     toast("Signed out");
   }
 
@@ -341,7 +393,9 @@ window.CassandraCommon = (function () {
     const menu = document.getElementById("acct-menu");
     if (!btn || !menu) return;
 
-    renderAccountMenu();
+    bootstrapAuth().finally(function () {
+      renderAccountMenu();
+    });
 
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -394,8 +448,8 @@ window.CassandraCommon = (function () {
         const action = el.getAttribute("data-acct-action");
         menu.hidden = true;
         btn.setAttribute("aria-expanded", "false");
-        if (action === "signin") window.location.href = "/subscribe";
-        else if (action === "signup") window.location.href = "/subscribe?new=1";
+        if (action === "signin") window.location.href = "/login.html";
+        else if (action === "signup") window.location.href = "/signup.html";
         else if (action === "contact") openContactFlow();
         else if (action === "agents") window.location.href = "/stocks/NOW";
         else if (action === "watchlist") window.location.href = "/#watchlist";
@@ -450,6 +504,10 @@ window.CassandraCommon = (function () {
     getSession,
     setSession,
     signOut,
+    authHeaders,
+    getJwt,
+    bootstrapAuth,
+    clearAuth,
     initAccountMenu,
     initLangCycle,
     initThemeToggle,

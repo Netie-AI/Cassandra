@@ -4,4 +4,10 @@
 /portfolio /static/coming-soon.html?page=portfolio  200
 /alerts   /static/coming-soon.html?page=alerts    200
 /stocks/* /index.html                              200
-/*        /index.html                              200
+/login    /login.html                              200
+/signup   /signup.html                             200
+/ops      /ops.html                                200
+/privacy  /privacy.html                            200
+/terms    /terms.html                              200
+/unsubscribe /index.html                           200
+/*        /404.html                               404

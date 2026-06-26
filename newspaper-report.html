@@ -403,6 +403,15 @@
     font-size: 11px; opacity: 0; transition: opacity 0.2s; z-index: 99;
   }
   .toast.show { opacity: 1; }
+  .archive-banner {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    color: var(--color-warn, #92400e);
+    padding: 6px 0 10px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.75rem;
+  }
+  .archive-banner a { color: inherit; font-weight: 600; margin-left: 8px; }
   @media (max-width: 600px) {
     .columns { grid-template-columns: 1fr; }
     .col { border-right: none; border-bottom: var(--rule); padding: 0.75rem 0; }
@@ -425,6 +434,11 @@
     <button class="ctrl-btn" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode">☀ / ☾</button>
   </div>
 </div>
+
+<p id="archive-banner" class="archive-banner" hidden>
+  Viewing archived edition -
+  <a href="/newspaper-report">See latest</a>
+</p>
 
 <!-- Masthead -->
 <header>
@@ -616,13 +630,26 @@ let currentLang = 'en';
 
 async function applyNewspaperBodies(lang) {
   const COL_KEYS = { 'col1-body': 'col1_html', 'col2-body': 'col2_html', 'col3-body': 'col3_html' };
-  const asof = window.__reportAsof || new URLSearchParams(location.search).get('asof');
+  const params = new URLSearchParams(location.search);
+  const runId = params.get('run_id');
+  const asof = runId || window.__reportAsof || params.get('asof');
   let bodies = null;
   try {
-    const q = new URLSearchParams({ lang });
-    if (asof) q.set('date', asof);
-    const r = await fetch('/api/newspaper-body?' + q.toString());
-    if (r.ok) bodies = await r.json();
+    if (runId) {
+      const r = await fetch('/api/ops/run/' + encodeURIComponent(runId));
+      if (r.ok) {
+        const detail = await r.json();
+        const block = (detail.newspaper && detail.newspaper[lang]) || detail.newspaper?.en;
+        if (block) bodies = block;
+        if (detail.asof) window.__reportAsof = detail.asof;
+      }
+    }
+    if (!bodies) {
+      const q = new URLSearchParams({ lang });
+      if (asof) q.set('date', asof);
+      const r = await fetch('/api/newspaper-body?' + q.toString());
+      if (r.ok) bodies = await r.json();
+    }
   } catch (_) { /* fallback to golden static */ }
   if (!bodies) {
     bodies = (window.NEWSPAPER_BODIES && window.NEWSPAPER_BODIES[lang]) || window.NEWSPAPER_BODIES.en;
@@ -703,7 +730,129 @@ function refreshPaymentCTA() {
 window.refreshPaymentCTA = refreshPaymentCTA;
 refreshPaymentCTA();
 
-/* ── Fetch live score  -  see newspaper.js for full update ── */
+(function initRunIdArchive() {
+  const params = new URLSearchParams(location.search);
+  const runId = params.get('run_id');
+  const lang = params.get('lang');
+  if (runId) {
+    const banner = document.getElementById('archive-banner');
+    if (banner) banner.hidden = false;
+  }
+  if (lang && I18N[lang]) setLang(lang);
+})();
+
+</script>
+
+<div id="subscribe-overlay" class="sub-overlay" hidden aria-hidden="true">
+  <div class="sub-overlay-card" role="dialog" aria-labelledby="sub-overlay-title">
+    <button type="button" class="sub-overlay-close" onclick="closeSubscribeOverlay()" aria-label="Close">✕</button>
+    <div id="sub-overlay-title" class="sub-overlay-title">Cassandra Daily</div>
+    <div class="sub-overlay-lead">Free edition - one signal, every morning.</div>
+    <input id="overlay-email" type="email" placeholder="your@email.com" class="sub-overlay-input" autocomplete="email"/>
+    <button type="button" class="sub-overlay-btn" onclick="overlaySignup()">Get Free Edition →</button>
+    <div id="overlay-msg" class="sub-overlay-msg"></div>
+    <div class="sub-overlay-foot">No spam. Unsubscribe anytime. Research only - not financial advice.</div>
+  </div>
+</div>
+
+<style>
+  .sub-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(10, 10, 10, 0.6);
+    backdrop-filter: blur(12px);
+    display: none; align-items: center; justify-content: center;
+    padding: var(--space-lg, 1.25rem);
+  }
+  .sub-overlay[hidden] { display: none !important; }
+  .sub-overlay:not([hidden]) { display: flex; }
+  .sub-overlay-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(24px);
+    border-radius: 4px;
+    padding: 40px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+  }
+  [data-theme="light"] .sub-overlay-card {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(0, 0, 0, 0.12);
+    color: #1a1a1a;
+  }
+  [data-theme="light"] .sub-overlay-title,
+  [data-theme="light"] .sub-overlay-lead,
+  [data-theme="light"] .sub-overlay-foot { color: #333; }
+  [data-theme="light"] .sub-overlay-input {
+    background: #fff; color: #1a1a1a; border-color: rgba(0,0,0,0.15);
+  }
+  .sub-overlay-close {
+    position: absolute; top: 12px; right: 16px;
+    background: none; border: none; color: rgba(255,255,255,0.6);
+    font-size: 20px; cursor: pointer;
+  }
+  [data-theme="light"] .sub-overlay-close { color: rgba(0,0,0,0.45); }
+  .sub-overlay-title {
+    font-family: var(--font-serif, Georgia, serif);
+    font-size: 28px; color: #fff; margin-bottom: 8px;
+  }
+  .sub-overlay-lead { font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 24px; }
+  .sub-overlay-input {
+    width: 100%; padding: 12px; box-sizing: border-box;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; font-size: 14px; margin-bottom: 12px; outline: none;
+  }
+  .sub-overlay-btn {
+    width: 100%; padding: 12px; background: #fff; color: #1a1a1a;
+    font-size: 13px; font-family: var(--font-sans, 'DM Sans', sans-serif);
+    border: none; cursor: pointer;
+  }
+  .sub-overlay-msg { margin-top: 12px; font-size: 12px; color: rgba(255,255,255,0.7); min-height: 18px; }
+  .sub-overlay-foot { margin-top: 16px; font-size: 11px; color: rgba(255,255,255,0.4); }
+</style>
+
+<script>
+function openSubscribeOverlay() {
+  var el = document.getElementById('subscribe-overlay');
+  if (!el) return;
+  el.hidden = false;
+  el.setAttribute('aria-hidden', 'false');
+  document.getElementById('overlay-email')?.focus();
+}
+function closeSubscribeOverlay() {
+  var el = document.getElementById('subscribe-overlay');
+  if (!el) return;
+  el.hidden = true;
+  el.setAttribute('aria-hidden', 'true');
+}
+async function overlaySignup() {
+  var email = (document.getElementById('overlay-email')?.value || '').trim();
+  var msg = document.getElementById('overlay-msg');
+  if (!email.includes('@')) { if (msg) msg.textContent = 'Enter a valid email.'; return; }
+  try {
+    var r = await fetch('/api/digest/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, source: 'newspaper-overlay' })
+    });
+    var d = await r.json();
+    if (d.ok) {
+      if (msg) msg.textContent = "✓ You're in. First edition arrives on the next trading-day run.";
+      setTimeout(closeSubscribeOverlay, 2500);
+    } else {
+      if (msg) msg.textContent = d.detail || d.message || 'Something went wrong - try again.';
+    }
+  } catch (_) {
+    if (msg) msg.textContent = 'Could not reach the server.';
+  }
+}
+document.getElementById('subscribe-overlay')?.addEventListener('click', function (e) {
+  if (e.target === this) closeSubscribeOverlay();
+});
+window.openSubscribeOverlay = openSubscribeOverlay;
+window.closeSubscribeOverlay = closeSubscribeOverlay;
+window.overlaySignup = overlaySignup;
 </script>
 <script src="/static/newspaper.js"></script>
 </body>

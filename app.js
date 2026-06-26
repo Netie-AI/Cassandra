@@ -10,6 +10,15 @@ const WL_USER_KEY = "cassandra-user-id";
 
 const DEMO = window.CassandraDemo || {};
 
+function apiHeaders(extra) {
+  const base = Object.assign({}, extra || {});
+  const CC = window.CassandraCommon;
+  if (CC && typeof CC.authHeaders === "function") {
+    return CC.authHeaders(base);
+  }
+  return base;
+}
+
 const FDATA = {
   en: [
     { t: "API as Ground Truth", d: "Integrate CRS score and factor feeds directly into your models, screeners, and alerts.", cta: "View API docs →", href: "/docs/api" },
@@ -190,7 +199,7 @@ async function sendAgent() {
   try {
     const r = await fetch("/api/agent/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: apiHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ message: msg }),
     });
     const d = await r.json();
@@ -401,13 +410,13 @@ async function loadWatchlist() {
     try {
       await fetch("/api/watchlist/update", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: apiHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ user: uid, tickers }),
       });
     } catch (_) { /* offline */ }
   }
   try {
-    const r = await fetch(`/api/watchlist?user=${encodeURIComponent(uid)}`);
+    const r = await fetch(`/api/watchlist?user=${encodeURIComponent(uid)}`, { headers: apiHeaders() });
     if (r.ok) {
       const d = await r.json();
       if (d.rows?.length) {
@@ -439,7 +448,7 @@ async function saveWatchlist(tickers) {
 
 async function fetchLatest() {
   try {
-    const r = await fetch("/api/latest");
+    const r = await fetch("/api/latest", { headers: apiHeaders() });
     if (r.ok) return await r.json();
   } catch (_) { /* offline */ }
   return null;
@@ -447,7 +456,7 @@ async function fetchLatest() {
 
 async function fetchHighlights() {
   try {
-    const r = await fetch("/api/report/highlights");
+    const r = await fetch("/api/report/highlights", { headers: apiHeaders() });
     if (r.ok) return await r.json();
   } catch (_) { /* offline */ }
   return null;
