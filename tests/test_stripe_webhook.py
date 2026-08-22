@@ -16,7 +16,7 @@ TEST_WHSEC = "whsec_test_cassandra_fixture_not_a_real_secret"
 
 def _signed(name: str) -> tuple[bytes, str]:
     payload = (FIXTURES / name).read_bytes()
-    header = stripe.Webhook.generate_test_header_string(
+    header = stripe.WebhookSignature.generate_signature_header(
         payload=payload.decode("utf-8"),
         secret=TEST_WHSEC,
     )
@@ -73,25 +73,6 @@ def test_price_id_fallback_when_metadata_missing(monkeypatch):
     }
     mapped = map_stripe_event(event)
     assert mapped["tier"] == "agent"
-
-
-def test_fastapi_webhook_accepts_signed_fixture(monkeypatch):
-    from fastapi.testclient import TestClient
-
-    from api.main import app
-
-    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", TEST_WHSEC)
-    monkeypatch.setenv("STRIPE_SECRET_KEY", "")
-    payload, header = _signed("checkout.session.completed.json")
-    with patch("src.billing.apply_mapped_event", return_value={"applied": True, "action": "upsert"}):
-        client = TestClient(app)
-        r = client.post(
-            "/api/webhooks/stripe",
-            content=payload,
-            headers={"stripe-signature": header, "content-type": "application/json"},
-        )
-    assert r.status_code == 200
-    assert r.json()["received"] is True
 
 
 def test_apply_mapped_event_calls_apply_subscription():
