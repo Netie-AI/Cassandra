@@ -1,0 +1,18 @@
+{
+  "id": "evt_test_sub_deleted",
+  "object": "event",
+  "type": "customer.subscription.deleted",
+  "data": {
+    "object": {
+      "id": "sub_test_789",
+      "object": "subscription",
+      "customer": "cus_test_123",
+      "status": "canceled",
+      "metadata": {
+        "product_line": "cassandra",
+        "tier": "agent",
+        "user_id": "user-ghi"
+      }
+    }
+  }
+}

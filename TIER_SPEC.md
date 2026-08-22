@@ -1,6 +1,23 @@
 # CASSANDRA TIER SPEC + STOCK DEMO PAGES
 > Cursor: implement in Phase 4. This is the source of truth for gating + demo pages.
 
+## Registration trial (2026-08-22)
+
+Every new **registered** account gets The Agent (max) free for 90 days.
+
+```
+trial_max_until = created_at + 90 days
+now < trial_max_until  -> effective_tier = agent   (no charge)
+now >= trial_max_until -> effective_tier = free    unless Stripe is active
+```
+
+The trial does **not** auto-convert to a paid plan. After drop, the user may
+subscribe via Stripe to Report / Briefing / Agent. Digest-only emails (no
+account) stay Free.
+
+`effective_tier` is the only gate for dashboard, API, chat quota, watchlist,
+and newsletter depth.
+
 ---
 
 ## Tier gating in API

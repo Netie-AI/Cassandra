@@ -1,4 +1,9 @@
-"""Newsletter send — Resend batch dispatch + single-edition helper."""
+"""Newsletter send — Resend batch dispatch + single-edition helper.
+
+Default is --dry-run. Pass --live to actually send. Never required on the
+cloud VM: laptop Task Scheduler stubs (0545/0600/1800 MYT) stay on the
+laptop; this module documents cron equivalents only.
+"""
 from __future__ import annotations
 
 import argparse
@@ -10,9 +15,27 @@ from typing import Any, Iterator
 
 import httpx
 
-from .render import render_edition_html, render_edition_text
+from src.entitlement import effective_tier, newsletter_depth, normalize_tier
+
+from .render import preview_tier_bodies, render_edition_html, render_edition_text
 
 _BATCH_SIZE = 100
+
+# MYT = Asia/Kuala_Lumpur (UTC+8). Laptop xml stubs already exist; cloud uses cron.
+CRON_SLOTS_MYT = ("05:45", "06:00", "18:00")
+CRON_COMMENT = """
+# Cassandra newsletter / desk slots (MYT = UTC+8). Do not require Windows Task Scheduler.
+# 05:45 MYT  ->  21:45 UTC previous calendar day
+# 06:00 MYT  ->  22:00 UTC previous calendar day
+# 18:00 MYT  ->  10:00 UTC same calendar day
+#
+# 45 21 * * 1-5  cd /opt/cassandra && python -m src.newsletter.send --dry-run
+# 0  22 * * 1-5  cd /opt/cassandra && python -m src.newsletter.send --dry-run
+# 0  10 * * 1-5  cd /opt/cassandra && python -m src.newsletter.send --dry-run
+#
+# Live send (ops only, after reviewing dry-run):
+#   python -m src.newsletter.send --live
+"""
 
 
 def is_configured() -> bool:
@@ -22,6 +45,26 @@ def is_configured() -> bool:
 def _chunks(items: list, size: int) -> Iterator[list]:
     for i in range(0, len(items), size):
         yield items[i : i + size]
+
+
+def resolve_recipient_tier(rec: dict) -> str:
+    """Digest-only emails stay Free. Registered accounts use entitlement."""
+    if rec.get("effective_tier"):
+        return normalize_tier(str(rec["effective_tier"]))
+    if rec.get("created_at"):
+        return effective_tier(
+            rec.get("created_at"),
+            subscription_tier=rec.get("subscription_tier"),
+            subscription_status=rec.get("subscription_status"),
+        )
+    email = str(rec.get("email") or "")
+    try:
+        from src.db.supabase_auth import account_for_email
+
+        snap = account_for_email(email)
+        return normalize_tier(str(snap.get("effective_tier") or "free"))
+    except Exception:
+        return "free"
 
 
 def send_edition(
@@ -41,15 +84,7 @@ def send_edition(
     raise RuntimeError("No email provider configured — set RESEND_API_KEY or SMTP_* in .env")
 
 
-def dispatch_digest(*, dry_run: bool = False) -> dict[str, Any]:
-    """
-    Batch-send the latest edition to confirmed digest subscribers.
-    Uses Resend /emails/batch (100 per call) when RESEND_API_KEY is set.
-    """
-    from src.store import latest_score, list_digest_recipients, log_newsletter_send, mark_digest_sent
-
-    recipients = list_digest_recipients()
-    score = latest_score() or {}
+def _score_subject(score: dict) -> tuple[str, float | None, str, str | None, float | None, str]:
     crs = score.get("crs")
     band = score.get("band") or "n/a"
     asof = score.get("asof") or "unknown"
@@ -60,26 +95,58 @@ def dispatch_digest(*, dry_run: bool = False) -> dict[str, Any]:
         if crs is not None
         else f"Cassandra daily - {asof}"
     )
+    return subject, crs, band, phase, phase_conf, str(asof)
+
+
+def dispatch_digest(*, dry_run: bool = True) -> dict[str, Any]:
+    """
+    Batch-send the latest edition to confirmed digest subscribers.
+    dry_run=True (default): print per-tier bodies, send nothing.
+    Pass dry_run=False / --live to send.
+    """
+    from src.store import latest_score, list_digest_recipients
+
+    recipients = list_digest_recipients()
+    score = latest_score() or {}
+    subject, crs, _band, phase, phase_conf, asof = _score_subject(score)
+    previews = preview_tier_bodies(crs=crs, phase=phase, phase_conf=phase_conf, asof=asof)
+
+    resolved: list[dict[str, Any]] = []
+    for rec in recipients:
+        tier = resolve_recipient_tier(rec)
+        resolved.append(
+            {
+                "email": rec["email"],
+                "unsub_token": rec.get("unsub_token"),
+                "effective_tier": tier,
+                "depth": newsletter_depth(tier),
+            }
+        )
 
     if dry_run:
         return {
             "sent": 0,
             "failed": 0,
             "dry_run": True,
-            "recipients": [r["email"] for r in recipients],
+            "live": False,
+            "recipients": [r["email"] for r in resolved],
+            "recipient_tiers": resolved,
             "subject": subject,
+            "tier_bodies": {k: v["text"] for k, v in previews.items()},
+            "tier_html": {k: v["html"] for k, v in previews.items()},
+            "cron_slots_myt": list(CRON_SLOTS_MYT),
         }
 
     if not recipients:
-        return {"sent": 0, "failed": 0, "dry_run": False, "subject": subject}
+        return {"sent": 0, "failed": 0, "dry_run": False, "live": True, "subject": subject}
 
     if not is_configured():
         raise RuntimeError("No email provider configured — set RESEND_API_KEY or SMTP_* in .env")
 
     if os.getenv("RESEND_API_KEY"):
-        return _dispatch_resend_batch(recipients, subject, crs, phase, phase_conf, asof)
+        return _dispatch_resend_batch(resolved, subject, crs, phase, phase_conf, asof)
 
-    return _dispatch_sequential(recipients, subject, crs, phase, phase_conf, asof)
+    return _dispatch_sequential(resolved, subject, crs, phase, phase_conf, asof)
 
 
 def _dispatch_resend_batch(
@@ -104,14 +171,16 @@ def _dispatch_resend_batch(
         chunk_emails: list[str] = []
         for rec in chunk:
             email = rec["email"]
+            tier = rec.get("effective_tier") or "free"
             html = render_edition_html(
                 crs=crs,
                 phase=phase,
                 phase_conf=phase_conf,
                 asof=str(asof),
                 unsub_token=rec["unsub_token"],
+                tier=tier,
             )
-            text = render_edition_text(crs=crs, phase=phase, asof=str(asof))
+            text = render_edition_text(crs=crs, phase=phase, asof=str(asof), tier=tier)
             item: dict[str, Any] = {
                 "from": from_addr,
                 "to": [email],
@@ -147,7 +216,7 @@ def _dispatch_resend_batch(
                 log_newsletter_send(email, subject, ok=False, detail=str(exc)[:200])
 
     mark_digest_sent(sent_emails)
-    return {"sent": sent, "failed": failed, "dry_run": False, "subject": subject, "provider": "resend_batch"}
+    return {"sent": sent, "failed": failed, "dry_run": False, "live": True, "subject": subject, "provider": "resend_batch"}
 
 
 def _dispatch_sequential(
@@ -167,14 +236,16 @@ def _dispatch_sequential(
     sent_emails: list[str] = []
     for rec in recipients:
         email = rec["email"]
+        tier = rec.get("effective_tier") or "free"
         html = render_edition_html(
             crs=crs,
             phase=phase,
             phase_conf=phase_conf,
             asof=str(asof),
             unsub_token=rec["unsub_token"],
+            tier=tier,
         )
-        text = render_edition_text(crs=crs, phase=phase, asof=str(asof))
+        text = render_edition_text(crs=crs, phase=phase, asof=str(asof), tier=tier)
         try:
             send_edition(to=email, subject=subject, html=html, text=text, tags={"type": "digest", "asof": str(asof)})
             log_newsletter_send(email, subject, ok=True)
@@ -186,7 +257,7 @@ def _dispatch_sequential(
         time.sleep(0.1)
 
     mark_digest_sent(sent_emails)
-    return {"sent": sent, "failed": failed, "dry_run": False, "subject": subject, "provider": "smtp_or_single"}
+    return {"sent": sent, "failed": failed, "dry_run": False, "live": True, "subject": subject, "provider": "smtp_or_single"}
 
 
 def _from_address(purpose: str = "digest") -> str:
@@ -217,6 +288,7 @@ def _send_resend(
         "to": [to],
         "subject": subject,
         "html": html,
+        "text": text,
     }
     reply_to = os.getenv("RESEND_REPLY_TO")
     if reply_to:
@@ -259,20 +331,44 @@ def _send_smtp(*, to: str, subject: str, html: str, text: str | None) -> dict[st
     return {"ok": True, "provider": "smtp", "to": to}
 
 
+def print_dry_run(out: dict[str, Any]) -> None:
+    print("DRY-RUN (no email sent). Pass --live to send.")
+    print(f"subject: {out.get('subject')}")
+    print(f"cron slots MYT: {', '.join(out.get('cron_slots_myt') or CRON_SLOTS_MYT)}")
+    bodies = out.get("tier_bodies") or {}
+    for tier in ("free", "report", "briefing", "agent"):
+        print(f"\n===== {tier} =====")
+        print(bodies.get(tier, "(missing)"))
+    resolved = out.get("recipient_tiers") or []
+    print(f"\nrecipients: {len(resolved)}")
+    for rec in resolved[:20]:
+        print(f"  {rec.get('email')}  tier={rec.get('effective_tier')}  depth={rec.get('depth')}")
+    if len(resolved) > 20:
+        print(f"  ... +{len(resolved) - 20} more")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Cassandra newsletter batch dispatch")
-    parser.add_argument("--dry-run", action="store_true", help="Print recipients only")
+    parser = argparse.ArgumentParser(
+        description="Cassandra newsletter batch dispatch. Dry-run is the default.",
+        epilog=CRON_COMMENT,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=True,
+        help="Print per-tier bodies and recipients only (default)",
+    )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Actually send. Required to leave dry-run. Do not use in CI.",
+    )
     args = parser.parse_args()
-    out = dispatch_digest(dry_run=args.dry_run)
-    recipients = out.get("recipients") or []
-    if args.dry_run:
-        if not recipients:
-            print("0 subscribers (confirmed=1)")
-        else:
-            for email in recipients[:3]:
-                print(email)
-            if len(recipients) > 3:
-                print(f"... +{len(recipients) - 3} more")
+    dry_run = not args.live
+    out = dispatch_digest(dry_run=dry_run)
+    if dry_run:
+        print_dry_run(out)
     else:
         print(out)
 

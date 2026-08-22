@@ -95,7 +95,7 @@ function renderStock(ticker) {
           </div>
           <div class="sd-upsell">
             <p>Premium unlocks the timestamped change-log, level-by-level watchlist with invalidation markers, and the full 2000-vs-today news similarity engine with sourced comparables.</p>
-            <a href="/subscribe?tier=agent&trial=1" class="sd-trial-link">Start 7-day free trial</a>
+            <a href="/signup.html" class="sd-trial-link">Register: 3 months Agent, then Free</a>
           </div>
           <div class="stock-chat-panel">
             <div class="stock-chat-header">
@@ -142,7 +142,7 @@ function renderStock(ticker) {
         <button type="button" class="glass-close" onclick="closeStockGate()">✕</button>
         <div class="glass-title">Subscriber edition</div>
         <div class="glass-msg">This edition is available to Report subscribers.</div>
-        <button type="button" class="glass-submit" onclick="window.location.href='/pricing?tier=report'">Start free trial</button>
+        <button type="button" class="glass-submit" onclick="window.location.href='/pricing?tier=report'">Subscribe after trial</button>
       </div>
     </div>
   `;

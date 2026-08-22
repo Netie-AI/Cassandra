@@ -922,3 +922,45 @@ def increment_agent_usage(email: str, date: str) -> int:
             (email, date),
         ).fetchone()
     return int(row["count"]) if row else 1
+
+
+def _ensure_chat_usage_table(c: sqlite3.Connection) -> None:
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS chat_usage (
+            actor_key TEXT NOT NULL,
+            usage_date TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (actor_key, usage_date)
+        )
+    """)
+
+
+def get_chat_usage(actor_key: str, date: str) -> int:
+    actor = (actor_key or "anonymous")[:128]
+    date = (date or "")[:10]
+    with _conn() as c:
+        _ensure_chat_usage_table(c)
+        row = c.execute(
+            "SELECT count FROM chat_usage WHERE actor_key = ? AND usage_date = ?",
+            (actor, date),
+        ).fetchone()
+    return int(row["count"]) if row else 0
+
+
+def increment_chat_usage(actor_key: str, date: str) -> int:
+    actor = (actor_key or "anonymous")[:128]
+    date = (date or "")[:10]
+    with _conn() as c:
+        _ensure_chat_usage_table(c)
+        c.execute(
+            """
+            INSERT INTO chat_usage (actor_key, usage_date, count) VALUES (?, ?, 1)
+            ON CONFLICT(actor_key, usage_date) DO UPDATE SET count = count + 1
+            """,
+            (actor, date),
+        )
+        row = c.execute(
+            "SELECT count FROM chat_usage WHERE actor_key = ? AND usage_date = ?",
+            (actor, date),
+        ).fetchone()
+    return int(row["count"]) if row else 1

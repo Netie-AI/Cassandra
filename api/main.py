@@ -17,10 +17,12 @@ from fastapi.staticfiles import StaticFiles
 
 from .auth import (
     FREE_DELAY_DAYS,
-    FIRST_SUB_TRIAL_DAYS,
+    TRIAL_MAX_DAYS,
+    entitlement_for_request,
     gate_score,
     get_user_tier,
     is_master,
+    is_paid,
     normalize_tier,
     resolve_score_dict,
     subscription_checkout_options,
@@ -146,7 +148,7 @@ def _score_for_tier_asof(tier: str, asof: str | None) -> dict | None:
     if not asof:
         return resolve_score_dict(tier)
 
-    if tier in ("report", "briefing", "agent"):
+    if is_paid(tier):
         return score_on_or_before(asof) or latest_score()
 
     delayed = score_by_offset_days(FREE_DELAY_DAYS) or latest_score()
@@ -313,7 +315,7 @@ def dashboard(
     if not raw:
         raise HTTPException(404, "No score yet — POST /api/run first")
     score = gate_score(raw, tier)
-    metrics = latest_metrics() if tier in ("report", "briefing", "agent") else []
+    metrics = latest_metrics() if is_paid(tier) else []
     return {"score": score, "metrics": metrics, "tier": tier}
 
 
@@ -324,7 +326,7 @@ def report_sections(tier: str = Depends(get_user_tier)):
     score = latest_score()
     if not score:
         raise HTTPException(404, "No score yet")
-    effective = tier if tier in ("report", "briefing", "agent") else "free"
+    effective = tier if is_paid(tier) else "free"
     return generate_report_sections(score, effective)
 
 
@@ -335,7 +337,7 @@ def report_html(tier: str = Depends(get_user_tier)):
     score = latest_score()
     if not score:
         raise HTTPException(404, "No score yet")
-    effective = tier if tier in ("report", "briefing", "agent") else "report"
+    effective = tier if is_paid(tier) else "report"
     sections = generate_report_sections(score, effective)
     return HTMLResponse(render_report_html(sections))
 
@@ -366,7 +368,20 @@ def api_indices():
 
 
 @app.get("/api/watchlist")
-def api_watchlist(user: str = Query(default="local")):
+def api_watchlist(
+    user: str = Query(default="local"),
+    tier: str = Depends(get_user_tier),
+):
+    caps = tier_caps(tier)
+    if not caps.get("can_watchlist"):
+        return {
+            "user_id": user,
+            "tickers": [],
+            "rows": [],
+            "locked": True,
+            "tier": tier,
+            "note": "Watchlist is The Agent (or the 90-day registration trial). After day 90 you drop to Free.",
+        }
     from src.watchlist import get_watchlist
     return get_watchlist(user)
 
@@ -374,7 +389,18 @@ def api_watchlist(user: str = Query(default="local")):
 @app.post("/api/watchlist/update")
 def api_watchlist_update(
     body: dict = Body(...),
+    tier: str = Depends(get_user_tier),
 ):
+    caps = tier_caps(tier)
+    if not caps.get("can_watchlist"):
+        return JSONResponse(
+            {
+                "error": "watchlist_locked",
+                "tier": tier,
+                "note": "Watchlist is The Agent (or the 90-day registration trial). After day 90 you drop to Free.",
+            },
+            status_code=403,
+        )
     from src.watchlist import update_watchlist
     user = str(body.get("user") or "local")
     tickers = body.get("tickers") or []
@@ -591,11 +617,16 @@ def auth_me(authorization: str | None = Header(default=None)):
     from src.db.supabase_auth import user_from_token
 
     if not is_configured():
-        return {"auth_configured": False, "tier": "free"}
+        return {
+            "auth_configured": False,
+            "tier": "free",
+            "note": "Auth is stub until SUPABASE_SERVICE_ROLE_KEY and SUPABASE_JWT_SECRET are set.",
+        }
     user = user_from_token(authorization)
     if not user:
         raise HTTPException(401, "Not signed in")
-    return {"auth_configured": True, **user}
+    extra = entitlement_for_request(authorization)
+    return {"auth_configured": True, **user, "entitlement": extra}
 
 
 @app.post("/api/auth/logout")
@@ -635,95 +666,93 @@ def auth_callback(
 
 @app.post("/api/webhooks/stripe")
 async def stripe_webhook(request: Request):
-    """Stripe checkout/subscription events → Supabase tier sync."""
-    from src.db.supabase_auth import apply_subscription, find_user_id_by_email
+    """Signed Stripe events → entitlement (checkout / invoice.paid / subscription.deleted)."""
+    from src.billing import apply_mapped_event, construct_event, map_stripe_event, webhook_secret
 
-    secret = os.getenv("STRIPE_WEBHOOK_SECRET")
-    if not secret:
+    if not webhook_secret():
         raise HTTPException(503, "Stripe webhook not configured")
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
     try:
-        import stripe
-
-        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-        event = stripe.Webhook.construct_event(payload, sig, secret)
+        event = construct_event(payload, sig)
     except ImportError as exc:
         raise HTTPException(503, "Install stripe package for webhook verification") from exc
     except Exception as exc:
         raise HTTPException(400, "Invalid Stripe signature") from exc
 
-    etype = event.get("type", "")
-    obj = (event.get("data") or {}).get("object") or {}
+    mapped = map_stripe_event(event)
+    if not mapped:
+        return {"received": True, "mapped": False}
+    try:
+        result = apply_mapped_event(mapped)
+    except RuntimeError:
+        result = {"applied": False, "reason": "supabase_stub", **mapped}
+    return {"received": True, **result}
 
-    def _is_cassandra_event(meta: dict) -> bool:
-        line = str((meta or {}).get("product_line") or "").lower()
-        return not line or line == "cassandra"
 
-    def _normalize_tier(raw: str | None) -> str | None:
-        if not raw:
-            return None
-        key = str(raw).lower()
-        mapping = {
-            "report": "report",
-            "pro": "briefing",
-            "briefing": "briefing",
-            "api": "agent",
-            "agent": "agent",
-        }
-        return mapping.get(key)
+@app.api_route("/api/billing/checkout", methods=["GET", "POST"])
+async def billing_checkout(
+    request: Request,
+    tier: str = Query(default="report"),
+    authorization: str | None = Header(default=None),
+):
+    """Stripe Checkout for Report / Briefing / Agent. No trial_period_days (no auto-convert)."""
+    from src.billing import BillingError, create_checkout_session
+    from src.db.supabase_auth import stripe_customer_id_for_user, user_from_token
 
-    def _tier_from_metadata(meta: dict) -> str | None:
-        return _normalize_tier((meta or {}).get("tier") or (meta or {}).get("plan"))
+    payload: dict = {}
+    if request.method == "POST":
+        try:
+            raw = await request.json()
+            if isinstance(raw, dict):
+                payload = raw
+        except Exception:
+            payload = {}
+    wanted = normalize_tier(str(payload.get("tier") or tier or "report"))
+    user = user_from_token(authorization)
+    email = payload.get("email") or (user or {}).get("email")
+    uid = (user or {}).get("id")
+    customer_id = stripe_customer_id_for_user(str(uid)) if uid else None
+    base = str(request.base_url).rstrip("/")
+    try:
+        session = create_checkout_session(
+            tier=wanted,
+            success_url=f"{base}/pricing?checkout=success&tier={wanted}",
+            cancel_url=f"{base}/pricing?checkout=cancel&tier={wanted}",
+            customer_email=str(email) if email else None,
+            user_id=str(uid) if uid else None,
+            customer_id=customer_id,
+        )
+    except BillingError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    if request.method == "GET":
+        return RedirectResponse(session["url"])
+    return session
 
-    def _tier_from_price(price_id: str) -> str | None:
-        mapping = {
-            os.getenv("STRIPE_PRICE_REPORT", ""): "report",
-            os.getenv("STRIPE_PRICE_PRO", ""): "briefing",
-            os.getenv("STRIPE_PRICE_BRIEFING", ""): "briefing",
-            os.getenv("STRIPE_PRICE_API", ""): "agent",
-            os.getenv("STRIPE_PRICE_AGENT", ""): "agent",
-        }
-        return mapping.get(price_id or "")
 
-    if etype in ("checkout.session.completed", "customer.subscription.created", "customer.subscription.updated"):
-        meta = obj.get("metadata") or {}
-        if not _is_cassandra_event(meta):
-            return {"received": True, "skipped": "not_cassandra"}
-        tier = _tier_from_metadata(meta)
-        if not tier and obj.get("items", {}).get("data"):
-            price_id = obj["items"]["data"][0].get("price", {}).get("id", "")
-            tier = _tier_from_price(price_id)
-        if not tier and obj.get("display_items"):
-            price_id = obj["display_items"][0].get("price", {}).get("id", "")
-            tier = _tier_from_price(price_id)
-        email = obj.get("customer_email") or meta.get("email")
-        user_id = meta.get("user_id") or meta.get("supabase_user_id")
-        if not user_id and email:
-            user_id = find_user_id_by_email(str(email))
-        if user_id and tier:
-            status = "active"
-            if etype == "customer.subscription.updated" and obj.get("status") in ("canceled", "unpaid", "past_due"):
-                status = str(obj.get("status"))
-            apply_subscription(
-                user_id=str(user_id),
-                tier=tier,
-                provider="stripe",
-                external_id=str(obj.get("id") or obj.get("subscription") or ""),
-                status=status,
-            )
-    elif etype == "customer.subscription.deleted":
-        meta = obj.get("metadata") or {}
-        user_id = meta.get("user_id") or meta.get("supabase_user_id")
-        if user_id:
-            apply_subscription(
-                user_id=str(user_id),
-                tier=str(meta.get("tier") or "report"),
-                provider="stripe",
-                external_id=str(obj.get("id") or ""),
-                status="canceled",
-            )
-    return {"received": True}
+@app.api_route("/api/billing/portal", methods=["GET", "POST"])
+def billing_portal(
+    request: Request,
+    authorization: str | None = Header(default=None),
+):
+    """Stripe Customer Portal. Requires an existing Stripe customer."""
+    from src.billing import BillingError, create_portal_session
+    from src.db.supabase_auth import stripe_customer_id_for_user, user_from_token
+
+    user = user_from_token(authorization)
+    if not user:
+        raise HTTPException(401, "Sign in to manage billing")
+    customer_id = stripe_customer_id_for_user(str(user["id"]))
+    if not customer_id:
+        raise HTTPException(404, "No Stripe customer on this account yet")
+    base = str(request.base_url).rstrip("/")
+    try:
+        portal = create_portal_session(customer_id=customer_id, return_url=f"{base}/pricing")
+    except BillingError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    if request.method == "GET":
+        return RedirectResponse(portal["url"])
+    return portal
 
 
 @app.post("/api/digest/signup")
@@ -850,13 +879,14 @@ def subscribe_options(
     tier: str = Query(default="report"),
     first_sub: bool = Query(default=True, description="First-time subscriber eligible for trial"),
 ):
-    """Checkout flags for payment providers — 7-day trial on first subscription."""
-    opts = subscription_checkout_options(tier, is_first_subscription=first_sub)
-    opts["trial_message"] = (
-        f"{FIRST_SUB_TRIAL_DAYS} days free for new subscribers"
-        if opts["first_subscriber_trial"]
-        else "No trial — returning subscriber"
-    )
+    """Checkout flags. Registration trial is 90 days of Agent, then Free. No auto-convert."""
+    del first_sub
+    opts = subscription_checkout_options(tier)
+    opts["trial_days"] = 0
+    opts["registration_trial_days"] = TRIAL_MAX_DAYS
+    opts["auto_converts"] = False
+    opts["checkout_path"] = "/api/billing/checkout"
+    opts["portal_path"] = "/api/billing/portal"
     return opts
 
 
@@ -866,7 +896,7 @@ def vouchers(ref: str | None = Query(default=None)):
     code = ref or secrets.token_hex(4).upper()
     return {
         "referral_code": f"NETIE-{code[:6]}",
-        "referral_rule": "When a referral subscribes, referrer gets 7 days free API — activate in account vouchers.",
+        "referral_rule": "When a referral registers, they get 3 months of The Agent. Referrer voucher is a later add-on.",
         "vouchers": [],
         "activate_url": "/subscribe?voucher=pending",
     }
@@ -891,7 +921,10 @@ def newsletter_dispatch(
     """Internal batch dispatch — PIPELINE_KEY gated only."""
     from src.newsletter.send import dispatch_digest
 
-    dry_run = bool(body.get("dry_run"))
+    dry_run = True if "dry_run" not in body else bool(body.get("dry_run"))
+    live = bool(body.get("live"))
+    if live:
+        dry_run = False
     try:
         return dispatch_digest(dry_run=dry_run)
     except RuntimeError as exc:

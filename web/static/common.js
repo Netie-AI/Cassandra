@@ -29,7 +29,7 @@ window.CassandraCommon = (function () {
       shareDownload: "Download HTML",
       shareView: "Newspaper",
       referralTitle: "Refer a friend",
-      referralBody: "When they subscribe, you get 7 days of API access on the top plan.",
+      referralBody: "When they register, they get 3 months of The Agent, then Free. Paid referral vouchers come later.",
       referralCopy: "Copy referral link",
       insideZone: "In",
       belowMania: "points below Mania",

@@ -8,10 +8,12 @@ log = logging.getLogger("cassandra.startup")
 
 
 def log_activation_state() -> None:
+    from src.billing import is_configured as stripe_live
     from src.db.supabase_client import is_configured as supabase_live
 
     checks = {
         "Supabase auth": supabase_live(),
+        "Stripe billing": stripe_live(),
         "OpenRouter LLM": bool(os.getenv("OPENROUTER_API_KEY")),
         "Finnhub movers": bool(os.getenv("FINNHUB_API_KEY")),
         "Resend email": bool(os.getenv("RESEND_API_KEY")),

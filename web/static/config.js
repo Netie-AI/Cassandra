@@ -10,11 +10,17 @@ Object.assign(window.CASSANDRA_CONFIG, {
   },
   newsletterAction: "",
   payments: {
+    checkout: {
+      report: "/api/billing/checkout?tier=report",
+      briefing: "/api/billing/checkout?tier=briefing",
+      agent: "/api/billing/checkout?tier=agent",
+      portal: "/api/billing/portal",
+    },
     international: {
-      stripeSubscribe: "",   // fallback alias for Report tier
-      stripeReport: "https://buy.stripe.com/fZu5kDchg1y35fK8D29ws00",
-      stripeBriefing: "https://buy.stripe.com/bJe14n9541y3dMgbPe9ws01",
-      stripeAgent: "https://buy.stripe.com/14AfZhbdc90v9w02eE9ws02",
+      stripeSubscribe: "/api/billing/checkout?tier=report",
+      stripeReport: "/api/billing/checkout?tier=report",
+      stripeBriefing: "/api/billing/checkout?tier=briefing",
+      stripeAgent: "/api/billing/checkout?tier=agent",
       stripeDonate: "",
       paypalDonate: "",
     },
@@ -31,9 +37,9 @@ Object.assign(window.CASSANDRA_CONFIG, {
     },
   },
   // Aliases for validation (mirror payments.international)
-  stripe_report_url: "https://buy.stripe.com/fZu5kDchg1y35fK8D29ws00",
-  stripe_pro_url: "https://buy.stripe.com/bJe14n9541y3dMgbPe9ws01",
-  stripe_api_url: "https://buy.stripe.com/14AfZhbdc90v9w02eE9ws02",
+  stripe_report_url: "/api/billing/checkout?tier=report",
+  stripe_pro_url: "/api/billing/checkout?tier=briefing",
+  stripe_api_url: "/api/billing/checkout?tier=agent",
 });
 
 (function syncStripeAliases() {

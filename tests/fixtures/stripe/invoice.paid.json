@@ -1,0 +1,28 @@
+{
+  "id": "evt_test_invoice_paid",
+  "object": "event",
+  "type": "invoice.paid",
+  "data": {
+    "object": {
+      "id": "in_test_123",
+      "object": "invoice",
+      "customer": "cus_test_123",
+      "customer_email": "paid@example.com",
+      "subscription": "sub_test_456",
+      "status": "paid",
+      "lines": {
+        "data": [
+          {
+            "price": {"id": "price_test_briefing"},
+            "metadata": {"tier": "briefing"}
+          }
+        ]
+      },
+      "metadata": {
+        "product_line": "cassandra",
+        "tier": "briefing",
+        "user_id": "user-def"
+      }
+    }
+  }
+}

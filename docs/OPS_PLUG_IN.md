@@ -7,7 +7,7 @@
 |---|---|---|
 | T−120 min | Auto pipeline starts | Windows Task Scheduler or `python -m src.orchestrator --schedule` |
 | T−30 min | Review draft in browser | `http://localhost:8080/newspaper-report` |
-| T (desk time) | Send newsletter | `python -m src.newsletter.dispatch --asof today` (stub until list wired) |
+| T (desk time) | Review dry-run, then live send | `python -m src.newsletter.send` then `--live` (see `docs/NEWSLETTER.md`) |
 | After send | Publish score | `publish_score()` already runs inside `--run` when coverage ≥ gate |
 
 Set `OPS_PRERUN_MINUTES=120` and `OPS_OFFICE_TIME=09:00` in `.env` (see `.env.example`).
@@ -66,10 +66,13 @@ python -m src.orchestrator --schedule
 ```
 Fires 12:00 / 21:00 / 00:00 UTC+8 on NYSE trading days (`calendar_guard`).
 
-**Option B — Windows Task Scheduler (2h before office):**
+**Option B — cron on the cloud VM (do not require Windows Task Scheduler):**
+See `docs/NEWSLETTER.md`. Slots 0545 / 0600 / 1800 MYT map to UTC cron. Laptop xml stubs may stay on the laptop.
+
+**Option B2 — Windows Task Scheduler (laptop only, optional):**
 - Trigger: daily at your `OPS_OFFICE_TIME` minus 120 minutes
 - Action: `python -m src.orchestrator --run`
-- Start in: `C:\Users\OoiJianHong\Cassandra`
+- Start in: local Cassandra checkout
 - Set `.env` loaded via system env or `setx`
 
 **Option C — Cloudflare Worker cron** (post-deploy): see `docs/DEPLOY.md`.
