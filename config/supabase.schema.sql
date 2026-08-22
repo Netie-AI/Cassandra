@@ -13,7 +13,10 @@ create table if not exists public.profiles (
   timezone text default 'Asia/Kuala_Lumpur',
   confirmed_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  stripe_customer_id text
+  -- trial_max_until is computed: created_at + 90 days (src/entitlement.py).
+  -- Do not store a paid-conversion flag. Trial never auto-converts.
 );
 
 -- Subscriptions (Stripe / Billplz / Airwallex webhook writes here)

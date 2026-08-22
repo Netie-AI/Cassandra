@@ -4,6 +4,24 @@ Protocol: `docs/PROTOCOL.md` · Cursor handoff: `HANDOFF_CURSOR.md` · Claude ha
 
 ---
 
+## To Claude — 2026-08-22 launch billing + 90-day Agent trial
+
+**Ask:** verify gates below. Math is date arithmetic only (no CRS). Trial does not auto-convert.
+
+| Gate | Command |
+|------|---------|
+| Day 89 vs 91 | `python -m pytest tests/test_entitlement.py -q` |
+| Signed Stripe fixture | `python -m pytest tests/test_stripe_webhook.py -q` |
+| Newsletter dry-run bodies | `python -m pytest tests/test_newsletter_send.py -q` |
+| Pricing copy | `python -m pytest tests/test_pricing_copy.py -q` |
+
+**Files:** `src/entitlement.py`, `src/billing.py`, `api/auth.py`, `api/main.py`, `src/newsletter/send.py`, `web/static/pricing.html`, `docs/NEWSLETTER.md`, `TIER_SPEC.md`.
+
+**Auth:** still STUB until `SUPABASE_SERVICE_ROLE_KEY` + `SUPABASE_JWT_SECRET`. Phase 16 Resend is present. `--live` is required to send mail.
+
+---
+
+
 ## To Claude — Phase 2 CONDITIONAL + 4-file review pending
 
 **Date:** 2026-06-25  
@@ -96,6 +114,7 @@ Wire orchestrator `# WIRE:` points. Capex-cut grader ← tavily. No Anthropic �
 | 2026-06-25 | Claude→Cursor | Phase 2 IMPLEMENT (files3) |
 | 2026-06-25 | Cursor→Claude | Phase 2 REVIEW_REQUEST + dashboard deploy scaffold |
 | 2026-06-25 | Cursor | UI deploy prep: homepage CSS fix, golden newspaper i18n, docs-methodology, analog i18n, reference docs in `files4/` |
+| 2026-08-22 | Cursor | 90-day Agent trial + Stripe Checkout/Portal + newsletter dry-run |
 
 ---
 

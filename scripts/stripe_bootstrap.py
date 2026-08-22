@@ -50,7 +50,7 @@ def main() -> int:
         link = stripe.PaymentLink.create(
             line_items=[{"price": price.id, "quantity": 1}],
             metadata={"product_line": "cassandra", "tier": tier_key, "internal_tier": internal_tier},
-            subscription_data={"trial_period_days": 7, "metadata": {"product_line": "cassandra", "tier": tier_key}},
+            subscription_data={"metadata": {"product_line": "cassandra", "tier": tier_key}},
         )
         urls[tier_key] = link.url
         price_ids[tier_key] = price.id

@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from src.db import supabase_auth
 
@@ -24,24 +23,22 @@ def test_auth_not_configured_when_keys_missing():
         assert out["error"] == "auth_not_configured"
 
 
-def test_resolve_user_tier_prefers_active_subscription():
-    mock_sb = MagicMock()
-    mock_sb.table.return_value.select.return_value.eq.return_value.in_.return_value.execute.return_value = MagicMock(
-        data=[{"tier": "briefing", "status": "active"}]
-    )
-
-    with patch("src.db.supabase_auth.get_client", return_value=mock_sb):
-        tier = supabase_auth.resolve_user_tier("user-123")
-    assert tier == "briefing"
+def test_resolve_user_tier_prefers_trial_when_created_recent():
+    created = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+    with patch("src.db.supabase_auth._best_subscription", return_value=(None, None)):
+        with patch("src.db.supabase_auth._profile_created_at", return_value=created):
+            assert supabase_auth.resolve_user_tier("user-123") == "agent"
 
 
-def test_resolve_user_tier_falls_back_to_profile():
-    mock_sb = MagicMock()
-    subs_chain = mock_sb.table.return_value.select.return_value.eq.return_value.in_.return_value
-    subs_chain.execute.return_value = MagicMock(data=[])
-    profile_chain = mock_sb.table.return_value.select.return_value.eq.return_value.maybe_single.return_value
-    profile_chain.execute.return_value = MagicMock(data={"tier": "report"})
+def test_resolve_user_tier_paid_after_trial():
+    created = (datetime.now(timezone.utc) - timedelta(days=91)).isoformat()
+    with patch("src.db.supabase_auth._best_subscription", return_value=("briefing", "active")):
+        with patch("src.db.supabase_auth._profile_created_at", return_value=created):
+            assert supabase_auth.resolve_user_tier("user-123") == "briefing"
 
-    with patch("src.db.supabase_auth.get_client", return_value=mock_sb):
-        tier = supabase_auth.resolve_user_tier("user-456")
-    assert tier == "report"
+
+def test_resolve_user_tier_free_after_trial_without_sub():
+    created = (datetime.now(timezone.utc) - timedelta(days=91)).isoformat()
+    with patch("src.db.supabase_auth._best_subscription", return_value=(None, None)):
+        with patch("src.db.supabase_auth._profile_created_at", return_value=created):
+            assert supabase_auth.resolve_user_tier("user-456") == "free"

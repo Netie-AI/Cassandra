@@ -1,49 +1,41 @@
-"""Tier lookup + score access gates."""
+"""Tier lookup + score access gates. Effective tier comes from entitlement.py."""
 from __future__ import annotations
 
 import os
 
 from fastapi import Header
 
-VALID_TIERS = frozenset({"free", "report", "briefing", "agent", "vip", "master"})
-PAID_TIERS = frozenset({"report", "briefing", "agent", "vip"})
-LOCKED_FACTORS = ("S", "B", "C")
-FREE_DELAY_DAYS = 2
-FIRST_SUB_TRIAL_DAYS = 7
+from src.entitlement import (
+    LOCKED_FACTORS,
+    PAID_TIERS,
+    VALID_TIERS,
+    effective_tier as compute_effective_tier,
+    entitlement_record,
+    gate_score,
+    is_paid,
+    is_trial_active,
+    newsletter_depth,
+    normalize_tier,
+    parse_datetime,
+    tier_caps,
+    trial_max_until,
+)
 
-TIER_CAPS = {
-    "free": {"can_read_report": False, "can_generate_agents": False, "can_chat": False},
-    "report": {"can_read_report": True, "can_generate_agents": False, "can_chat": False},
-    "briefing": {"can_read_report": True, "can_generate_agents": False, "can_chat": True},
-    "agent": {"can_read_report": True, "can_generate_agents": True, "can_chat": True},
-    "vip": {"can_read_report": True, "can_generate_agents": True, "can_chat": True},
-    "master": {"can_read_report": True, "can_generate_agents": True, "can_chat": True},
-}
+# Re-export so existing imports keep working.
+FREE_DELAY_DAYS = 2
+TRIAL_MAX_DAYS = 90
+# Registration trial is 90 days of Agent. Stripe checkout has no trial days
+# and does not auto-convert to a paid plan.
+FIRST_SUB_TRIAL_DAYS = 0
 
 TIER_DISPLAY = {
     "free": "Free",
     "report": "Report · $4.99",
-    "briefing": "Pro Desk · $9.99",
-    "agent": "VIP · $49.99",
-    "vip": "VIP · $49.99",
+    "briefing": "The Briefing · $9.99",
+    "agent": "The Agent · $49.99",
+    "vip": "The Agent · $49.99",
     "master": "Master",
 }
-
-
-def normalize_tier(tier: str | None) -> str:
-    """Map legacy/internal tier ids to canonical keys."""
-    if not tier:
-        return "free"
-    t = tier.lower()
-    if t == "pro":
-        return "briefing"
-    if t in ("api", "vip"):
-        return "agent"
-    return t if t in VALID_TIERS else "free"
-
-
-def tier_caps(tier: str) -> dict[str, bool]:
-    return dict(TIER_CAPS.get(normalize_tier(tier), TIER_CAPS["free"]))
 
 
 def is_master(jwt_token: str | None) -> bool:
@@ -75,8 +67,21 @@ def _x_tier_allowed() -> bool:
         return True
 
 
+def _account_from_jwt(jwt_token: str | None) -> dict:
+    """Pull created_at + stored subscription from JWT/profile. Empty if stub."""
+    if not jwt_token:
+        return {}
+    auth = jwt_token if jwt_token.startswith("Bearer ") else f"Bearer {jwt_token}"
+    try:
+        from src.db.supabase_auth import account_from_token
+
+        return account_from_token(auth) or {}
+    except Exception:
+        return {}
+
+
 def effective_tier(jwt_token: str | None, header_tier: str | None = None) -> str:
-    """Resolve tier; master email always maps to master caps."""
+    """Resolve the tier that gates dashboard, API, chat, and newsletter."""
     if is_master(jwt_token):
         return "master"
     if header_tier and _x_tier_allowed():
@@ -86,36 +91,32 @@ def effective_tier(jwt_token: str | None, header_tier: str | None = None) -> str
                 pass
             else:
                 return ht
-    return normalize_tier(get_tier(jwt_token))
+    account = _account_from_jwt(jwt_token)
+    if not account:
+        return "free"
+    return compute_effective_tier(
+        account.get("created_at"),
+        subscription_tier=account.get("subscription_tier"),
+        subscription_status=account.get("subscription_status"),
+        is_master_user=bool(account.get("is_master")),
+    )
 
 
 def get_tier(jwt_token: str | None = None) -> str:
-    """Direct JWT tier lookup (smoke tests / CLI). Returns 'free' when auth missing or invalid."""
-    if not jwt_token:
-        return "free"
-    auth = jwt_token if jwt_token.startswith("Bearer ") else f"Bearer {jwt_token}"
-    try:
-        from src.db.supabase_client import tier_from_jwt
-        tier = tier_from_jwt(auth)
-        return normalize_tier(tier) if tier else "free"
-    except Exception:
-        return "free"
+    """Direct JWT entitlement lookup. Returns 'free' when auth missing or invalid."""
+    return effective_tier(jwt_token, None)
 
 
 def get_user_tier(
     authorization: str | None = Header(default=None),
     x_tier: str | None = Header(default=None, alias="X-Tier"),
 ) -> str:
-    """Return user tier. Dev: pass X-Tier header. Prod: Supabase JWT when configured."""
+    """Return effective tier. Dev: X-Tier header. Prod: entitlement from registration + Stripe."""
     return effective_tier(authorization, x_tier)
 
 
-def is_paid(tier: str) -> bool:
-    return tier in PAID_TIERS or tier == "master"
-
-
 def resolve_score_dict(tier: str) -> dict | None:
-    """Free tier gets score from FREE_DELAY_DAYS ago; paid gets latest."""
+    """Free tier gets score from FREE_DELAY_DAYS ago; paid/trial-max gets latest."""
     from src.store import latest_score, score_by_offset_days
 
     if is_paid(tier):
@@ -133,29 +134,58 @@ def resolve_score_dict(tier: str) -> dict | None:
     return out
 
 
-def gate_score(score: dict | None, tier: str) -> dict | None:
-    if not score:
-        return score
-    if is_paid(tier):
-        return score
-    out = dict(score)
-    factors = dict(out.get("factors") or {})
-    for key in LOCKED_FACTORS:
-        if key in factors:
-            factors[key] = None
-    out["factors"] = factors
-    return out
-
-
 def subscription_checkout_options(tier: str, *, is_first_subscription: bool = True) -> dict:
-    """Payment checkout metadata — 7-day trial on first paid subscription (not VIP)."""
+    """Checkout metadata. Registration already granted 90 days of Agent. No Stripe trial."""
+    del is_first_subscription  # kept for API compatibility
     tier = normalize_tier(tier)
     if tier not in VALID_TIERS:
         tier = "report"
-    out: dict = {"tier": tier, "trial_days": 0, "first_subscriber_trial": False}
-    if tier == "agent":
-        return out
-    if is_first_subscription and tier in PAID_TIERS and tier != "agent":
-        out["trial_days"] = FIRST_SUB_TRIAL_DAYS
-        out["first_subscriber_trial"] = True
-    return out
+    return {
+        "tier": tier,
+        "trial_days": 0,
+        "first_subscriber_trial": False,
+        "registration_trial_days": TRIAL_MAX_DAYS,
+        "trial_message": (
+            "Every new account gets The Agent free for 3 months from registration. "
+            "On day 90 you drop to Free. No charge during the trial. "
+            "Subscribe after that if you want Report, Briefing, or Agent."
+        ),
+        "auto_converts": False,
+    }
+
+
+def entitlement_for_request(jwt_token: str | None = None) -> dict:
+    account = _account_from_jwt(jwt_token)
+    return entitlement_record(
+        account.get("created_at"),
+        subscription_tier=account.get("subscription_tier"),
+        subscription_status=account.get("subscription_status"),
+        is_master_user=bool(account.get("is_master")),
+    )
+
+
+__all__ = [
+    "FREE_DELAY_DAYS",
+    "FIRST_SUB_TRIAL_DAYS",
+    "LOCKED_FACTORS",
+    "PAID_TIERS",
+    "TRIAL_MAX_DAYS",
+    "TIER_DISPLAY",
+    "VALID_TIERS",
+    "effective_tier",
+    "entitlement_for_request",
+    "entitlement_record",
+    "gate_score",
+    "get_tier",
+    "get_user_tier",
+    "is_master",
+    "is_paid",
+    "is_trial_active",
+    "newsletter_depth",
+    "normalize_tier",
+    "parse_datetime",
+    "resolve_score_dict",
+    "subscription_checkout_options",
+    "tier_caps",
+    "trial_max_until",
+]

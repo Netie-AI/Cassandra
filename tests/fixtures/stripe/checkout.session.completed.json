@@ -1,0 +1,19 @@
+{
+  "id": "evt_test_checkout_completed",
+  "object": "event",
+  "type": "checkout.session.completed",
+  "data": {
+    "object": {
+      "id": "cs_test_123",
+      "object": "checkout.session",
+      "customer": "cus_test_123",
+      "customer_email": "trial@example.com",
+      "subscription": "sub_test_123",
+      "metadata": {
+        "product_line": "cassandra",
+        "tier": "report",
+        "user_id": "user-abc"
+      }
+    }
+  }
+}

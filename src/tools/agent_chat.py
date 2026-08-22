@@ -10,41 +10,19 @@ from pathlib import Path
 
 import httpx
 
+from src.entitlement import normalize_tier, tier_caps
+
 from ..db.supabase_client import is_configured
 from .agent_gate import gate_message
 
 _COMPACT = Path(__file__).resolve().parents[2] / "agents" / "trading_engine_compact.md"
 _MAX_CONTEXT_CHARS = 1200
 _MAX_REPLY_TOKENS = 320
-_PAID_TIERS = frozenset({"report", "briefing", "agent", "vip", "master"})
-_CHAT_TIERS = frozenset({"briefing", "agent", "vip", "master"})
 _VIP_TIERS = frozenset({"agent", "vip", "master"})
 
 
-def _normalize_tier(tier: str) -> str:
-    t = (tier or "free").lower()
-    if t == "pro":
-        return "briefing"
-    if t in ("api", "vip"):
-        return "agent"
-    return t
-
-
-def _tier_caps(tier: str) -> dict[str, bool]:
-    t = _normalize_tier(tier)
-    if t == "master":
-        return {"can_chat": True, "can_generate_agents": True}
-    if t == "agent":
-        return {"can_chat": True, "can_generate_agents": True}
-    if t == "briefing":
-        return {"can_chat": True, "can_generate_agents": False}
-    if t == "report":
-        return {"can_chat": False, "can_generate_agents": False}
-    return {"can_chat": False, "can_generate_agents": False}
-
-
 _STUB_REPLY = (
-    "Demo mode: full agent chat ships after account sign-in (Pro Desk or VIP tier). "
+    "Demo mode: full agent chat ships after account sign-in (The Agent / 90-day trial). "
     "I can still help with the desk snapshot below. "
     "Ask about CRS band, fragility vs trigger, or a watchlist ticker."
 )
@@ -89,10 +67,12 @@ def _demo_stub(gate_score: float, *, extra: str = "") -> dict:
 
 
 def chat(message: str, *, tier: str = "free", actor_key: str | None = None) -> dict:
-    from ..store import is_agent_banned, record_agent_abuse
+    from datetime import datetime, timezone
 
-    tier = _normalize_tier(tier)
-    caps = _tier_caps(tier)
+    from ..store import get_chat_usage, increment_chat_usage, is_agent_banned, record_agent_abuse
+
+    tier = normalize_tier(tier)
+    caps = tier_caps(tier)
     actor = (actor_key or "anonymous")[:128]
 
     if is_agent_banned(actor):
@@ -138,9 +118,25 @@ def chat(message: str, *, tier: str = "free", actor_key: str | None = None) -> d
             "auth_configured": True,
             "live_chat": False,
             "reply": (
-                "Agent chat requires Pro Desk or VIP subscription. "
+                "Agent chat is for The Agent (or the 90-day registration trial). "
+                "After day 90 the account drops to Free unless you subscribe. "
                 f"Desk snapshot (read-only): {_score_context()}."
             ),
+        }
+
+    limit = int(caps.get("chat_daily_limit") or 50)
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    used = get_chat_usage(actor, day)
+    if used >= limit:
+        return {
+            "allowed": False,
+            "score": gate.score,
+            "reason": "chat_quota",
+            "auth_configured": True,
+            "live_chat": False,
+            "used": used,
+            "limit": limit,
+            "reply": f"Daily chat quota reached ({limit}/day on The Agent).",
         }
 
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -182,11 +178,14 @@ def chat(message: str, *, tier: str = "free", actor_key: str | None = None) -> d
     r.raise_for_status()
     data = r.json()
     reply = data["choices"][0]["message"]["content"].strip()
+    used_after = increment_chat_usage(actor, day)
     return {
         "allowed": True,
         "score": gate.score,
         "reason": "ok",
         "auth_configured": True,
         "live_chat": True,
+        "used": used_after,
+        "limit": limit,
         "reply": reply,
     }
