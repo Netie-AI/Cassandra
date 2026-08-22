@@ -8,18 +8,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="/static/tokens.css"/>
-  <link rel="stylesheet" href="/static/styles.css"/>
-  <link rel="stylesheet" href="/static/pricing.css"/>
-  <link rel="stylesheet" href="/static/docs.css"/>
+  <link rel="stylesheet" href="tokens.css"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="pricing.css"/>
+  <link rel="stylesheet" href="docs.css"/>
 </head>
 <body class="home-page pricing-page">
   <div class="home-wrap">
     <header class="home-header home-header-v3">
       <div class="home-header-top">
         <div class="home-header-brand">
-          <a href="/" class="home-logo cp">Cassandra</a>
-          <nav class="home-header-nav"><a href="/">Home</a><a href="/newspaper-report">Newspaper</a><a href="/pricing">Plans</a></nav>
+          <a href="index.html" class="home-logo cp">Cassandra</a>
+          <nav class="home-header-nav"><a href="index.html">Home</a><a href="newspaper-report.html">Newspaper</a><a href="pricing.html">Plans</a></nav>
         </div>
         <div class="home-toolbar">
           <button type="button" id="lang-cycle-btn" class="icon-btn lang-cycle-btn" aria-label="Language">
@@ -33,8 +33,8 @@
         </div>
       </div>
       <div class="home-header-meta">
-        <a href="/" class="home-link">← Home</a>
-        <a href="/newspaper-report" class="home-link">Today's edition</a>
+        <a href="index.html" class="home-link">← Home</a>
+        <a href="newspaper-report.html" class="home-link">Today's edition</a>
       </div>
     </header>
 
@@ -44,7 +44,26 @@
       <p class="pricing-lead" id="trial-lead">First-time subscribers receive the complete edition free for 7 days. Cancel anytime before renewal.</p>
     </section>
 
-    <div class="pricing-grid" id="tier-grid"></div>
+    <div class="pricing-grid" id="tier-grid">
+      <div class="pricing-col">
+        <div class="sh">Report</div>
+        <div class="cm pricing-price">$4.99<span class="pricing-period"> /mo</span></div>
+        <div class="pricing-freq">7 days free · new subscribers</div>
+        <a class="pricing-cta" href="https://buy.stripe.com/fZu5kDchg1y35fK8D29ws00">Start free trial</a>
+      </div>
+      <div class="pricing-col pricing-col-rec">
+        <div class="sh pricing-rec-label">Pro Desk</div>
+        <div class="cm pricing-price">$9.99<span class="pricing-period"> /mo</span></div>
+        <div class="pricing-freq">7 days free · new subscribers</div>
+        <a class="pricing-cta" href="https://buy.stripe.com/bJe14n9541y3dMgbPe9ws01">Start free trial</a>
+      </div>
+      <div class="pricing-col">
+        <div class="sh">API</div>
+        <div class="cm pricing-price">$49.99<span class="pricing-period"> /mo</span></div>
+        <div class="pricing-freq">7 days free · new subscribers</div>
+        <a class="pricing-cta" href="https://buy.stripe.com/14AfZhbdc90v9w02eE9ws02">Start free trial</a>
+      </div>
+    </div>
 
     <div class="pricing-note" id="pay-note">Pay via FPX · TnG · DuitNow (MYR) · Credit / Debit card</div>
 
@@ -65,15 +84,15 @@
     <div class="home-footer-tools footer-tools">
       <span>Cassandra Research Desk · crash.netie.ai</span>
       <nav class="docs-footer-nav">
-        <a href="/docs/api">API reference</a>
-        <a href="/docs/institutional">Institutional feed</a>
-        <a href="/docs/methodology">Methodology</a>
+        <a href="docs-api.html">API reference</a>
+        <a href="docs-institutional.html">Institutional feed</a>
+        <a href="docs-methodology.html">Methodology</a>
       </nav>
     </div>
   </div>
 
-  <script src="/static/config.js"></script>
-  <script src="/static/common.js"></script>
-  <script src="/static/pricing.js"></script>
+  <script src="config.js"></script>
+  <script src="common.js"></script>
+  <script src="pricing.js"></script>
 </body>
 </html>
