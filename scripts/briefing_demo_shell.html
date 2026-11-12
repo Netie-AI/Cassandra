@@ -1,0 +1,89 @@
+<title>Cassandra AI Briefing</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@500;700&family=DM+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column like a newspaper front page on a phone; edition switch sticks to the top. */
+:root {
+  --bg: #fbfaf8; --panel: #f3f1ed; --ink: #141414; --muted: #5c5a56; --rule: rgba(0,0,0,.14);
+  --up: #15803d; --down: #b91c1c; --sg: #9a1c2e;
+  --serif: "Crimson Pro", Georgia, "Times New Roman", serif;
+  --sans: "DM Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121215; --panel: #1c1c22; --ink: #f2f2f4; --muted: #a3a3ad; --rule: rgba(255,255,255,.16);
+  --up: #4ade80; --down: #f87171; --sg: #fb7185; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121215; --panel: #1c1c22; --ink: #f2f2f4; --muted: #a3a3ad; --rule: rgba(255,255,255,.16);
+  --up: #4ade80; --down: #f87171; --sg: #fb7185; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 400 17px/1.6 var(--sans); }
+.wrap { max-width: 660px; margin: 0 auto; padding-block: 20px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+a { color: inherit; } a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+header.mast { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; padding-bottom: 12px; border-bottom: 3px double var(--ink); }
+header.mast h1 { font: 700 clamp(34px, 9vw, 52px)/1 var(--serif); margin: 0; letter-spacing: -.01em; }
+header.mast p { margin: 0; font: 400 13px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.lede { margin: 14px 0 0; color: var(--muted); font-size: 15px; }
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; gap: 8px; padding: 12px 0; background: var(--bg); border-bottom: 1px solid var(--rule); margin-top: 14px; }
+.tabs button { flex: 1; min-width: 0; font: 700 15px var(--sans); color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 4px; padding: 10px 8px; cursor: pointer; }
+.tabs button small { display: block; font: 400 12px var(--mono); color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tabs button[aria-selected="true"] small { color: var(--bg); opacity: .75; }
+.ed { display: flex; flex-direction: column; gap: 14px; padding-top: 18px; }
+.ed p { margin: 0; }
+.subject { font: 400 14px var(--mono); padding: 10px 12px; background: var(--panel); overflow-wrap: anywhere; }
+.subject span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.hook { font: 500 22px/1.4 var(--serif); text-wrap: pretty; }
+.bp { font-style: italic; color: var(--muted); }
+h2 { font: 700 13px var(--mono); text-transform: uppercase; letter-spacing: .1em; margin: 18px 0 0; padding-top: 12px; border-top: 2px solid var(--ink); }
+.story h3 { font: 700 21px/1.25 var(--serif); margin: 0 0 6px; text-wrap: balance; }
+.story.top h3 { font-size: clamp(26px, 6.5vw, 32px); }
+.story h3 a { text-decoration: none; } .story h3 a:hover { text-decoration: underline; }
+.story { display: flex; flex-direction: column; gap: 6px; }
+.stories { display: flex; flex-direction: column; gap: 22px; }
+.stories .story + .story { padding-top: 20px; border-top: 1px solid var(--rule); }
+.why b, .take b, .lunch b { display: block; font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.src { font-size: 14px; color: var(--muted); padding: 8px 0; align-self: flex-start; }
+.sg { align-self: flex-start; font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--sg); border: 1px solid currentColor; padding: 1px 6px; border-radius: 2px; }
+.lunch { background: var(--panel); padding: 12px 14px; font: 500 19px/1.4 var(--serif); }
+.mkts { display: flex; flex-direction: column; gap: 20px; }
+.mkt h4 { margin: 0; font: 700 16px var(--sans); } .sum { margin: 2px 0 6px; }
+.tw { overflow-x: auto; } table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+td { padding: 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td span { display: block; font-size: 13px; color: var(--muted); }
+td.px { text-align: right; font: 400 13px var(--mono); color: var(--muted); white-space: nowrap; padding-left: 10px; }
+td.pct { text-align: right; font: 600 15px var(--mono); white-space: nowrap; padding-left: 12px; }
+.up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--muted); }
+.asof { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.take i { color: var(--muted); font-size: 14px; }
+.ev { border-left: 3px solid var(--ink); padding-left: 12px; display: flex; flex-direction: column; gap: 2px; }
+.ev a { font-weight: 700; } .ev span { font-size: 13px; color: var(--muted); }
+dl { margin: 0; display: grid; gap: 4px; } dt { font-weight: 700; } dd { margin: 0 0 8px; }
+.audit { background: var(--panel); padding: 12px 14px; font-size: 14px; margin-top: 10px; }
+.audit summary { cursor: pointer; font-weight: 700; } .audit ul { margin: 8px 0 0; padding-left: 18px; }
+footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+</style>
+<div class="wrap">
+  <header class="mast"><h1>Cassandra</h1><p>AI Briefing · {{DATE}}</p></header>
+  <p class="lede">AI news and markets in plain English, twice a day. These are real editions built from live news feeds and prices. Pick one.</p>
+  <div class="tabs" role="tablist" aria-label="Edition">{{TABS}}</div>
+  {{BODY}}
+  <footer>Stories are rewritten by an AI editor, then checked by software against the linked source. Open the source before acting on a story. Cassandra is a research tool. Not financial advice.</footer>
+</div>
+<script>
+(function () {
+  var tabs = [].slice.call(document.querySelectorAll('[role="tab"]'));
+  function show(id) {
+    tabs.forEach(function (t) {
+      var on = t.id === 'tab-' + id;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    try { localStorage.setItem('edition', id); } catch (e) {}
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.id.slice(4)); window.scrollTo(0, 0); }); });
+  var want = (location.hash || '').slice(1);
+  if (!want) { try { want = localStorage.getItem('edition'); } catch (e) {} }
+  if (want && document.getElementById('tab-' + want)) show(want);
+})();
+</script>
