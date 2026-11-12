@@ -30,8 +30,9 @@ Schedule on Windows: `scripts/register-briefing-tasks.ps1` (calls `scripts/run-b
 
 | Part | Source | Key needed |
 |---|---|---|
-| AI news | RSS feeds listed in `config/briefing.yaml` (TechCrunch, The Verge, MIT Tech Review, Ars Technica, Tech in Asia, Business Times, CNA, Google News SG) | none |
+| AI news | 18 RSS feeds listed in `config/briefing.yaml`: general press (BBC, NYT, Guardian, SCMP), tech press, Singapore and regional press, and company blogs (OpenAI, Google, Nvidia) | none |
 | Prices | Yahoo Finance chart API | none |
+| What to expect next | US data releases from the ForexFactory weekly calendar (US, high and medium impact, only those with a plain-English meaning in `config/briefing.yaml`), and results dates for a watchlist of big tech names from Nasdaq's public calendar | none |
 | Events | `config/events.yaml`, hand-curated with a source URL per event | none |
 | Jargon buster | `config/glossary.yaml`, hand-written definitions | none |
 | Rewrite into plain English | Gemini (`GEMINI_API_KEY`, models in `GEMINI_BRIEFING_MODELS`) | yes |

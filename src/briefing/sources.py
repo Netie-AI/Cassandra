@@ -236,6 +236,84 @@ def fetch_quotes(rows: list[dict], *, problems: list[str] | None = None) -> list
 
 
 # --------------------------------------------------------------------------- #
+# Calendar: scheduled US data releases + big-tech earnings ("what to expect")
+# --------------------------------------------------------------------------- #
+def parse_econ(payload: list, *, start: dt.datetime, end: dt.datetime, tz: dt.tzinfo,
+               explain: list[dict]) -> list[dict]:
+    """US High/Medium-impact releases (and market holidays) in (start, end], with a plain meaning.
+    Releases we cannot explain in plain English are left out: this audience would not know them."""
+    out, seen = [], set()
+    for ev in payload:
+        if ev.get("country") != "USD" or ev.get("impact") not in ("High", "Medium", "Holiday"):
+            continue
+        try:
+            when = dt.datetime.fromisoformat(ev["date"])
+        except (KeyError, ValueError):
+            continue
+        if when.tzinfo is None or not (start < when <= end):
+            continue
+        title = str(ev.get("title", "")).strip()
+        plain = next((x["plain"] for x in explain if x["match"] in title.lower()), None)
+        key = (plain, when.date())                    # "CPI m/m" + "Core CPI m/m" are one event to a reader
+        if not plain or key in seen:
+            continue
+        seen.add(key)
+        local = when.astimezone(tz)
+        out.append({"kind": "data", "sort": when.astimezone(UTC).isoformat(), "title": title,
+                    "when": local.strftime("%a %d %b, %H:%M") + " Singapore time", "plain": plain})
+    return out
+
+
+_EARN_TIME = {"time-after-hours": "after the US market closes (early next morning in Singapore)",
+              "time-pre-market": "before the US market opens (that evening in Singapore)"}
+
+
+def parse_earnings(payload: dict, *, day: dt.date, watchlist: dict[str, str]) -> list[dict]:
+    """Watchlist companies reporting results on `day` (US date)."""
+    out = []
+    for row in ((payload.get("data") or {}).get("rows") or []):
+        name = watchlist.get(str(row.get("symbol", "")).upper())
+        if not name:
+            continue
+        timing = _EARN_TIME.get(row.get("time"), "time not announced")
+        out.append({"kind": "earnings", "sort": f"{day.isoformat()}T23:00:00", "ticker": row["symbol"].upper(),
+                    "title": f"{name} reports quarterly results", "when": f"{day.strftime('%a %d %b')}, {timing}",
+                    "plain": "the company's report card for the last three months", "date": day.isoformat()})
+    return out
+
+
+def fetch_calendar(cfg: dict, *, now: dt.datetime, hours: int, tz: dt.tzinfo,
+                   skip: set[tuple[str, str]] = frozenset(), problems: list[str] | None = None) -> list[dict]:
+    """Scheduled items for the "On the calendar" list. `skip` = (ticker, date) already in events.yaml."""
+    problems = problems if problems is not None else []
+    cal = cfg.get("calendar") or {}
+    items: list[dict] = []
+    try:
+        r = httpx.get(cal["econ_url"], headers=_UA, timeout=20)
+        r.raise_for_status()
+        items += parse_econ(r.json(), start=now, end=now + dt.timedelta(hours=hours), tz=tz,
+                            explain=cal.get("explain", []))
+    except Exception as exc:
+        problems.append(f"US economic calendar unavailable ({type(exc).__name__})")
+    us_today = (now - dt.timedelta(hours=5)).date()          # US Eastern, near enough for a date
+    failed = 0
+    for i in range(int(cal.get("earnings_days_ahead", 5)) + 1):
+        day = us_today + dt.timedelta(days=i)
+        if day.weekday() >= 5:
+            continue
+        try:
+            r = httpx.get(cal["earnings_url"], params={"date": day.isoformat()}, headers=_UA, timeout=20)
+            r.raise_for_status()
+            items += [e for e in parse_earnings(r.json(), day=day, watchlist=cal.get("watchlist", {}))
+                      if (e["ticker"], e["date"]) not in skip]
+        except Exception:
+            failed += 1
+    if failed:
+        problems.append(f"company results calendar incomplete ({failed} day(s) unavailable)")
+    return sorted(items, key=lambda x: x["sort"])
+
+
+# --------------------------------------------------------------------------- #
 # Events + glossary
 # --------------------------------------------------------------------------- #
 def upcoming_events(today: dt.date, *, horizon_days: int = 45, limit: int = 5,

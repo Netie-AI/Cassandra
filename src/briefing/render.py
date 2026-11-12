@@ -121,11 +121,17 @@ def render_html(ed: dict[str, Any]) -> str:
         parts.append(f"<h2 style='{_H2}'>{label}</h2>")
         parts += [_story_html(s) for s in stories[1:]]
 
-    if ed.get("outlook") or ed["events"]:
+    if ed.get("outlook") or ed["events"] or ed.get("calendar"):
         parts.append(f"<h2 style='{_H2}'>What to watch next</h2>")
         if ed.get("outlook"):
             parts.append(f"<p style='margin:0 0 14px;'><strong>Our read:</strong> {e(ed['outlook'])} "
                          f"<span style='{_SMALL}'>(opinion, not a forecast)</span></p>")
+        for c in ed.get("calendar", []):
+            parts.append(
+                "<div style='margin:0 0 12px;'>"
+                f"<strong>{e(c['title'])}</strong><div style='{_SMALL}'>{e(c['when'])}</div>"
+                f"<div>In plain English: {e(c['plain'])}.</div></div>"
+            )
         for ev in ed["events"]:
             parts.append(
                 "<div style='margin:0 0 14px;padding-left:12px;border-left:3px solid #1a1a1a;'>"
@@ -183,6 +189,8 @@ def render_text(ed: dict[str, Any]) -> str:
                 lines += [f"In plain English: {ed['market_take']}", ""]
     if ed.get("outlook"):
         lines += [f"Our read (opinion): {ed['outlook']}", ""]
+    for c in ed.get("calendar", []):
+        lines += [f"{c['title']}, {c['when']}: {c['plain']}.", ""]
     for ev in ed["events"]:
         lines += [f"{ev['name']}, {_when(ev)}: {ev['why']}", ""]
     for g in ed["glossary"]:

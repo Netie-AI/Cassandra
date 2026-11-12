@@ -7,6 +7,7 @@ events:
   - name: Nvidia quarterly results
     start: 2026-11-17
     kind: earnings
+    ticker: NVDA
     confirmed: true
     where: after the US close (early Wed 18 Nov, Singapore time)
     why: Nvidia sells most of the chips that run AI. Its sales numbers are the clearest signal of whether companies are still spending heavily on AI.

@@ -219,6 +219,27 @@ def test_events_file_is_valid_and_countdown_works():
     assert len(far) == 1                                                       # nothing near: show the next one
 
 
+def test_calendar_parsing_explains_and_filters():
+    cal = sources.load_config()["calendar"]
+    sgt = dt.timezone(dt.timedelta(hours=8))
+    now = dt.datetime(2026, 11, 12, 12, 0, tzinfo=UTC)
+    ff = [
+        {"title": "CPI m/m", "country": "USD", "date": "2026-11-12T08:30:00-05:00", "impact": "High"},
+        {"title": "Core CPI m/m", "country": "USD", "date": "2026-11-12T08:30:00-05:00", "impact": "High"},   # same event
+        {"title": "CPI m/m", "country": "EUR", "date": "2026-11-12T08:30:00-05:00", "impact": "High"},        # not US
+        {"title": "Natural Gas Storage", "country": "USD", "date": "2026-11-12T10:30:00-05:00", "impact": "Medium"},
+        {"title": "Unemployment Claims", "country": "USD", "date": "2026-11-20T08:30:00-05:00", "impact": "High"},  # too far
+        {"title": "PPI m/m", "country": "USD", "date": "2026-11-12T08:30:00", "impact": "High"},              # no timezone
+    ]
+    (row,) = sources.parse_econ(ff, start=now, end=now + dt.timedelta(hours=30), tz=sgt, explain=cal["explain"])
+    assert row["when"] == "Thu 12 Nov, 21:30 Singapore time" and "inflation" in row["plain"]
+
+    nasdaq = {"data": {"rows": [{"symbol": "NVDA", "time": "time-after-hours"}, {"symbol": "ZZZZ", "time": "x"}]}}
+    (e,) = sources.parse_earnings(nasdaq, day=dt.date(2026, 11, 17), watchlist=cal["watchlist"])
+    assert e["title"] == "Nvidia reports quarterly results" and "early next morning in Singapore" in e["when"]
+    assert sources.parse_earnings({"data": {"rows": None}}, day=dt.date(2026, 11, 14), watchlist={}) == []
+
+
 def test_glossary_hits_are_curated_terms_only():
     hits = sources.glossary_hits("New data centre uses 5,000 GPUs, capex soars")
     assert [h["term"] for h in hits] == ["Data centre", "GPU / AI chip", "Capex"]
@@ -237,6 +258,7 @@ def _edition(**over):
                      "url": "https://ex.com/?a=1&b='2'"}],
         "outlook": "Watch.", "glossary": [{"term": "GPU", "plain": "A chip."}],
         "events": sources.upcoming_events(dt.date(2027, 5, 30)),
+        "calendar": [{"title": "CPI m/m", "when": "Thu 12 Nov, 21:30 Singapore time", "plain": "the US inflation report"}],
         "writer": "gemini", "rejected": [], "problems": ["price for Nikkei unavailable (Timeout)"],
     }
     return {**ed, **over}
@@ -248,7 +270,7 @@ def test_render_html_escapes_untrusted_text_and_shows_everything():
     assert "href='https://ex.com/?a=1&amp;b=&#x27;2&#x27;'" in html           # quote cannot break the attribute
     assert "0.0%" not in html and ">flat<" in html                             # no "-0.0%"
     assert "Say this at lunch" in html and "What it means for you" in html
-    assert "Jargon buster" in html
+    assert "Jargon buster" in html and "In plain English: the US inflation report." in html
     assert "date not yet confirmed" in html                                    # Computex 2027 flag
     assert "price for Nikkei unavailable" in html                              # degradation is visible
     assert render.UNSUB_PLACEHOLDER in html

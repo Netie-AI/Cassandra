@@ -55,6 +55,8 @@ def _move_word(pct: float | None) -> str:
 
 def _phrase(row: dict) -> str:
     word = _move_word(row["pct"])
+    if row["label"].endswith("futures"):          # plural subject
+        word = word.replace("was ", "were ")
     return f"{row['label']} {word}" + ("" if row["pct_text"] in ("flat", "n/a") else f" ({row['pct_text']})")
 
 
@@ -136,8 +138,13 @@ def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | N
     since = now - dt.timedelta(hours=cfg["lookback_hours"][edition])
     stories = sources.fetch_stories(cfg, since=since, now=now, problems=problems)
     events = sources.upcoming_events(today, horizon_days=14 if not weekly else 45)
+    all_events = sources.load_config("events").get("events", [])
+    calendar = sources.fetch_calendar(
+        cfg, now=now, hours=168 if weekly else 30, tz=tz, problems=problems,
+        skip={(ev["ticker"], ev["start"].isoformat()) for ev in all_events if ev.get("ticker")})
     copy = writer.write_copy(stories, edition=edition, date_label=local.strftime("%A %d %B %Y"),
-                             market_facts=_facts(blocks), market_dirs=market_dirs(blocks), events=events)
+                             market_facts=_facts(blocks), market_dirs=market_dirs(blocks), events=events,
+                             calendar=calendar)
     if copy["writer"] == "wire":
         problems.append(f"stories are shown in their original wording ({copy['writer_note']})")
     if not copy["stories"]:
@@ -149,7 +156,8 @@ def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | N
     else:
         subject = copy.get("subject") or writer._clip(copy["stories"][0]["headline"], writer.SUBJECT_MAX)
     story_text = " ".join(f"{s['headline']} {s['what']} {s['why']} {s['title']}" for s in copy["stories"])
-    glossary_text = story_text + " " + " ".join(b["title"] for b in blocks) + (" futures" if futures else "")
+    glossary_text = (story_text + " " + " ".join(b["title"] for b in blocks) + (" futures" if futures else "")
+                     + " " + " ".join(c["title"] for c in calendar))
     return {
         "edition": edition,
         "title": TITLES[edition],
@@ -165,6 +173,7 @@ def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | N
         "stories": copy["stories"],
         "outlook": copy.get("outlook", ""),
         "events": events,
+        "calendar": calendar,
         "glossary": sources.glossary_hits(glossary_text),
         "writer": copy["writer"],
         "rejected": copy.get("rejected", []),

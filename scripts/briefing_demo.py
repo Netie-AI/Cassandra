@@ -45,6 +45,8 @@ def edition(ed, hidden):
         p.append('<h2>Also in AI</h2><div class="stories">' + "".join(story(s) for s in st[1:]) + '</div>')
     p.append('<h2>What to watch next</h2>')
     if ed.get("outlook"): p.append(f'<p class="take"><b>Our read</b> {e(ed["outlook"])} <i>(opinion, not a forecast)</i></p>')
+    for c in ed.get("calendar", []):
+        p.append(f'<div class="cal"><b>{e(c["title"])}</b><span>{e(c["when"])}</span><p>In plain English: {e(c["plain"])}.</p></div>')
     for ev in ed["events"]:
         p.append(f'<div class="ev"><a href="{e(ev["source"], quote=True)}">{e(ev["name"])}</a>'
                  f'<span>{e(_when(ev))} · {e(ev.get("where", ""))}</span><p>{e(ev["why"])}</p></div>')

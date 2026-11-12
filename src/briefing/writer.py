@@ -47,7 +47,7 @@ You get JSON: candidate stories, market facts, upcoming events. Return ONE JSON 
    "why": "1 sentence starting with 'If you' or 'For', naming who is affected (shoppers, employees, business owners, savers, students) and how"}],
  "talking_point": "One sentence a reader could repeat at lunch, about the first story only.",
  "market_take": "2 sentences on the market mood in everyday language",
- "outlook": "2 sentences on what to watch next, tied to the events given. Do not repeat the event descriptions."
+ "outlook": "2 sentences on what to watch next, tied to on_the_calendar_next and upcoming_events. Do not repeat their descriptions."
 }
 
 Picking: choose the 4 to 6 stories that matter most to an ordinary person, biggest first.
@@ -221,7 +221,7 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str]) -> 
 
 
 def write_copy(stories: list[Story], *, edition: str, date_label: str, market_facts: list[str],
-               market_dirs: set[str], events: list[dict]) -> dict[str, Any]:
+               market_dirs: set[str], events: list[dict], calendar: list[dict] | None = None) -> dict[str, Any]:
     """Model-edited copy, fact-checked. Falls back to wire_copy() loudly."""
     if not stories:
         return wire_copy([], "no stories in the window")
@@ -237,6 +237,7 @@ def write_copy(stories: list[Story], *, edition: str, date_label: str, market_fa
                         "source": s.source, "region": s.region} for s in candidates],
         "market_facts": market_facts,
         "upcoming_events": [{"name": e["name"], "in_days": e["days_away"], "why": e["why"]} for e in events],
+        "on_the_calendar_next": [{"what": c["title"], "meaning": c["plain"]} for c in (calendar or [])],
     }, ensure_ascii=False)
 
     errors: list[str] = []
