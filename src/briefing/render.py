@@ -13,7 +13,15 @@ _SITE = "https://crash.netie.ai"
 _H2 = ("font-family:Georgia,serif;font-size:20px;margin:32px 0 12px;padding-top:14px;"
        "border-top:2px solid #1a1a1a;color:#1a1a1a;")
 _SMALL = "font-size:13px;color:#555;"
-_LINK = "display:inline-block;padding:8px 0;"
+_LINK = "display:inline-block;padding:12px 0;"          # 44px tap target with the 20px line
+_KICKER = "font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#555;"
+
+
+def read_minutes(ed: dict[str, Any]) -> int:
+    words = sum(len(str(s.get(k) or "").split()) for s in ed["stories"] for k in ("headline", "what", "why"))
+    words += sum(len(str(ed.get(k) or "").split()) for k in ("hook", "big_picture", "market_take", "outlook"))
+    words += 12 * sum(len(b["rows"]) for b in ed["markets"]) + 25 * (len(ed["events"]) + len(ed.get("calendar", [])))
+    return max(1, round(words / 200))
 
 
 def _day(iso: str) -> str:
@@ -75,12 +83,13 @@ def _story_html(s: dict) -> str:
     why = (f"<p style='margin:6px 0 0;'><strong>What it means for you:</strong> {e(s['why'])}</p>"
            if s.get("why") else "")
     what = f"<p style='margin:6px 0 0;'>{e(s['what'])}</p>" if s.get("what") else ""
-    flag = " 🇸🇬" if s.get("region") == "sg" else ""
+    kick = " · ".join(x for x in (s.get("tag"), "Singapore" if s.get("region") == "sg" else "") if x)
+    kicker = f"<div style='{_KICKER}'>{e(kick)}</div>" if kick else ""
     url = e(s["url"], quote=True)
     return (
-        "<div style='margin:0 0 20px;'>"
-        f"<a href='{url}' style='font-family:Georgia,serif;font-size:18px;font-weight:700;"
-        f"color:#1a1a1a;text-decoration:none;line-height:1.35;'>{e(s['headline'])}{flag}</a>"
+        f"<div style='margin:0 0 20px;'>{kicker}"
+        f"<a href='{url}' style='display:block;padding:9px 0;font-family:Georgia,serif;font-size:19px;"
+        f"font-weight:700;color:#1a1a1a;text-decoration:none;line-height:1.35;'>{e(s['headline'])}</a>"
         f"{what}{why}"
         f"<a href='{url}' style='{_SMALL}{_LINK}'>Read the source: {e(s['source'])}</a></div>"
     )
@@ -93,15 +102,13 @@ def render_html(ed: dict[str, Any]) -> str:
         f"<div style='display:none;max-height:0;overflow:hidden;'>{e(preheader)}</div>",
         "<div style=\"max-width:600px;margin:0 auto;padding:0 16px;font-family:'DM Sans',Arial,sans-serif;"
         "font-size:16px;line-height:1.6;color:#1a1a1a;\">",
-        "<div style='border-bottom:2px solid #1a1a1a;padding:16px 0;'>"
-        "<span style='font-family:Georgia,serif;font-size:22px;font-weight:700;'>Cassandra</span>"
-        f"<span style='font-size:13px;color:#555;margin-left:12px;'>AI Briefing · {e(ed['title'])} · "
-        f"{e(ed['date_label'])}</span></div>",
+        "<div style='padding:16px 0 4px;'>"
+        "<div style='font-family:Georgia,serif;font-size:24px;font-weight:700;line-height:1.2;'>Cassandra</div>"
+        f"<div style='font-size:13px;color:#555;'>AI Briefing · {e(ed['title'])} · "
+        f"{e(ed['date_label']).replace(' ', '&nbsp;')} · {read_minutes(ed)}&nbsp;min&nbsp;read</div></div>",
     ]
     if ed.get("hook"):
         parts.append(f"<p style='font-size:18px;line-height:1.5;margin:20px 0 0;'>{e(ed['hook'])}</p>")
-    if ed.get("big_picture"):
-        parts.append(f"<p style='margin:10px 0 0;font-style:italic;color:#333;'>{e(ed['big_picture'])}</p>")
 
     if stories:      # the biggest story comes before the numbers
         parts.append(f"<h2 style='{_H2}'>Top story</h2>")
@@ -121,6 +128,11 @@ def render_html(ed: dict[str, Any]) -> str:
         parts.append(f"<h2 style='{_H2}'>{label}</h2>")
         parts += [_story_html(s) for s in stories[1:]]
 
+    if ed.get("big_picture"):      # the synthesis reads best once the stories are known
+        parts.append(f"<h2 style='{_H2}'>The big picture</h2>"
+                     f"<p style='margin:0;font-family:Georgia,serif;font-size:18px;line-height:1.5;'>"
+                     f"{e(ed['big_picture'])}</p>")
+
     if ed.get("outlook") or ed["events"] or ed.get("calendar"):
         parts.append(f"<h2 style='{_H2}'>What to watch next</h2>")
         if ed.get("outlook"):
@@ -135,7 +147,8 @@ def render_html(ed: dict[str, Any]) -> str:
         for ev in ed["events"]:
             parts.append(
                 "<div style='margin:0 0 14px;padding-left:12px;border-left:3px solid #1a1a1a;'>"
-                f"<a href='{e(ev['source'], quote=True)}' style='font-weight:700;color:#1a1a1a;'>{e(ev['name'])}</a>"
+                f"<a href='{e(ev['source'], quote=True)}' style='display:block;padding:10px 0;font-weight:700;"
+                f"color:#1a1a1a;'>{e(ev['name'])}</a>"
                 f"<div style='{_SMALL}'>{e(_when(ev))} · {e(ev.get('where', ''))}</div>"
                 f"<div>{e(ev['why'])}</div></div>"
             )
@@ -150,11 +163,11 @@ def render_html(ed: dict[str, Any]) -> str:
               "linked source (numbers, direction, quotes). " if ed["writer"] != "wire" else "")
     parts.append(
         "<p style='margin:28px 0 0;'>Know someone who would like this? Forward it to them.</p>"
-        f"<div style='font-size:12px;color:#767676;border-top:1px solid #e5e5e5;margin-top:16px;padding:12px 0;'>"
+        f"<div style='font-size:13px;color:#666;border-top:1px solid #e5e5e5;margin-top:16px;padding:12px 0;'>"
         f"Prices from Yahoo Finance. {writer}Open the source link before acting on a story."
         f"{notes}<br>Cassandra is a research tool. Not financial advice.<br>"
         f"<a href='{_SITE}/api/digest/unsubscribe?token={UNSUB_PLACEHOLDER}' "
-        f"style='color:#767676;{_LINK}'>Unsubscribe</a>"
+        f"style='color:#666;{_LINK}'>Unsubscribe</a>"
         "</div></div>"
     )
     return "\n".join(parts)
@@ -170,9 +183,8 @@ def render_page(ed: dict[str, Any]) -> str:
 
 def render_text(ed: dict[str, Any]) -> str:
     lines = [f"CASSANDRA AI BRIEFING · {ed['title']} · {ed['date_label']}", ""]
-    for key in ("hook", "big_picture"):
-        if ed.get(key):
-            lines += [ed[key], ""]
+    if ed.get("hook"):
+        lines += [ed["hook"], ""]
     for i, s in enumerate(ed["stories"]):
         lines += [s["headline"], s.get("what") or ""]
         if s.get("why"):
@@ -187,6 +199,8 @@ def render_text(ed: dict[str, Any]) -> str:
                 lines.append("")
             if ed.get("market_take"):
                 lines += [f"In plain English: {ed['market_take']}", ""]
+    if ed.get("big_picture"):
+        lines += [f"The big picture: {ed['big_picture']}", ""]
     if ed.get("outlook"):
         lines += [f"Our read (opinion): {ed['outlook']}", ""]
     for c in ed.get("calendar", []):

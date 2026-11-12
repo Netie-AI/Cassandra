@@ -85,3 +85,11 @@ calendar:
     - {match: "consumer sentiment", plain: "a survey of how confident American shoppers feel"}
     - {match: "consumer confidence", plain: "a survey of how confident American shoppers feel"}
     - {match: "bank holiday",       plain: "US markets are closed"}
+
+# Fallback AI editors, tried in this order when Gemini is rate-limited or down. Each is used only
+# if its key is set in the environment. Any OpenAI-compatible chat endpoint works. The same fact
+# check runs on the copy whichever editor wrote it.
+writers:
+  - {name: mistral,    key_env: MISTRAL_API_KEY,    model: mistral-large-latest,        url: "https://api.mistral.ai/v1/chat/completions"}
+  - {name: cerebras,   key_env: CEREBRAS_API_KEY,   model: gpt-oss-120b,                url: "https://api.cerebras.ai/v1/chat/completions"}
+  - {name: openrouter, key_env: OPENROUTER_API_KEY, model: anthropic/claude-sonnet-4-6, url: "https://openrouter.ai/api/v1/chat/completions"}

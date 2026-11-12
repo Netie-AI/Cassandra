@@ -20,6 +20,8 @@ import re
 import time
 from typing import Any
 
+import httpx
+
 from src.report import _gemini_generate
 from src.tools.copy_lint import lint_no_em_dash
 
@@ -31,58 +33,82 @@ MAX_CANDIDATES = 40
 RETRY_PAUSE_S = 20
 SUBJECT_MAX = 60
 
-SYSTEM = """\
-You edit a short AI newsletter for busy, NON-TECHNICAL readers in Singapore (managers, shop and
-business owners, students, retirees, first-time investors). They are smart, short of time, and
-do not know tech or finance jargon. Make real AI news clear, lively and worth forwarding.
+TAGS = ("Big Tech", "Money", "Jobs", "Rules", "Everyday life", "Science")
 
-You get JSON: candidate stories, market facts, upcoming events. Return ONE JSON object:
+SYSTEM = """\
+ROLE
+You edit a short AI newsletter for busy, NON-TECHNICAL readers in Singapore: managers, shop and
+business owners, students, retirees, first-time investors. They are smart, short of time, and
+do not know tech or finance jargon. They read on a phone. Your job: make real AI news clear,
+lively and worth forwarding, without ever bending a fact.
+
+INPUT
+JSON with candidate stories (id, title, summary, source, region), market_facts,
+upcoming_events and on_the_calendar_next.
+
+OUTPUT: one JSON object, nothing else
 {
- "subject": "max 55 characters. Lead with the single most surprising fact, then a second hook after a comma. No newsletter name, no date.",
+ "subject": "max 55 characters. The single most surprising fact first, then a second hook after a comma. No newsletter name, no date.",
  "hook": "2 sentences. First: the biggest story in plain words. Second: what else is inside. Speak to 'you'.",
- "big_picture": "1 or 2 sentences linking today's stories into one trend. No digits.",
  "stories": [{"id": "<candidate id>",
-   "headline": "max 10 words, concrete subject and active verb",
-   "what": "1 or 2 short sentences, plain words",
-   "why": "1 sentence starting with 'If you' or 'For', naming who is affected (shoppers, employees, business owners, savers, students) and how"}],
- "talking_point": "One sentence a reader could repeat at lunch, about the first story only.",
+   "tag": "one of: Big Tech | Money | Jobs | Rules | Everyday life | Science",
+   "headline": "max 10 words, a concrete subject and an active verb",
+   "what": "1 or 2 short sentences. Leave it empty if the candidate has no summary.",
+   "why": "1 sentence starting with 'If you' or 'For', naming who is affected and how"}],
+ "talking_point": "One sentence a reader could repeat at lunch. It must be about the FIRST story and name its main subject.",
+ "big_picture": "1 or 2 sentences linking today's stories into one trend. No digits.",
  "market_take": "2 sentences on the market mood in everyday language",
  "outlook": "2 sentences on what to watch next, tied to on_the_calendar_next and upcoming_events. Do not repeat their descriptions."
 }
 
-Picking: choose the 4 to 6 stories that matter most to an ordinary person, biggest first.
-Each must clearly be about AI or the AI industry (chips, data centres, AI companies, rules,
-jobs); if the title alone does not show the AI link, skip it. Prefer well-known companies,
-government, jobs, money, everyday products. Include 1 or 2 with region "sg" when good ones
-exist. Skip developer news, rumours, opinion columns and duplicates. Never pick two
-candidates about the same event.
+PICKING STORIES
+- Choose 4 to 6, biggest first. The first one is the story people will talk about today.
+- Each must clearly be about AI or the AI industry (chips, data centres, AI companies, rules,
+  jobs). If the title alone does not show the AI link, skip it.
+- Aim for a mix: use at least 3 different tags, and no more than 2 stories about the same company.
+- Include 1 or 2 with region "sg" when good ones exist.
+- Prefer candidates that have a summary: you can explain them properly.
+- Skip developer news, rumours, opinion columns and duplicates. Never pick two candidates
+  about the same event.
 
-Respect, never broken:
-- Report what a person did in their job (resigned, was appointed, was charged, announced).
-  Never repeat claims about anyone's private life (relationships, affairs, family, health,
-  looks), even if the source does. Say "after a scandal" or "after allegations" at most.
-- Never mock, shame or insult a person, a company or a group. No sarcasm about people.
-- Skip stories that are mainly gossip, personal attacks, opinion rants or insults.
-- Skip video-game and entertainment news unless the story is really about AI.
-- "talking_point" must be a useful fact or idea, never gossip about a person.
+WRITING
+- Voice: a well-read friend at a kopitiam. Short sentences. Active voice. British spelling
+  (centre, organisation, travellers).
+- One idea per sentence. No sentence over 22 words.
+- Replace jargon with everyday words, or explain it in brackets the first time:
+  "a benchmark (a standard test)", "data centres (warehouses full of computers)".
+- No hype or filler: revolutionary, game-changing, shockwaves, landscape, cutting-edge,
+  "digital tools", "advanced services", "the industry", "in today's world".
+- "why" must be concrete. Name a real person in a real situation and what changes for them.
+    Weak:   "For tech users, heavy spending could speed up advanced digital services."
+    Strong: "If you use AI apps at work, more data centres could mean fewer slowdowns at busy hours."
+    Weak:   "For businesses, this could help adopt reliable tools safely."
+    Strong: "For a law firm in Singapore, this may show which AI tools get local rules right."
 
-Voice: a well-read friend at a kopitiam. Short sentences. Active voice. Everyday comparisons
-are welcome if they add no facts. Explain any technical or finance term in the same sentence.
-No hype or filler (revolutionary, game-changing, shockwaves, landscape).
-
-Accuracy, never broken:
+ACCURACY, never broken
 - Use only facts in that candidate's title and summary. Never add numbers, names, dates,
-  quotes, causes or reactions that are not there. If a candidate has only a title, restate
-  it plainly and stop.
-- Copy numbers as digits with their unit exactly as written ("over 250", "$395", "$3 billion").
-  Never spell them out, convert currency or round.
-- Keep the direction (rose or fell) and keep any doubt in the source (denies, reportedly, rumour).
+  quotes, causes or reactions that are not there.
+- If a candidate has no summary, write the headline and the "why" only. Do not guess details.
+- Copy numbers as digits with their unit and currency exactly as written ("over 250", "$395",
+  "S$3 billion"). Never spell them out, convert currency or round.
+- Keep the direction (rose or fell) and keep any hedge in the source headline (denies, may,
+  in talks, reportedly, plans to).
 - "why", "big_picture", "talking_point": word consequences as possible (could, may).
 - "market_take", "outlook", "big_picture": NO digits. Describe direction only as market_facts
   show it; if an index moved less than 0.2%, call it flat. Do not say a story caused a market
-  move. No price predictions. No buy or sell advice. Use careful words (could, may, watch for).
-- No em-dashes or en-dashes.
-JSON only. No markdown.
+  move. No price predictions. No buy, sell or avoid advice. No certainty (will rise, certain).
+
+RESPECT, never broken
+- Report what a person did in their job (resigned, was appointed, was charged, announced).
+  Never repeat claims about anyone's private life (relationships, family, health, looks),
+  even if the source does. Say "after allegations" at most.
+- Never mock, shame or insult a person, a company or a group. No sarcasm about people.
+- Skip gossip, personal attacks and rants. Skip video-game and entertainment news unless it
+  is really about AI.
+- "talking_point" is a useful fact or idea, never gossip about a person.
+
+FORMAT
+- No em-dashes or en-dashes. No markdown. JSON only.
 """
 
 # -- fact-check primitives ---------------------------------------------------
@@ -116,7 +142,7 @@ _CAUSE = re.compile(r"\b(?:because of|due to|thanks to|caused by|driven by|as a 
 # Kept narrow on purpose: "Ministry of Home Affairs", "nude image ban" and "winners and losers" are news.
 _DISRESPECT = re.compile(
     r"\b(?:extramarital|mistress\w*|love child|affairs? scandals?|affair with|"
-    r"(?:his|her|their|an|secret|alleged|second) affairs?|cheat(?:ed|ing) on|girlfriends?|boyfriends?|"
+    r"affair|(?:his|her|their|secret|alleged|second|over|amid|after|following) affairs|cheat(?:ed|ing) on|girlfriends?|boyfriends?|"
     r"divorc\w+|pathetic|idiots?|idiotic|stupid|morons?|clowns?|humiliat\w+|ugly)\b", re.I)
 
 
@@ -209,7 +235,7 @@ def wire_copy(stories: list[Story], reason: str) -> dict[str, Any]:
             continue
         per_source[s.source] = per_source.get(s.source, 0) + 1
         picked.append({**s.to_dict(), "headline": s.title, "what": _clip(s.summary, 280), "why": "",
-                       "edited": False})
+                       "edited": False, "tag": ""})
         if len(picked) >= MAX_STORIES:
             break
     return {"subject": "", "hook": "", "big_picture": "", "talking_point": "", "stories": picked,
@@ -227,7 +253,8 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str]) -> 
             rejected.append("story with unknown id dropped")
             continue
         corpus = f"{src.title} {src.summary}"
-        row = {**src.to_dict(), "edited": True}
+        tag = str(item.get("tag") or "").strip()
+        row = {**src.to_dict(), "edited": True, "tag": tag if tag in TAGS else ""}   # fixed set, never free text
         for field, fallback in (("headline", src.title), ("what", src.summary), ("why", "")):
             text = lint_no_em_dash(str(item.get(field) or "").strip())
             if field == "why":       # a possible consequence: must not state new facts or advice
@@ -289,14 +316,60 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str]) -> 
     return copy
 
 
+class EditorError(ValueError):
+    """An editor failure whose message is safe to print (never contains a URL or key)."""
+
+
+def _strip_fences(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1].rsplit("```", 1)[0]
+    if not text.lstrip().startswith("{") and "{" in text and "}" in text:     # prose around the object
+        text = text[text.index("{"): text.rindex("}") + 1]
+    return text.strip()
+
+
+def _openai_chat(url: str, key: str, model: str, prompt: str) -> str:
+    """Any OpenAI-compatible chat endpoint (Mistral, Cerebras, OpenRouter, Groq), JSON mode."""
+    r = httpx.post(url, headers={"Authorization": f"Bearer {key}"}, timeout=240, json={
+        "model": model, "temperature": 0.3, "response_format": {"type": "json_object"},
+        "max_tokens": 16000,        # reasoning models spend most of this thinking before they answer
+        "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]})
+    r.raise_for_status()
+    choice = r.json()["choices"][0]
+    content = choice["message"]["content"]
+    if isinstance(content, list):      # reasoning models return parts; keep the answer, drop the thinking
+        content = "".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
+    if not (content or "").strip():
+        raise EditorError(f"empty reply (finish_reason={choice.get('finish_reason')})")
+    return content
+
+
+def _editors(gemini_key: str | None, writers: list[dict]) -> list[tuple[str, Any]]:
+    """Editors to try, in order: Gemini models first, then every configured fallback whose key is set.
+    Whichever writes the copy, the same fact check runs on it."""
+    out: list[tuple[str, Any]] = []
+    if gemini_key:
+        for m in os.getenv("GEMINI_BRIEFING_MODELS", DEFAULT_MODELS).split(","):
+            if m.strip():
+                out.append((m.strip(), lambda p, m=m.strip(): _gemini_generate(
+                    gemini_key, p, SYSTEM, model=m, max_tokens=8192, temperature=0.3, json_mode=True, timeout=120)))
+    for w in writers:
+        k = os.getenv(w["key_env"], "").strip()
+        if k:
+            out.append((f"{w['name']}:{w['model']}", lambda p, w=w, k=k: _openai_chat(w["url"], k, w["model"], p)))
+    return out
+
+
 def write_copy(stories: list[Story], *, edition: str, date_label: str, market_facts: list[str],
-               market_dirs: set[str], events: list[dict], calendar: list[dict] | None = None) -> dict[str, Any]:
+               market_dirs: set[str], events: list[dict], calendar: list[dict] | None = None,
+               writers: list[dict] | None = None) -> dict[str, Any]:
     """Model-edited copy, fact-checked. Falls back to wire_copy() loudly."""
     if not stories:
         return wire_copy([], "no stories in the window")
     key = os.getenv("GEMINI_API_KEY")
-    if not key:
-        return wire_copy(stories, "GEMINI_API_KEY not set")
+    if not _editors(key, writers or []):
+        return wire_copy(stories, "GEMINI_API_KEY not set and no fallback editor key is set")
 
     # Gossip and opinion pieces are never offered to the editor. A big event is covered by many
     # sources, so it then picks a respectful one instead of losing the story at the check stage.
@@ -315,24 +388,23 @@ def write_copy(stories: list[Story], *, edition: str, date_label: str, market_fa
     }, ensure_ascii=False)
 
     errors: list[str] = []
-    models = [m.strip() for m in os.getenv("GEMINI_BRIEFING_MODELS", DEFAULT_MODELS).split(",") if m.strip()]
-    for i, model in enumerate(models * 2):               # two passes: 503 "overloaded" is usually brief
-        if i == len(models):
+    editors = _editors(key, writers or [])
+    for i, (label, call) in enumerate(editors * 2):      # two passes: "overloaded" is usually brief
+        if i == len(editors):
             time.sleep(RETRY_PAUSE_S)
         try:
-            text = _gemini_generate(key, prompt, SYSTEM, model=model, max_tokens=8192,
-                                    temperature=0.3, json_mode=True, timeout=120)
-            raw = json.loads(text)
+            raw = json.loads(_strip_fences(call(prompt)))
             if not isinstance(raw, dict):
                 raise ValueError("model did not return a JSON object")
             copy = ground(raw, candidates, market_dirs)
             if len(copy["stories"]) < min(3, len(candidates)):
                 raise ValueError(f"only {len(copy['stories'])} usable stories")
-            copy["writer"] = model
+            copy["writer"] = label
             copy["writer_note"] = ""
             return copy
         except Exception as exc:
             # never str(exc): httpx errors embed the request URL, which carries the API key
             status = getattr(getattr(exc, "response", None), "status_code", "")
-            errors.append(f"{model}: {type(exc).__name__} {status}".strip())
+            detail = str(exc) if isinstance(exc, EditorError) else status
+            errors.append(f"{label}: {type(exc).__name__} {detail}".strip())
     return wire_copy(stories, "AI editor unavailable: " + "; ".join(errors)[-300:])

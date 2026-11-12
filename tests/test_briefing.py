@@ -199,7 +199,7 @@ def test_respect_filter_does_not_block_ordinary_news_words():
                "UK to ban AI apps that create nude images", "Winners and losers of the AI chip boom",
                "Figma adds AI mockups", "Nvidia's fat margins", "Musk slams OpenAI in court filing"):
         assert not writer.disrespectful(ok), ok
-    for bad in ("CEO resigns amid spy, affair scandals", "He quit over an affair with a colleague",
+    for bad in ("CEO resigns amid spy, affair scandals", "Nvidia CEO resigns over affairs", "the alleged spy affair broke", "He quit over an affair with a colleague",
                 "reports of two extramarital affairs", "Founder's pathetic attempt to pivot"):
         assert writer.disrespectful(bad), bad
 
@@ -312,6 +312,39 @@ def test_no_key_falls_back_to_labelled_wire_copy(monkeypatch):
     assert len(out["stories"]) == 2                                            # max 2 per source, no opinion
 
 
+def test_fallback_editor_takes_over_when_gemini_is_rate_limited(monkeypatch):
+    """Live 2026-11-13: Gemini's free tier returned 429 for hours and every edition fell back to raw headlines."""
+    monkeypatch.setenv("GEMINI_API_KEY", "g")
+    monkeypatch.setenv("FAKE_KEY", "f")
+    monkeypatch.delenv("UNSET_KEY", raising=False)
+    monkeypatch.setattr(writer, "_gemini_generate", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("429")))
+    calls = []
+
+    def chat(url, key, model, prompt):
+        calls.append((url, key, model))
+        return '```json\n{"stories": [{"id": "s1", "headline": "Nvidia sells 250 chips", "what": "It paid $3 billion.", "why": ""}]}\n```'
+
+    monkeypatch.setattr(writer, "_openai_chat", chat)
+    writers = [{"name": "skipme", "key_env": "UNSET_KEY", "model": "x", "url": "u0"},
+               {"name": "fake", "key_env": "FAKE_KEY", "model": "m1", "url": "u1"}]
+    out = writer.write_copy([_story()], edition="morning", date_label="x", market_facts=[], market_dirs=set(),
+                            events=[], writers=writers)
+    assert out["writer"] == "fake:m1" and calls == [("u1", "f", "m1")]
+    assert out["stories"][0]["edited"] is True                         # same fact check, passed
+
+
+def test_openai_chat_keeps_the_answer_and_drops_thinking_parts(monkeypatch):
+    """Live: Mistral returned content as a list of parts (thinking + text), which crashed the parser."""
+    class R:
+        def raise_for_status(self): pass
+        def json(self):
+            return {"choices": [{"message": {"content": [
+                {"type": "thinking", "thinking": [{"type": "text", "text": "hmm"}]},
+                {"type": "text", "text": '{"stories": []}'}]}}]}
+    monkeypatch.setattr(writer.httpx, "post", lambda *a, **k: R())
+    assert writer._openai_chat("u", "k", "m", "p") == '{"stories": []}'
+
+
 def test_model_failure_note_never_leaks_api_key(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "SECRET-KEY-123")
     monkeypatch.setattr(writer, "RETRY_PAUSE_S", 0)
@@ -421,6 +454,25 @@ def test_render_html_escapes_untrusted_text_and_shows_everything():
     assert "price for Nikkei unavailable" in html                              # degradation is visible
     assert render.UNSUB_PLACEHOLDER in html
     assert "—" not in html
+
+
+def test_email_layout_order_and_labels():
+    ed = _edition()
+    ed["stories"][0]["tag"] = "Big Tech"
+    ed["stories"].append({**ed["stories"][0], "headline": "Second story", "tag": "<b>bad</b>"})
+    html = render.render_html(ed)
+    order = [html.index(x) for x in ("Top story", "Say this at lunch", "Markets in 30 seconds", "Also in AI",
+                                     "The big picture", "What to watch next", "Jargon buster", "Unsubscribe")]
+    assert order == sorted(order)                                  # reading order on a phone
+    assert "min&nbsp;read" in html and ">Big Tech<" in html and "<b>bad</b>" not in html
+    assert "padding:12px 0" in html                                # 44px tap targets on links
+
+
+def test_story_tag_must_come_from_the_fixed_set():
+    raw = {"stories": [{"id": "s1", "tag": "Gossip", "headline": "Nvidia sells 250 chips", "what": "It paid $3 billion.", "why": ""},
+                       {"id": "s2", "tag": "Money", "headline": "Nvidia sells 250 chips", "what": "It paid $3 billion.", "why": ""}]}
+    out = writer.ground(raw, [_story(1), _story(2)], set())
+    assert [s["tag"] for s in out["stories"]] == ["", "Money"]
 
 
 def test_render_text_has_links_and_unsub():

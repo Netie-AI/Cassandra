@@ -75,7 +75,10 @@ Known limits (open, from two adversarial reviews on 2026-11-13):
 - The weekly change is "past five sessions", not the calendar week, and the weekly "week
   ahead" depends on the calendar source having rolled over by Sunday 09:00.
 - The AI keyword filter still lets through the odd non-AI "chip" story; the editor is the backstop.
-- Gemini's free tier rate-limits heavy use (many builds in an hour). Two builds a day is fine.
+- Gemini's free tier rate-limits heavy use (many builds in an hour). Fallback editors are
+  configured under `writers:` in `config/briefing.yaml` (Mistral, Cerebras, OpenRouter) and are
+  unit-tested, but none has produced a live edition yet: Mistral returned an unusable reply on
+  the full prompt and then rate-limited, and the Cerebras key had no credit (2026-11-13).
 - Stories from some feeds have a title only. They run as headline, "what it means for you" and
   source link, with no summary (the editor is not allowed to invent one).
 
@@ -84,6 +87,16 @@ Known limits (open, from two adversarial reviews on 2026-11-13):
 A non-technical reader in Singapore opens it, understands what happened in AI and in markets in
 two minutes, trusts every fact, and forwards it. In order of priority: correct, clear, worth
 forwarding, on time (07:30 and 20:30 Singapore time).
+
+## Layout rules (checked at 320, 360, 390, 430, 600, 768 and 1280px)
+
+- Reading order on a phone: opening line, top story, lunch line, markets, more stories, the big
+  picture, what to watch, jargon buster. The first story must start within the first screen.
+- No sideways scrolling at any width. Body text 16px or more, labels 12px or more.
+- Every link and button is at least 44px tall to tap.
+- Each story carries a type label from a fixed set (`writer.TAGS`) plus "Singapore" when local.
+- The demo page (`scripts/briefing_demo.py`) moves markets, watch list and jargon into a right
+  rail from 980px, has section chips to jump around, and follows light and dark themes.
 
 ## Maintenance
 
