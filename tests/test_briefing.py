@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 
 import pytest
 
@@ -240,7 +241,7 @@ def test_ground_keeps_good_copy_and_rejects_invented_facts():
     assert out["outlook"] == "Watch chip makers closely."
     assert out["big_picture"] and out["talking_point"] == "Nvidia paid $3 billion."
     assert len(out["subject"]) <= writer.SUBJECT_MAX and not out["subject"].endswith(" ")
-    assert len(out["rejected"]) == 5
+    assert len(out["rejected"]) == 6                                          # incl. title-only "what"
 
 
 def test_gossip_and_insults_never_run():
@@ -263,6 +264,43 @@ def test_gossip_and_insults_never_run():
     assert not writer.disrespectful("Nvidia's chief executive resigned after a scandal, and the board named a successor.")
     wire = writer.wire_copy([src, rude, ok], "x")
     assert [s["id"] for s in wire["stories"]] == ["s3"]
+
+
+def test_title_only_source_gets_no_invented_summary():
+    """Live run 2026-11-13: a title-only story got a 'what' describing details the title never gave."""
+    src = _story(1, title="Scale AI Launches Singapore Legal Reasoning Benchmark with IMDA", summary="")
+    raw = {"stories": [{"id": "s1", "headline": "Scale AI launches Singapore legal benchmark with IMDA",
+                        "what": "The system tests how accurately models process local legal facts.",
+                        "why": "For businesses, local testing could help."}]}
+    row = writer.ground(raw, [src], set())["stories"][0]
+    assert row["what"] == "" and row["headline"].startswith("Scale AI launches") and row["why"]
+
+
+def test_talking_point_must_be_about_the_top_story():
+    top = _story(1, title="Scale AI launches benchmark", summary="It tests legal reasoning.")
+    raw = {"talking_point": "Nvidia's chief executive has resigned.",
+           "stories": [{"id": "s1", "headline": "Scale AI launches benchmark", "what": "It tests legal reasoning.", "why": ""}]}
+    assert writer.ground(raw, [top], set())["talking_point"] == ""
+    raw["talking_point"] = "Scale AI now tests how well software reasons about law."
+    assert writer.ground(raw, [top], set())["talking_point"]
+
+
+def test_gossip_and_opinion_sources_are_never_offered_to_the_editor(monkeypatch):
+    """Live run 2026-11-13: the editor picked a gossip-worded source for the day's biggest story,
+    the check dropped it, and the edition lost the story although clean sources covered it."""
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    seen = {}
+
+    def fake(key, prompt, system, **kw):
+        seen["ids"] = [c["id"] for c in json.loads(prompt)["candidates"]]
+        return json.dumps({"stories": [{"id": "s3", "headline": "Nvidia chief executive resigns",
+                                        "what": "It paid $3 billion.", "why": ""}]})
+
+    monkeypatch.setattr(writer, "_gemini_generate", fake)
+    stories = [_story(1, title="CEO quits over an affair with a colleague"), _story(2, title="Is the AI king finished?"),
+               _story(3, title="Nvidia chief executive resigns")]
+    out = writer.write_copy(stories, edition="morning", date_label="x", market_facts=[], market_dirs=set(), events=[])
+    assert seen["ids"] == ["s3"] and [s["id"] for s in out["stories"]] == ["s3"]
 
 
 def test_no_key_falls_back_to_labelled_wire_copy(monkeypatch):

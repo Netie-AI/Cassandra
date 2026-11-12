@@ -76,7 +76,8 @@ Known limits (open, from two adversarial reviews on 2026-11-13):
   ahead" depends on the calendar source having rolled over by Sunday 09:00.
 - The AI keyword filter still lets through the odd non-AI "chip" story; the editor is the backstop.
 - Gemini's free tier rate-limits heavy use (many builds in an hour). Two builds a day is fine.
-- Stories from Google News often have a title only, so their summary restates the title.
+- Stories from some feeds have a title only. They run as headline, "what it means for you" and
+  source link, with no summary (the editor is not allowed to invent one).
 
 ## The goal (what every change is judged against)
 

@@ -238,6 +238,9 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str]) -> 
                 bad = check_story_text(text, corpus, title=src.title)
             if disrespectful(text):
                 bad.append("gossip or insult wording")
+            if field == "what" and text and not src.summary:
+                # a title-only source gives the editor nothing to summarise: any "what" is embellishment
+                bad.append("source has a headline only, nothing to summarise")
             if bad or not text:
                 rejected += [f"{src.id}.{field}: {b}" for b in bad]
                 text = fallback
@@ -266,13 +269,20 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str]) -> 
     corpora = [f"{s['title']} {s['summary']}" for s in out_stories]
     take("subject", lambda t: check_spanning(t, corpora))
     take("hook", lambda t: check_spanning(t, corpora))
-    take("talking_point", lambda t: check_story_text(t, first, title=out_stories[0]["title"] if out_stories else None))
+    def about_top_story(t: str) -> list[str]:
+        bad = check_story_text(t, first, title=out_stories[0]["title"] if out_stories else None)
+        names = {w for w in re.findall(r"\b[A-Z][A-Za-z]{3,}\b", first)}
+        if not any(n in t for n in names):
+            bad.append("is not about the top story")
+        return bad
+
+    take("talking_point", about_top_story)
     take("big_picture", check_free_text)
     take("outlook", check_free_text)
     take("market_take", lambda t: check_free_text(t, market_dirs))
     if any(": dropped," in r for r in rejected):
         # the opening lines were written for a line-up that no longer exists
-        copy["hook"] = copy["big_picture"] = ""
+        copy["hook"] = copy["big_picture"] = copy["talking_point"] = ""
         copy["subject"] = _clip(out_stories[0]["headline"], SUBJECT_MAX) if out_stories else ""
         rejected.append("subject and hook rebuilt: a picked story was dropped")
     copy["rejected"] = rejected
@@ -288,7 +298,12 @@ def write_copy(stories: list[Story], *, edition: str, date_label: str, market_fa
     if not key:
         return wire_copy(stories, "GEMINI_API_KEY not set")
 
-    candidates = stories[:MAX_CANDIDATES]
+    # Gossip and opinion pieces are never offered to the editor. A big event is covered by many
+    # sources, so it then picks a respectful one instead of losing the story at the check stage.
+    candidates = [s for s in stories
+                  if not _is_opinion(s) and not disrespectful(f"{s.title} {s.summary}")][:MAX_CANDIDATES]
+    if not candidates:
+        return wire_copy(stories, "no usable stories in the window")
     prompt = json.dumps({
         "edition": edition,
         "date": date_label,
