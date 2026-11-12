@@ -20,6 +20,7 @@ from dataclasses import asdict, dataclass
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 import yaml
@@ -211,8 +212,8 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
     prev_d = bars[-2][0]
     return Quote(
         symbol=symbol, label=label, note=note, close=float(last_c),
-        # a gap of more than 5 days means a missing bar: the "one-day" change would span several sessions
-        pct_1d=(last_c / prev_c - 1) * 100 if (last_d - prev_d).days <= 5 else None,
+        # a gap of more than 4 days means a missing bar: the "one-day" change would span several sessions
+        pct_1d=(last_c / prev_c - 1) * 100 if (last_d - prev_d).days <= 4 else None,   # weekend + 1 holiday
         pct_5d=(last_c / week_c - 1) * 100 if week_c else None,
         session_date=last_d.isoformat(),
         live=live,
@@ -248,19 +249,22 @@ def parse_econ(payload: list, *, start: dt.datetime, end: dt.datetime, tz: dt.tz
             continue
         try:
             when = dt.datetime.fromisoformat(ev["date"])
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError):
             continue
         if when.tzinfo is None or not (start < when <= end):
             continue
         title = str(ev.get("title", "")).strip()
-        plain = next((x["plain"] for x in explain if x["match"] in title.lower()), None)
+        plain = next((x["plain"] for x in explain
+                      if re.search(rf"(?<![a-z]){re.escape(x['match'])}(?![a-z])", title.lower())), None)
         key = (plain, when.date())                    # "CPI m/m" + "Core CPI m/m" are one event to a reader
         if not plain or key in seen:
             continue
         seen.add(key)
         local = when.astimezone(tz)
+        stamp = (local.strftime("%a %d %b") if ev["impact"] == "Holiday"          # all-day, the clock time is noise
+                 else local.strftime("%a %d %b, %H:%M") + " Singapore time")
         out.append({"kind": "data", "sort": when.astimezone(UTC).isoformat(), "title": title,
-                    "when": local.strftime("%a %d %b, %H:%M") + " Singapore time", "plain": plain})
+                    "when": stamp, "plain": plain})
     return out
 
 
@@ -268,13 +272,23 @@ _EARN_TIME = {"time-after-hours": "after the US market closes (early next mornin
               "time-pre-market": "before the US market opens (that evening in Singapore)"}
 
 
-def parse_earnings(payload: dict, *, day: dt.date, watchlist: dict[str, str]) -> list[dict]:
-    """Watchlist companies reporting results on `day` (US date)."""
+_NY = ZoneInfo("America/New_York")
+
+
+def parse_earnings(payload: dict, *, day: dt.date, watchlist: dict[str, str],
+                   now: dt.datetime | None = None) -> list[dict]:
+    """Watchlist companies reporting results on `day` (US date). Results already out by `now`
+    are left off: this list is "what to expect", not a recap."""
     out = []
+    ny = now.astimezone(_NY) if now else None
     for row in ((payload.get("data") or {}).get("rows") or []):
         name = watchlist.get(str(row.get("symbol", "")).upper())
         if not name:
             continue
+        if ny and ny.date() == day:
+            released = dt.time(9, 30) if row.get("time") == "time-pre-market" else dt.time(16, 0)
+            if ny.time() >= released:
+                continue
         timing = _EARN_TIME.get(row.get("time"), "time not announced")
         out.append({"kind": "earnings", "sort": f"{day.isoformat()}T23:00:00", "ticker": row["symbol"].upper(),
                     "title": f"{name} reports quarterly results", "when": f"{day.strftime('%a %d %b')}, {timing}",
@@ -295,7 +309,7 @@ def fetch_calendar(cfg: dict, *, now: dt.datetime, hours: int, tz: dt.tzinfo,
                             explain=cal.get("explain", []))
     except Exception as exc:
         problems.append(f"US economic calendar unavailable ({type(exc).__name__})")
-    us_today = (now - dt.timedelta(hours=5)).date()          # US Eastern, near enough for a date
+    us_today = now.astimezone(_NY).date()
     failed = 0
     for i in range(int(cal.get("earnings_days_ahead", 5)) + 1):
         day = us_today + dt.timedelta(days=i)
@@ -304,7 +318,7 @@ def fetch_calendar(cfg: dict, *, now: dt.datetime, hours: int, tz: dt.tzinfo,
         try:
             r = httpx.get(cal["earnings_url"], params={"date": day.isoformat()}, headers=_UA, timeout=20)
             r.raise_for_status()
-            items += [e for e in parse_earnings(r.json(), day=day, watchlist=cal.get("watchlist", {}))
+            items += [e for e in parse_earnings(r.json(), day=day, watchlist=cal.get("watchlist", {}), now=now)
                       if (e["ticker"], e["date"]) not in skip]
         except Exception:
             failed += 1

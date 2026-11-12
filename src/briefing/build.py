@@ -131,6 +131,11 @@ def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | N
         asia["title"] = "Singapore, last close"
     if edition == "evening" and us:
         us["title"] = "Wall Street, last close"
+    # "overnight" / "today" are only true when the market actually traded in that session
+    if edition == "morning" and us and (today - dt.date.fromisoformat(us["asof"])).days > 1:
+        us["title"] = "Wall Street, last close (no US trading overnight)"
+    if edition == "evening" and asia and asia["asof"] != today.isoformat():
+        asia["title"] = "Asia, last close (no trading today)"
     blocks = [b for b in blocks if b]
     if not blocks:
         problems.append("no market data at all: market section omitted")

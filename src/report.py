@@ -1,7 +1,7 @@
 """
 report.py — Gemini Flash daily report text (LLM narrates; never computes CRS).
 
-Model: gemini-2.5-flash (free tier via ai.google.dev). Migrate before Oct 2026 for image models.
+Model: gemini-flash-latest (free tier via ai.google.dev; gemini-2.5-flash was retired for new keys). Migrate before Oct 2026 for image models.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import httpx
 
 from .tools.copy_lint import lint_dict_strings, lint_no_em_dash
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")   # alias: survives model retirements
 GEMINI_IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
 
 _SECTION_KEYS = (

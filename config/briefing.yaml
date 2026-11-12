@@ -38,7 +38,7 @@ feeds:
 ai_keywords: ["ai", "a.i.", "artificial intelligence", "openai", "chatgpt", "anthropic", "deepmind", "nvidia",
               "llm", "llms", "chatbot", "chatbots", "machine learning", "data centre", "data centres",
               "data center", "data centers", "gpu", "gpus", "semiconductor", "semiconductors", "chip", "chips",
-              "chipmaker", "chipmakers", "robot", "robots", "agentic", "deepseek", "tsmc", "generative"]
+              "chipmaker", "chipmakers", "robot", "robots", "agentic", "deepseek", "tsmc", "generative", "copilot", "gemini", "xai"]
 
 # Yahoo Finance symbols. label is what a non-technical reader sees.
 markets:

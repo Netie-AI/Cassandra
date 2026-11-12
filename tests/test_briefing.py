@@ -120,7 +120,7 @@ def test_ungrounded_numbers_pair_value_with_unit():
     ("Apple buys Perplexity", 'Apple boss says "this is a done deal"'),                        # invented quote
 ])
 def test_adversarial_copy_is_rejected(source, copy):
-    assert writer.check_story_text(copy, source), f"accepted: {copy!r}"
+    assert writer.check_story_text(copy, source, title=source), f"accepted: {copy!r}"
 
 
 @pytest.mark.parametrize("source, copy", [
@@ -129,10 +129,83 @@ def test_adversarial_copy_is_rejected(source, copy):
     ("OpenAI launches GPT-5 for 200 firms", "OpenAI launches GPT-5 for 200 companies"),
 ])
 def test_faithful_copy_is_accepted(source, copy):
-    assert writer.check_story_text(copy, source) == []
+    assert writer.check_story_text(copy, source, title=source) == []
+
+
+@pytest.mark.parametrize("source, copy", [
+    ("Shares fell 8% on Monday", "Shares up 8% on Monday"),                     # "up" + figure is a direction
+    ("Shares rose 8%", "Shares lost 8%"),
+    ("Shares rose 8%", "Shares down 8%"),
+    ("Apple may buy Perplexity", "Apple buys Perplexity"),                      # talks are not done deals
+    ("Apple in talks to buy Perplexity", "Apple buys Perplexity"),
+    ("Apple won't buy Perplexity", "Apple buys Perplexity"),
+    ("Firm raises US$3 billion", "Firm raises S$3 billion"),                    # currency swap
+    ("Firm raises 3 billion yen", "Firm raises $3 billion"),
+])
+def test_second_round_adversarial_copy_is_rejected(source, copy):
+    assert writer.check_story_text(copy, source, title=source), f"accepted: {copy!r}"
+
+
+@pytest.mark.parametrize("source, copy", [
+    ("Sales up 20% this year", "Sales rose 20% this year"),                      # used to be falsely rejected
+    ("Shares down 20%", "Shares fell 20%"),
+    ("Firm raises US$3 billion", "Firm raises $3 billion"),
+    ("Apple may buy Perplexity", "Apple could buy Perplexity"),
+    ("Users sign up for the new startup tool", "People sign up for a new tool"),  # "up" without a figure
+])
+def test_second_round_faithful_copy_is_accepted(source, copy):
+    assert writer.check_story_text(copy, source, title=source) == []
+
+
+def test_hedge_in_summary_does_not_reject_a_faithful_rewrite():
+    """Regression: a stray 'could'/'not' in the summary rejected most rewrites in a live run."""
+    src = _story(1, title="United Airlines blocks AI agents from booking flights",
+                 summary="The airline said it could not verify automated tools and will not allow them.")
+    raw = {"hook": "An airline blocks AI tools.", "subject": "United blocks AI agents",
+           "stories": [{"id": "s1", "headline": "United Airlines blocks AI booking tools",
+                        "what": "United Airlines is stopping automated AI tools from booking flights.", "why": ""}]}
+    out = writer.ground(raw, [src], set())
+    assert out["stories"][0]["edited"] is True and out["rejected"] == []
+
+
+def test_opening_lines_are_rebuilt_when_a_picked_story_is_dropped():
+    rude = _story(1, title="Founder's pathetic pivot mocked", summary="")
+    ok = _story(2, title="Google launches glasses", summary="")
+    raw = {"subject": "Founder pivots, Google launches glasses", "hook": "A founder pivots today.",
+           "stories": [{"id": "s1", "headline": "Founder's pathetic pivot", "what": "", "why": ""},
+                       {"id": "s2", "headline": "Google launches glasses", "what": "", "why": ""}]}
+    out = writer.ground(raw, [rude, ok], set())
+    assert out["hook"] == "" and out["subject"] == "Google launches glasses"
+
+
+def test_subject_cannot_glue_one_storys_number_to_another_storys_company():
+    corpora = ["OpenAI raises $40 billion", "Singapore startup hires 12 people"]
+    assert writer.check_spanning("OpenAI raises $40 billion, Singapore startup hires 12", corpora) == []
+    assert writer.check_spanning("Singapore startup raises $40 billion and hires 12", corpora)
+    assert writer.check_spanning("A busy day in AI", corpora) == []
+
+
+def test_why_line_cannot_state_new_facts_or_advice():
+    src = _story(1, title="Nvidia reports results", summary="Revenue was $35 billion.")
+    raw = {"stories": [{"id": "s1", "headline": "Nvidia reports results", "what": "Revenue was $35 billion.",
+                        "why": "If you own the shares, they soared and you should definitely buy more."}]}
+    out = writer.ground(raw, [src], set())
+    assert out["stories"][0]["why"] == "" and out["stories"][0]["edited"] is True
+
+
+def test_respect_filter_does_not_block_ordinary_news_words():
+    for ok in ("Singapore's Ministry of Home Affairs to use AI to spot scams", "OpenAI hires head of global affairs",
+               "UK to ban AI apps that create nude images", "Winners and losers of the AI chip boom",
+               "Figma adds AI mockups", "Nvidia's fat margins", "Musk slams OpenAI in court filing"):
+        assert not writer.disrespectful(ok), ok
+    for bad in ("CEO resigns amid spy, affair scandals", "He quit over an affair with a colleague",
+                "reports of two extramarital affairs", "Founder's pathetic attempt to pivot"):
+        assert writer.disrespectful(bad), bad
 
 
 def test_market_commentary_must_match_data_and_give_no_advice():
+    assert writer.check_free_text("Stocks rose because of the OpenAI deal.", {"up"})       # cause claim
+    assert writer.check_free_text("Nvidia will fall after its results, steer clear.")       # certainty + advice
     assert writer.check_free_text("Markets were calm and investors waited.", {"up"}) == []
     assert writer.check_free_text("Stocks slipped as investors worried.", {"up"})        # nothing fell
     assert writer.check_free_text("Stocks rallied.", {"down"})
@@ -168,6 +241,28 @@ def test_ground_keeps_good_copy_and_rejects_invented_facts():
     assert out["big_picture"] and out["talking_point"] == "Nvidia paid $3 billion."
     assert len(out["subject"]) <= writer.SUBJECT_MAX and not out["subject"].endswith(" ")
     assert len(out["rejected"]) == 5
+
+
+def test_gossip_and_insults_never_run():
+    """Owner rule: nothing that reads like bullying or gossip about a person."""
+    src = _story(1, title="Nvidia CEO resigns amid affair scandal", summary="The board accepted his resignation.")
+    rude = _story(2, title="Founder's pathetic pivot mocked online", summary="")
+    ok = _story(3, title="Google launches glasses", summary="")
+    raw = {"talking_point": "Did you hear the boss had an affair?", "hook": "A chief executive quit.",
+           "stories": [
+               {"id": "s1", "headline": "Nvidia chief executive resigns after a scandal",
+                "what": "He quit after an extramarital affair.", "why": "For investors, leadership may change."},
+               {"id": "s2", "headline": "Founder's pathetic pivot", "what": "", "why": ""},
+               {"id": "s3", "headline": "Google launches glasses", "what": "Google launched glasses.", "why": ""}]}
+    out = writer.ground(raw, [src, rude, ok], set())
+    assert [s["id"] for s in out["stories"]] == ["s1", "s3"]             # s2: no respectful wording available
+    top = out["stories"][0]
+    assert top["headline"] == "Nvidia chief executive resigns after a scandal"
+    assert top["what"] == "The board accepted his resignation."          # gossip line replaced by the source summary
+    assert out["talking_point"] == "" and out["hook"] == ""             # hook rebuilt: s2 was dropped
+    assert not writer.disrespectful("Nvidia's chief executive resigned after a scandal, and the board named a successor.")
+    wire = writer.wire_copy([src, rude, ok], "x")
+    assert [s["id"] for s in wire["stories"]] == ["s3"]
 
 
 def test_no_key_falls_back_to_labelled_wire_copy(monkeypatch):
@@ -234,7 +329,20 @@ def test_calendar_parsing_explains_and_filters():
     (row,) = sources.parse_econ(ff, start=now, end=now + dt.timedelta(hours=30), tz=sgt, explain=cal["explain"])
     assert row["when"] == "Thu 12 Nov, 21:30 Singapore time" and "inflation" in row["plain"]
 
+    assert sources.parse_econ([{"title": "NFIB Small Business Optimism", "country": "USD", "impact": "High",
+                                "date": "2026-11-12T08:30:00-05:00"},                       # "ism" inside a word
+                               {"title": "CPI m/m", "country": "USD", "impact": "High", "date": None}],
+                              start=now, end=now + dt.timedelta(hours=30), tz=sgt, explain=cal["explain"]) == []
+    (hol,) = sources.parse_econ([{"title": "Bank Holiday", "country": "USD", "impact": "Holiday",
+                                  "date": "2026-11-13T00:00:00-05:00"}],
+                                start=now, end=now + dt.timedelta(hours=30), tz=sgt, explain=cal["explain"])
+    assert hol["when"] == "Fri 13 Nov"                                                      # all-day: no clock time
+
     nasdaq = {"data": {"rows": [{"symbol": "NVDA", "time": "time-after-hours"}, {"symbol": "ZZZZ", "time": "x"}]}}
+    after_close = dt.datetime(2026, 11, 17, 23, 30, tzinfo=UTC)                             # 18:30 New York
+    assert sources.parse_earnings(nasdaq, day=dt.date(2026, 11, 17), watchlist=cal["watchlist"], now=after_close) == []
+    before = dt.datetime(2026, 11, 17, 12, 0, tzinfo=UTC)                                   # 07:00 New York
+    assert len(sources.parse_earnings(nasdaq, day=dt.date(2026, 11, 17), watchlist=cal["watchlist"], now=before)) == 1
     (e,) = sources.parse_earnings(nasdaq, day=dt.date(2026, 11, 17), watchlist=cal["watchlist"])
     assert e["title"] == "Nvidia reports quarterly results" and "early next morning in Singapore" in e["when"]
     assert sources.parse_earnings({"data": {"rows": None}}, day=dt.date(2026, 11, 14), watchlist={}) == []

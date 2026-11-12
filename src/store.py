@@ -5,7 +5,7 @@ import json
 import os
 import secrets
 import sqlite3
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -539,6 +539,18 @@ def log_newsletter_send(email: str, subject: str, *, ok: bool, detail: str = "")
     """Audit trail for batch sends — stored in contact_log."""
     msg = f"[newsletter] subject={subject!r} ok={ok} {detail}".strip()
     log_contact(email, msg, {"type": "newsletter_dispatch"})
+
+
+def newsletter_already_sent(subject: str, hours: int = 20) -> set[str]:
+    """Emails that already received this exact subject recently (a re-run must not double-send)."""
+    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    prefix = f"[newsletter] subject={subject!r} ok=True"       # same shape log_newsletter_send writes
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT email, message FROM contact_log WHERE logged_at >= ? AND message LIKE '[newsletter]%'",
+            (since,),
+        ).fetchall()
+    return {r["email"] for r in rows if r["message"].startswith(prefix)}
 
 
 def log_contact(email: str | None, message: str, client: dict | None) -> int:

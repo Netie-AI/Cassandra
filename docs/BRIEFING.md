@@ -45,27 +45,37 @@ Schedule on Windows: `scripts/register-briefing-tasks.ps1` (calls `scripts/run-b
    older session (local holiday) or one still trading is labelled.
 2. The model may only pick from fetched stories. A story id it invents, or repeats, is dropped.
 3. Each headline and summary is checked against that story's source text
-   (`writer.check_story_text`): every number with its unit ($3 million is not $3 billion, 5 is
-   not 5%), spelled-out quantities, rose versus fell, a dropped "denies" or "reportedly", and
-   quotes. A failed field falls back to the publisher's own wording.
-4. Commentary ("In plain English", "Our read", the big-picture line) may contain no numbers and
-   no buy or sell wording, and the market mood must match the data (`writer.check_free_text`).
-5. Event dates come only from `config/events.yaml`. Unconfirmed dates say so in the email.
-6. Nothing degrades silently. A dead feed, a missing price or a failed AI editor is printed in the
+   (`writer.check_story_text`): every number with its unit and currency ($3 million is not
+   $3 billion, 5 is not 5%, US$ is not S$), spelled-out quantities, direction (rose, up 8%,
+   fell, lost), hedges in the source headline (denies, may, in talks, reportedly), and quotes.
+   A failed field falls back to the publisher's own wording.
+4. "What it means for you" gets the same checks plus a ban on advice and certainty wording.
+5. The subject line and opening line are checked clause by clause: each clause must be supported
+   by one single story (`writer.check_spanning`). If a picked story is dropped, they are rebuilt.
+6. Commentary ("In plain English", "Our read", the big-picture line) may contain no numbers,
+   no buy/sell/avoid wording and no certainty ("will fall"); the market mood must match the
+   data and may not claim a cause (`writer.check_free_text`).
+7. Respect: nothing about anyone's private life and no insults (`writer.disrespectful`). The
+   editor is told to report what a person did in their job only. Copy that fails is replaced,
+   and a story whose only available wording fails does not run.
+8. Event dates come only from `config/events.yaml`. Unconfirmed dates say so. Calendar items
+   that have already happened are left off.
+9. Nothing degrades silently. A dead feed, a missing price or a failed AI editor is printed in the
    email footer and the run log. If the AI editor is down, `--send` refuses to send raw headlines
    (exit 1) unless `--allow-wire` is passed.
-7. The unsubscribe placeholder is random per run, so a link inside a story can never receive a
-   reader's unsubscribe token.
+10. Sending: the unsubscribe placeholder is random per run, so a link inside a story can never
+    receive a reader's token. A re-run of the same edition only reaches readers not yet served.
 
-Known limits (open, from the adversarial review on 2026-11-13):
-- A number can be re-attached to the wrong thing ("lay off 10% of 3,600 staff" becoming
-  "lays off 3,600 staff"), and a wrong name or claim with no number passes. Every story
-  carries its source link for this reason.
-- The subject line and hook are checked against all picked stories together, so they can
-  combine a number from one story with the name from another.
-- The morning after a US holiday still says "Wall Street overnight" for the previous session
-  (the table shows the true date; the title does not adapt yet).
-- The weekly change is "past five sessions", not the calendar week.
+Known limits (open, from two adversarial reviews on 2026-11-13):
+- A number can be re-attached to the wrong thing inside one story ("lay off 10% of 3,600
+  staff" becoming "lays off 3,600 staff"), and a wrong name or claim with no number, direction
+  or hedge passes. Every story carries its source link for this reason.
+- Small counts ("one", "a couple") and single-quoted quotes are not checked.
+- A hedge that sits only in the summary, not the headline, is not enforced.
+- The weekly change is "past five sessions", not the calendar week, and the weekly "week
+  ahead" depends on the calendar source having rolled over by Sunday 09:00.
+- The AI keyword filter still lets through the odd non-AI "chip" story; the editor is the backstop.
+- Gemini's free tier rate-limits heavy use (many builds in an hour). Two builds a day is fine.
 - Stories from Google News often have a title only, so their summary restates the title.
 
 ## The goal (what every change is judged against)

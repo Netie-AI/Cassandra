@@ -89,11 +89,12 @@ def dispatch_rendered(
     *, subject: str, html: str, text: str, unsub_placeholder: str, tags: dict[str, str], dry_run: bool = False
 ) -> dict[str, Any]:
     """Batch-send pre-rendered copy to confirmed subscribers; the placeholder becomes each unsub token."""
-    from src.store import list_digest_recipients
+    from src.store import list_digest_recipients, newsletter_already_sent
 
-    recipients = list_digest_recipients()
+    done = newsletter_already_sent(subject)          # a re-run after a partial failure must not double-send
+    recipients = [r for r in list_digest_recipients() if r["email"] not in done]
     if dry_run or not recipients:
-        return {"sent": 0, "failed": 0, "dry_run": dry_run, "subject": subject,
+        return {"sent": 0, "failed": 0, "dry_run": dry_run, "subject": subject, "already_sent": len(done),
                 "recipients": [r["email"] for r in recipients]}
     if not is_configured():
         raise RuntimeError("No email provider configured — set RESEND_API_KEY or SMTP_* in .env")
@@ -107,7 +108,7 @@ def dispatch_rendered(
 
 def _dispatch(recipients: list[dict], subject: str, render, *, tags: dict[str, str]) -> dict[str, Any]:
     if os.getenv("RESEND_API_KEY"):
-        return _dispatch_resend_batch(recipients, subject, render)
+        return _dispatch_resend_batch(recipients, subject, render, tags)
     return _dispatch_sequential(recipients, subject, render, tags)
 
 
@@ -115,6 +116,7 @@ def _dispatch_resend_batch(
     recipients: list[dict],
     subject: str,
     render,
+    tags: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     from src.store import log_newsletter_send, mark_digest_sent
 
@@ -140,6 +142,8 @@ def _dispatch_resend_batch(
             }
             if reply_to:
                 item["reply_to"] = reply_to
+            if tags:
+                item["tags"] = [{"name": k, "value": str(v)[:256]} for k, v in tags.items()]
             batch.append(item)
             chunk_emails.append(email)
 

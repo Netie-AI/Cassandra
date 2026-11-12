@@ -57,6 +57,15 @@ government, jobs, money, everyday products. Include 1 or 2 with region "sg" when
 exist. Skip developer news, rumours, opinion columns and duplicates. Never pick two
 candidates about the same event.
 
+Respect, never broken:
+- Report what a person did in their job (resigned, was appointed, was charged, announced).
+  Never repeat claims about anyone's private life (relationships, affairs, family, health,
+  looks), even if the source does. Say "after a scandal" or "after allegations" at most.
+- Never mock, shame or insult a person, a company or a group. No sarcasm about people.
+- Skip stories that are mainly gossip, personal attacks, opinion rants or insults.
+- Skip video-game and entertainment news unless the story is really about AI.
+- "talking_point" must be a useful fact or idea, never gossip about a person.
+
 Voice: a well-read friend at a kopitiam. Short sentences. Active voice. Everyday comparisons
 are welcome if they add no facts. Explain any technical or finance term in the same sentence.
 No hype or filler (revolutionary, game-changing, shockwaves, landscape).
@@ -79,29 +88,52 @@ JSON only. No markdown.
 # -- fact-check primitives ---------------------------------------------------
 _UNIT = {"%": "pct", "percent": "pct", "per cent": "pct", "k": "k", "thousand": "k", "m": "m", "mn": "m",
          "million": "m", "b": "b", "bn": "b", "billion": "b", "tn": "t", "trillion": "t"}
-_NUM = re.compile(r"(?<![A-Za-z])(\d[\d,]*(?:\.\d+)?)"
+_NUM = re.compile(r"(?<![A-Za-z])((?:US|S|A|HK|NT|C)?\$|£|€|¥)?(\d[\d,]*(?:\.\d+)?)"
                   r"(?:\s?(%)|\s?(percent|per cent|thousand|million|billion|trillion|mn|bn|tn|k|m|b)\b)?", re.I)
 _NUM_WORDS = re.compile(
     r"\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|"
     r"seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|"
     r"thousands?|millions?|billions?|trillions?|dozens?|half|halved|doubl\w+|tripl\w+)\b", re.I)
-_UP = re.compile(r"\b(?:rose|rises?|risen|rising|soar\w*|jump\w*|gain\w*|surg\w*|climb\w*|rall(?:y|ied|ies))\b", re.I)
+# "up 8%" / "down 8%" count as direction words only when a figure follows ("sign up" must not).
+_UP = re.compile(r"\b(?:rose|rises?|risen|rising|soar\w*|jump\w*|gain\w*|surg\w*|climb\w*|rall(?:y|ied|ies)|"
+                 r"higher|grew|grows?|increas\w+|rebound\w*|spik\w+|up\s+(?:by\s+)?[\d$£€])", re.I)
 _DOWN = re.compile(r"\b(?:fell|falls?|fallen|falling|drop\w*|slump\w*|plung\w*|slid\w*|slip\w*|tumbl\w*|"
-                   r"declin\w*|sank|sinks?|sinking|crash\w*)\b", re.I)
-_DOUBT = re.compile(r"\b(?:den(?:y|ies|ied)|rejects?|rejected|rules? out|refut\w+|rumou?r\w*|reportedly|"
-                    r"unconfirmed|alleged\w*)\b", re.I)
-_QUOTE = re.compile(r"[\"“]([^\"”]{8,})[\"”]")
-_ADVICE = re.compile(r"\b(?:buy|sell|invest in|guarantee[ds]?)\b", re.I)
+                   r"declin\w*|sank|sinks?|sinking|crash\w*|lower|lost|loses?|losing|shed|shrank|shrink\w*|"
+                   r"dip(?:s|ped|ping)?|plummet\w*|decreas\w+|collaps\w+|down\s+(?:by\s+)?[\d$£€])", re.I)
+# Hedges in a HEADLINE that make the claim less than a done fact. Copy must keep one of them.
+# Looked up in the source title only: a stray "could" or "not" deep in a summary is not a hedge
+# on the main claim, and demanding it there rejected most faithful rewrites.
+_DOUBT = re.compile(r"\b(?:den(?:y|ies|ied)|rejects?|rejected|turns? down|rules? out|refut\w+|rumou?r\w*|"
+                    r"reportedly|unconfirmed|alleged\w*|accus\w+|may|might|could|in talks|consider\w*|"
+                    r"weigh(?:s|ing)?|plans? to|planning to|expected to|said to|scraps?|scrapped|"
+                    r"will not|does not|did not|has not|no plans?)\b|\b(?:wo|does|did|has|is)n['\u2019]t\b", re.I)
+_QUOTE = re.compile(r"[\"\u201c]([^\"\u201d]{8,})[\"\u201d]")
+_ADVICE = re.compile(r"\b(?:buy|sell|purchase|invest in|avoid|dump|load up|steer clear|go short|"
+                     r"guarantee[ds]?|certain(?:ly)?|definitely|"
+                     r"will (?:rise|fall|crash|soar|double|surge|slump|drop|jump|cut|raise|hike))\b", re.I)
+_CAUSE = re.compile(r"\b(?:because of|due to|thanks to|caused by|driven by|as a result of|after the)\b", re.I)
+# Private-life gossip and insults. The newsletter reports what people did in their jobs.
+# Kept narrow on purpose: "Ministry of Home Affairs", "nude image ban" and "winners and losers" are news.
+_DISRESPECT = re.compile(
+    r"\b(?:extramarital|mistress\w*|love child|affairs? scandals?|affair with|"
+    r"(?:his|her|their|an|secret|alleged|second) affairs?|cheat(?:ed|ing) on|girlfriends?|boyfriends?|"
+    r"divorc\w+|pathetic|idiots?|idiotic|stupid|morons?|clowns?|humiliat\w+|ugly)\b", re.I)
+
+
+def disrespectful(text: str) -> bool:
+    """True when copy gossips about someone's private life or insults them."""
+    return bool(_DISRESPECT.search(text or ""))
 
 
 def _numbers(text: str) -> set:
     """Every quantity in the text as (value, unit), plus spelled-out quantity words."""
     out: set = set()
-    for value, pct, unit in _NUM.findall(text or ""):
+    for cur, value, pct, unit in _NUM.findall(text or ""):
+        cur = "$" if cur.upper() == "US$" else cur.upper()      # "$3bn" is not "S$3bn" or "£3bn"
         try:
-            out.add((float(value.replace(",", "")), _UNIT.get((pct or unit).lower(), "")))
+            out.add((float(value.replace(",", "")), cur + _UNIT.get((pct or unit).lower(), "")))
         except ValueError:
-            out.add((value, ""))
+            out.add((value, cur))
     rest = _NUM.sub(" ", text or "")          # "3 billion" is already counted above as (3, b)
     return out | {w.lower() for w in _NUM_WORDS.findall(rest)}
 
@@ -111,10 +143,9 @@ def ungrounded(text: str, corpus: str) -> set:
     return _numbers(text) - _numbers(corpus)
 
 
-def check_story_text(text: str, corpus: str, *, doubt: bool = True) -> list[str]:
+def check_story_text(text: str, corpus: str, *, title: str | None = None) -> list[str]:
     """Reasons this copy is not supported by its source text. Empty list = passes.
-    doubt=False for copy that spans several stories (subject, hook): one story's "reportedly"
-    must not be demanded of a line about another."""
+    `title`: the source headline; when it hedges its claim (denies, may, in talks), the copy must too."""
     why = []
     bad = ungrounded(text, corpus)
     if bad:
@@ -123,7 +154,7 @@ def check_story_text(text: str, corpus: str, *, doubt: bool = True) -> list[str]
         why.append("says something rose, source does not")
     if _DOWN.search(text) and not _DOWN.search(corpus):
         why.append("says something fell, source does not")
-    if doubt and _DOUBT.search(corpus) and not _DOUBT.search(text):
+    if title and _DOUBT.search(title) and not _DOUBT.search(text):
         why.append("dropped the source's denial or doubt")
     low = corpus.lower()
     if any(q.lower().strip(" .,") not in low for q in _QUOTE.findall(text)):
@@ -131,14 +162,27 @@ def check_story_text(text: str, corpus: str, *, doubt: bool = True) -> list[str]
     return why
 
 
+def check_spanning(text: str, corpora: list[str]) -> list[str]:
+    """For copy that covers several stories (subject, hook): every clause must be fully supported
+    by ONE story, so a number from one story cannot be glued to the company from another."""
+    why = []
+    for clause in re.split(r"(?<=[.!?;])\s+|,\s+(?:and|plus|while|as)\s+|\s+plus\s+|,\s+", text):
+        clause = clause.strip()
+        if clause and corpora and all(check_story_text(clause, c) for c in corpora):
+            why.append(f"no single story supports: {clause[:60]!r}")
+    return why
+
+
 def check_free_text(text: str, market_dirs: set[str] | None = None) -> list[str]:
-    """Checks for commentary fields: no quantities, no advice, mood must match the market data."""
+    """Checks for commentary fields: no quantities, no advice or certainty, mood must match the data."""
     why = []
     if _numbers(text):
         why.append("contains numbers")
     if _ADVICE.search(text):
-        why.append("contains advice wording")
+        why.append("contains advice or certainty wording")
     if market_dirs is not None:
+        if _CAUSE.search(text):
+            why.append("claims a cause for a market move")
         if _UP.search(text) and "up" not in market_dirs:
             why.append("says markets rose, data shows no riser")
         if _DOWN.search(text) and "down" not in market_dirs:
@@ -161,7 +205,7 @@ def wire_copy(stories: list[Story], reason: str) -> dict[str, Any]:
     """Unedited fallback: newest news stories, at most 2 per source, original wording."""
     picked, per_source = [], {}
     for s in stories:
-        if per_source.get(s.source, 0) >= 2 or _is_opinion(s):
+        if per_source.get(s.source, 0) >= 2 or _is_opinion(s) or disrespectful(f"{s.title} {s.summary}"):
             continue
         per_source[s.source] = per_source.get(s.source, 0) + 1
         picked.append({**s.to_dict(), "headline": s.title, "what": _clip(s.summary, 280), "why": "",
@@ -186,16 +230,23 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str]) -> 
         row = {**src.to_dict(), "edited": True}
         for field, fallback in (("headline", src.title), ("what", src.summary), ("why", "")):
             text = lint_no_em_dash(str(item.get(field) or "").strip())
-            if field == "why":       # a consequence, so only its quantities are checked
-                extra = ungrounded(text, corpus)
-                bad = [f"numbers not in source {sorted(map(str, extra))}"] if extra else []
-            else:
+            if field == "why":       # a possible consequence: must not state new facts or advice
                 bad = check_story_text(text, corpus)
+                if _ADVICE.search(text):
+                    bad.append("contains advice or certainty wording")
+            else:
+                bad = check_story_text(text, corpus, title=src.title)
+            if disrespectful(text):
+                bad.append("gossip or insult wording")
             if bad or not text:
                 rejected += [f"{src.id}.{field}: {b}" for b in bad]
                 text = fallback
                 row["edited"] = row["edited"] and field == "why"
             row[field] = text
+        # the publisher's own wording can be the problem: then the story does not run at all
+        if disrespectful(f"{row['headline']} {row['what']}"):
+            rejected.append(f"{src.id}: dropped, only available wording is gossip or insult")
+            continue
         out_stories.append(row)
 
     copy: dict[str, Any] = {"stories": out_stories}
@@ -207,15 +258,23 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str]) -> 
         if field == "subject":
             text = _clip(text, SUBJECT_MAX)
         bad = reasons_for(text) if text else []
+        if disrespectful(text):
+            bad.append("gossip or insult wording")
         rejected.extend(f"{field}: {b}" for b in bad)
         copy[field] = "" if bad else text
 
-    take("subject", lambda t: check_story_text(t, pooled, doubt=False))
-    take("hook", lambda t: check_story_text(t, pooled, doubt=False))
-    take("talking_point", lambda t: check_story_text(t, first))
+    corpora = [f"{s['title']} {s['summary']}" for s in out_stories]
+    take("subject", lambda t: check_spanning(t, corpora))
+    take("hook", lambda t: check_spanning(t, corpora))
+    take("talking_point", lambda t: check_story_text(t, first, title=out_stories[0]["title"] if out_stories else None))
     take("big_picture", check_free_text)
     take("outlook", check_free_text)
     take("market_take", lambda t: check_free_text(t, market_dirs))
+    if any(": dropped," in r for r in rejected):
+        # the opening lines were written for a line-up that no longer exists
+        copy["hook"] = copy["big_picture"] = ""
+        copy["subject"] = _clip(out_stories[0]["headline"], SUBJECT_MAX) if out_stories else ""
+        rejected.append("subject and hook rebuilt: a picked story was dropped")
     copy["rejected"] = rejected
     return copy
 
