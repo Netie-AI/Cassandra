@@ -206,6 +206,15 @@ def newspaper_report():
     return _static_page("newspaper-report.html")
 
 
+@app.get("/briefing")
+def briefing_latest():
+    """Latest AI Briefing edition as built by `python -m src.briefing` (same HTML as the email)."""
+    path = ROOT / "reports" / "briefings" / "latest.html"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="No briefing built yet. Run: python -m src.briefing --edition morning")
+    return FileResponse(path, media_type="text/html; charset=utf-8")
+
+
 @app.get("/agents")
 @app.get("/agents.html")
 def agents_page():

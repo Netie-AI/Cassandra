@@ -129,14 +129,27 @@ def _build_prompt(
     return json.dumps(payload, indent=2)
 
 
-def _gemini_generate(api_key: str, prompt: str, system: str) -> str:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+def _gemini_generate(
+    api_key: str,
+    prompt: str,
+    system: str,
+    *,
+    model: str | None = None,
+    max_tokens: int = 1024,
+    temperature: float = 0.4,
+    json_mode: bool = False,
+    timeout: float = 90,
+) -> str:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model or GEMINI_MODEL}:generateContent"
+    config: dict[str, Any] = {"temperature": temperature, "maxOutputTokens": max_tokens}
+    if json_mode:
+        config["responseMimeType"] = "application/json"
     body = {
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1024},
+        "generationConfig": config,
     }
-    r = httpx.post(url, params={"key": api_key}, json=body, timeout=60)
+    r = httpx.post(url, params={"key": api_key}, json=body, timeout=timeout)
     r.raise_for_status()
     data = r.json()
     return data["candidates"][0]["content"]["parts"][0]["text"]
