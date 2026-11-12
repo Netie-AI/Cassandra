@@ -76,19 +76,47 @@ def dispatch_digest(*, dry_run: bool = False) -> dict[str, Any]:
     if not is_configured():
         raise RuntimeError("No email provider configured — set RESEND_API_KEY or SMTP_* in .env")
 
-    if os.getenv("RESEND_API_KEY"):
-        return _dispatch_resend_batch(recipients, subject, crs, phase, phase_conf, asof)
+    def render(rec: dict) -> tuple[str, str]:
+        html = render_edition_html(
+            crs=crs, phase=phase, phase_conf=phase_conf, asof=str(asof), unsub_token=rec["unsub_token"]
+        )
+        return html, render_edition_text(crs=crs, phase=phase, asof=str(asof))
 
-    return _dispatch_sequential(recipients, subject, crs, phase, phase_conf, asof)
+    return _dispatch(recipients, subject, render, tags={"type": "digest", "asof": str(asof)})
+
+
+def dispatch_rendered(
+    *, subject: str, html: str, text: str, unsub_placeholder: str, tags: dict[str, str], dry_run: bool = False
+) -> dict[str, Any]:
+    """Batch-send pre-rendered copy to confirmed subscribers; the placeholder becomes each unsub token."""
+    from src.store import list_digest_recipients, newsletter_already_sent
+
+    done = newsletter_already_sent(subject)          # a re-run after a partial failure must not double-send
+    recipients = [r for r in list_digest_recipients() if r["email"] not in done]
+    if dry_run or not recipients:
+        return {"sent": 0, "failed": 0, "dry_run": dry_run, "subject": subject, "already_sent": len(done),
+                "recipients": [r["email"] for r in recipients]}
+    if not is_configured():
+        raise RuntimeError("No email provider configured — set RESEND_API_KEY or SMTP_* in .env")
+
+    def render(rec: dict) -> tuple[str, str]:
+        token = rec["unsub_token"] or ""
+        return html.replace(unsub_placeholder, token), text.replace(unsub_placeholder, token)
+
+    return _dispatch(recipients, subject, render, tags=tags)
+
+
+def _dispatch(recipients: list[dict], subject: str, render, *, tags: dict[str, str]) -> dict[str, Any]:
+    if os.getenv("RESEND_API_KEY"):
+        return _dispatch_resend_batch(recipients, subject, render, tags)
+    return _dispatch_sequential(recipients, subject, render, tags)
 
 
 def _dispatch_resend_batch(
     recipients: list[dict],
     subject: str,
-    crs: float | None,
-    phase: str | None,
-    phase_conf: float | None,
-    asof: str | int,
+    render,
+    tags: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     from src.store import log_newsletter_send, mark_digest_sent
 
@@ -104,14 +132,7 @@ def _dispatch_resend_batch(
         chunk_emails: list[str] = []
         for rec in chunk:
             email = rec["email"]
-            html = render_edition_html(
-                crs=crs,
-                phase=phase,
-                phase_conf=phase_conf,
-                asof=str(asof),
-                unsub_token=rec["unsub_token"],
-            )
-            text = render_edition_text(crs=crs, phase=phase, asof=str(asof))
+            html, text = render(rec)
             item: dict[str, Any] = {
                 "from": from_addr,
                 "to": [email],
@@ -121,6 +142,8 @@ def _dispatch_resend_batch(
             }
             if reply_to:
                 item["reply_to"] = reply_to
+            if tags:
+                item["tags"] = [{"name": k, "value": str(v)[:256]} for k, v in tags.items()]
             batch.append(item)
             chunk_emails.append(email)
 
@@ -153,10 +176,8 @@ def _dispatch_resend_batch(
 def _dispatch_sequential(
     recipients: list[dict],
     subject: str,
-    crs: float | None,
-    phase: str | None,
-    phase_conf: float | None,
-    asof: str | int,
+    render,
+    tags: dict[str, str],
 ) -> dict[str, Any]:
     import time
 
@@ -167,16 +188,9 @@ def _dispatch_sequential(
     sent_emails: list[str] = []
     for rec in recipients:
         email = rec["email"]
-        html = render_edition_html(
-            crs=crs,
-            phase=phase,
-            phase_conf=phase_conf,
-            asof=str(asof),
-            unsub_token=rec["unsub_token"],
-        )
-        text = render_edition_text(crs=crs, phase=phase, asof=str(asof))
+        html, text = render(rec)
         try:
-            send_edition(to=email, subject=subject, html=html, text=text, tags={"type": "digest", "asof": str(asof)})
+            send_edition(to=email, subject=subject, html=html, text=text, tags=tags)
             log_newsletter_send(email, subject, ok=True)
             sent_emails.append(email)
             sent += 1

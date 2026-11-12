@@ -1,0 +1,55 @@
+# Jargon buster. If a term shows up in today's stories, its plain-English meaning is printed
+# at the bottom of the email. Curated by hand so definitions are never invented by the model.
+# match: lowercase substrings that trigger the term.
+terms:
+  - term: AI model
+    match: ["ai model", "language model", "llm", "foundation model"]
+    plain: The "brain" behind tools like ChatGPT. It is software trained on huge amounts of text or images so it can answer questions and create content.
+  - term: AI agent
+    match: ["ai agent", "agentic", "agents"]
+    plain: An AI that does tasks for you step by step, such as booking, researching or writing code, instead of only answering questions.
+  - term: GPU / AI chip
+    match: ["gpu", "ai chip", "accelerator"]
+    plain: A powerful computer chip that AI needs in order to learn and run. Nvidia makes most of them.
+  - term: Data centre
+    match: ["data center", "data centre"]
+    plain: A warehouse full of computers. AI runs inside these buildings, and they use a lot of electricity and water.
+  - term: Capex
+    match: ["capex", "capital expenditure", "capital spending"]
+    plain: Money a company spends on big long-term things such as buildings and equipment. For tech giants today, that mostly means AI data centres.
+  - term: Hyperscaler
+    match: ["hyperscaler"]
+    plain: A giant cloud company (Microsoft, Amazon, Google, Meta) that builds and rents out enormous computing power.
+  - term: Training vs inference
+    match: ["inference", "training run", "model training"]
+    plain: Training is teaching the AI (slow and very expensive). Inference is the AI actually answering you (fast, and it happens every time you use it).
+  - term: Open source
+    match: ["open source", "open-source", "open weights"]
+    plain: Software or AI that anyone can download, inspect and use for free, instead of being locked inside one company.
+  - term: Earnings
+    match: ["earnings", "quarterly results", "revenue guidance"]
+    plain: A company's report card, published every three months, showing how much it sold and how much it kept as profit.
+  - term: Index
+    match: ["index", "s&p 500", "nasdaq", "straits times"]
+    plain: A basket of shares used as a quick measure of a whole market. If the index is up, most big companies in it rose.
+  - term: Futures
+    match: ["futures"]
+    plain: Bets on where a market will be later. Before the US market opens, futures give an early hint of the mood.
+  - term: Interest rates / the Fed
+    match: ["interest rate", "federal reserve", "the fed", "fomc", "rate cut", "rate hike"]
+    plain: The Fed is the US central bank. When it lowers interest rates, borrowing gets cheaper, which usually helps shares, especially technology.
+  - term: Export controls
+    match: ["export control", "export curbs", "chip ban", "export restriction"]
+    plain: Government rules that limit which advanced chips can be sold to certain countries, mainly US limits on sales to China.
+  - term: Valuation
+    match: ["valuation", "valued at"]
+    plain: What a company is judged to be worth. A high valuation means investors expect a lot of future growth.
+  - term: IPO
+    match: ["ipo", "public listing", "goes public", "go public"]
+    plain: When a private company starts selling its shares on a stock market for the first time.
+  - term: Interim CEO
+    match: ["interim ceo", "interim chief", "interim leader"]
+    plain: A temporary boss who runs the company until a permanent chief executive is chosen.
+  - term: Startup
+    match: ["startup", "start-up"]
+    plain: A young company trying to grow fast, usually funded by investors rather than by its own profits.

@@ -1,0 +1,95 @@
+# Cassandra AI Briefing: sources, markets, schedule.
+# Everything here is keyless (RSS + Yahoo chart API). Edit freely, no code change needed.
+
+timezone: Asia/Singapore
+
+# auto mode: which edition runs at which local hour window (see src/briefing/build.py::pick_edition)
+schedule:
+  morning: {days: [tue, wed, thu, fri, sat], time: "07:30"}   # after the US close, before SGX opens 09:00
+  evening: {days: [mon, tue, wed, thu, fri], time: "20:30"}   # after Asia closes, before the US opens
+  weekly:  {days: [sun], time: "09:00"}                        # week in review + week ahead
+
+# How far back each edition looks for stories (hours)
+lookback_hours: {morning: 16, evening: 14, weekly: 168}
+
+# ai_only: true means every item in the feed is already about AI; false means we keyword-filter it.
+# region: sg marks a Singapore-only feed. Other stories get the SG tag only if they mention Singapore.
+feeds:
+  - {name: TechCrunch,            region: global, ai_only: true,  url: "https://techcrunch.com/category/artificial-intelligence/feed/"}
+  - {name: The Verge,             region: global, ai_only: true,  url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"}
+  - {name: MIT Technology Review, region: global, ai_only: true,  url: "https://www.technologyreview.com/topic/artificial-intelligence/feed"}
+  - {name: Ars Technica,          region: global, ai_only: true,  url: "https://arstechnica.com/ai/feed/"}
+  - {name: BBC News,              region: global, ai_only: false, url: "https://feeds.bbci.co.uk/news/topics/ce1qrvleleqt/rss.xml"}
+  - {name: The New York Times,    region: global, ai_only: true,  url: "https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/spotlight/artificial-intelligence/rss.xml"}
+  - {name: The Guardian,          region: global, ai_only: false, url: "https://www.theguardian.com/uk/technology/rss"}
+  - {name: South China Morning Post, region: global, ai_only: false, url: "https://www.scmp.com/rss/36/feed"}
+  - {name: OpenAI,                region: global, ai_only: true,  url: "https://openai.com/news/rss.xml"}
+  - {name: Google,                region: global, ai_only: true,  url: "https://blog.google/technology/ai/rss/"}
+  - {name: Nvidia,                region: global, ai_only: false, url: "https://nvidianews.nvidia.com/releases.xml"}
+  - {name: Fintech News Singapore, region: global, ai_only: false, url: "https://fintechnews.sg/feed/"}
+  - {name: e27,                   region: global, ai_only: false, url: "https://e27.co/feed/"}
+  - {name: The Business Times,    region: global, ai_only: false, url: "https://www.businesstimes.com.sg/rss/companies-markets"}
+  - {name: Tech in Asia,          region: global, ai_only: false, url: "https://www.techinasia.com/feed"}
+  - {name: The Business Times,    region: global, ai_only: false, url: "https://www.businesstimes.com.sg/rss/technology"}
+  - {name: CNA,                   region: global, ai_only: false, url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"}
+  - {name: Google News SG,        region: sg,     ai_only: false, url: "https://news.google.com/rss/search?q=(AI+OR+%22artificial+intelligence%22)+Singapore+when:2d&hl=en-SG&gl=SG&ceid=SG:en"}
+
+# whole-word matches, lowercase
+ai_keywords: ["ai", "a.i.", "artificial intelligence", "openai", "chatgpt", "anthropic", "deepmind", "nvidia",
+              "llm", "llms", "chatbot", "chatbots", "machine learning", "data centre", "data centres",
+              "data center", "data centers", "gpu", "gpus", "semiconductor", "semiconductors", "chip", "chips",
+              "chipmaker", "chipmakers", "robot", "robots", "agentic", "deepseek", "tsmc", "generative", "copilot", "gemini", "xai"]
+
+# Yahoo Finance symbols. label is what a non-technical reader sees.
+markets:
+  us:
+    - {symbol: "^GSPC", label: "S&P 500",             note: "500 biggest US companies"}
+    - {symbol: "^IXIC", label: "Nasdaq",              note: "tech-heavy US index"}
+    - {symbol: "^SOX",  label: "Chip stocks (SOX)",   note: "companies that make AI chips"}
+    - {symbol: "NVDA",  label: "Nvidia",              note: "the biggest AI chip maker"}
+    - {symbol: "TSM",   label: "TSMC",                note: "the Taiwan firm that manufactures most AI chips"}
+  asia:
+    - {symbol: "^STI",    label: "Straits Times Index", note: "Singapore's main index"}
+    - {symbol: "D05.SI",  label: "DBS",                 note: "Singapore's biggest bank"}
+    - {symbol: "SGD=X",   label: "US dollar in SGD",    note: "Singapore dollars needed to buy one US dollar"}
+    - {symbol: "^N225",   label: "Nikkei 225",          note: "Japan"}
+    - {symbol: "^HSI",    label: "Hang Seng",           note: "Hong Kong"}
+    - {symbol: "^KS11",   label: "KOSPI",               note: "South Korea, home of Samsung and SK Hynix"}
+    - {symbol: "^TWII",   label: "Taiwan Weighted",     note: "Taiwan, home of TSMC"}
+  futures:
+    - {symbol: "ES=F", label: "S&P 500 futures", note: "a hint of how US stocks may open"}
+    - {symbol: "NQ=F", label: "Nasdaq futures",  note: "a hint of how US tech may open"}
+
+# "On the calendar": scheduled US releases and big-tech results (both keyless, see docs/BRIEFING.md).
+calendar:
+  econ_url: "https://nfs.faireconomy.media/ff_calendar_thisweek.json"   # this week only; fetch once per run
+  earnings_url: "https://api.nasdaq.com/api/calendar/earnings"          # ?date=YYYY-MM-DD, one call per day
+  earnings_days_ahead: 5
+  # ticker: name a non-technical reader recognises
+  watchlist: {NVDA: Nvidia, MSFT: Microsoft, GOOGL: "Google (Alphabet)", AMZN: Amazon, META: "Meta (Facebook)",
+              AAPL: Apple, TSM: TSMC, AMD: AMD, AVGO: Broadcom, ORCL: Oracle, PLTR: Palantir, TSLA: Tesla}
+  # plain-English meaning for US data releases, matched on the event title (first match wins)
+  explain:
+    - {match: "cpi",                plain: "the US inflation report: how fast prices are rising. Hotter than expected usually hurts tech shares"}
+    - {match: "ppi",                plain: "prices that US factories charge, an early hint about inflation"}
+    - {match: "pce",                plain: "the inflation measure the US central bank watches most closely"}
+    - {match: "non-farm",           plain: "the monthly US jobs report, the single most watched number on the economy"}
+    - {match: "unemployment claims", plain: "how many Americans newly applied for jobless benefits, a weekly health check on jobs"}
+    - {match: "unemployment rate",  plain: "the share of Americans out of work"}
+    - {match: "federal funds rate", plain: "the US central bank's interest rate decision"}
+    - {match: "fomc",               plain: "a signal from the US central bank about where interest rates are heading"}
+    - {match: "fed chair",          plain: "the head of the US central bank speaks, and markets listen for hints on interest rates"}
+    - {match: "gdp",                plain: "how fast the US economy is growing"}
+    - {match: "retail sales",       plain: "how much Americans are spending in shops and online"}
+    - {match: "ism",                plain: "a survey of how busy US businesses are"}
+    - {match: "consumer sentiment", plain: "a survey of how confident American shoppers feel"}
+    - {match: "consumer confidence", plain: "a survey of how confident American shoppers feel"}
+    - {match: "bank holiday",       plain: "US markets are closed"}
+
+# Fallback AI editors, tried in this order when Gemini is rate-limited or down. Each is used only
+# if its key is set in the environment. Any OpenAI-compatible chat endpoint works. The same fact
+# check runs on the copy whichever editor wrote it.
+writers:
+  - {name: mistral,    key_env: MISTRAL_API_KEY,    model: mistral-large-latest,        url: "https://api.mistral.ai/v1/chat/completions"}
+  - {name: cerebras,   key_env: CEREBRAS_API_KEY,   model: gpt-oss-120b,                url: "https://api.cerebras.ai/v1/chat/completions"}
+  - {name: openrouter, key_env: OPENROUTER_API_KEY, model: anthropic/claude-sonnet-4-6, url: "https://openrouter.ai/api/v1/chat/completions"}
