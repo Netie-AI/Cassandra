@@ -30,10 +30,9 @@ def save(ed: dict) -> Path:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     stem = f"{ed['date']}-{ed['edition']}"
     (OUT_DIR / f"{stem}.json").write_text(json.dumps(ed, indent=2, ensure_ascii=False), encoding="utf-8")
-    html = render.render_html(ed)
+    page = render.render_page(ed)
     for name in (f"{stem}.html", "latest.html"):
-        (OUT_DIR / name).write_text(f"<!doctype html><meta charset='utf-8'><title>{ed['title']}</title>{html}",
-                                    encoding="utf-8")
+        (OUT_DIR / name).write_text(page, encoding="utf-8")
     return OUT_DIR / f"{stem}.html"
 
 

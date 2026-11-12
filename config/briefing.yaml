@@ -24,9 +24,11 @@ feeds:
   - {name: CNA,                   region: global, ai_only: false, url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"}
   - {name: Google News SG,        region: sg,     ai_only: false, url: "https://news.google.com/rss/search?q=(AI+OR+%22artificial+intelligence%22)+Singapore+when:2d&hl=en-SG&gl=SG&ceid=SG:en"}
 
-ai_keywords: [" ai ", "ai-", "a.i.", "artificial intelligence", "openai", "chatgpt", "anthropic", "claude",
-              "gemini", "deepmind", "nvidia", "llm", "chatbot", "machine learning", "data centre", "data center",
-              "gpu", "semiconductor", "chip", "copilot", "robot", "agentic", "deepseek", "tsmc"]
+# whole-word matches, lowercase
+ai_keywords: ["ai", "a.i.", "artificial intelligence", "openai", "chatgpt", "anthropic", "deepmind", "nvidia",
+              "llm", "llms", "chatbot", "chatbots", "machine learning", "data centre", "data centres",
+              "data center", "data centers", "gpu", "gpus", "semiconductor", "semiconductors", "chip", "chips",
+              "chipmaker", "chipmakers", "robot", "robots", "agentic", "deepseek", "tsmc", "generative"]
 
 # Yahoo Finance symbols. label is what a non-technical reader sees.
 markets:

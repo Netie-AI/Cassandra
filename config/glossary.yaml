@@ -47,3 +47,9 @@ terms:
   - term: IPO
     match: ["ipo", "public listing", "goes public", "go public"]
     plain: When a private company starts selling its shares on a stock market for the first time.
+  - term: Interim CEO
+    match: ["interim ceo", "interim chief", "interim leader"]
+    plain: A temporary boss who runs the company until a permanent chief executive is chosen.
+  - term: Startup
+    match: ["startup", "start-up"]
+    plain: A young company trying to grow fast, usually funded by investors rather than by its own profits.

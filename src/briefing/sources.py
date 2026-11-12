@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 import html
+import math
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
@@ -54,14 +55,16 @@ class Story:
 
 
 def _clean(text: str | None, limit: int = 600) -> str:
-    text = re.sub(r"<[^>]+>", " ", html.unescape(text or ""))
+    # Strip real tags only. A bare "<" or ">" in prose ("cost < $5 ... revenue > $9bn") must
+    # survive, otherwise the text between them vanishes and the numbers change meaning.
+    text = re.sub(r"</?[a-zA-Z][^<>]*>", " ", html.unescape(text or ""))
     return re.sub(r"\s+", " ", text).strip()[:limit]
 
 
 def _parse_date(raw: str | None) -> dt.datetime | None:
     if not raw:
         return None
-    raw = raw.strip()
+    raw = re.sub(r"\b(SGT|HKT|MYT)$", "+0800", raw.strip())
     try:
         d = parsedate_to_datetime(raw)               # RSS: RFC 822
     except (TypeError, ValueError):
@@ -69,7 +72,9 @@ def _parse_date(raw: str | None) -> dt.datetime | None:
             d = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))   # Atom: ISO 8601
         except ValueError:
             return None
-    return (d if d.tzinfo else d.replace(tzinfo=UTC)).astimezone(UTC)
+    if d.tzinfo is None:       # no timezone = we cannot place it in the window honestly
+        return None
+    return d.astimezone(UTC)
 
 
 def parse_feed(xml_text: str, *, source: str, region: str = "global") -> list[Story]:
@@ -109,12 +114,13 @@ def parse_feed(xml_text: str, *, source: str, region: str = "global") -> list[St
 
 
 def _is_ai(story: Story, keywords: list[str]) -> bool:
-    text = f" {story.title} {story.summary} ".lower()
-    return any(k in text for k in keywords)
+    """Whole-word match, so "chip" does not fire on Chipotle and "ai" not on Dubai-based."""
+    text = f"{story.title} {story.summary}".lower()
+    return any(re.search(rf"(?<![a-z0-9]){re.escape(k)}(?![a-z0-9])", text) for k in keywords)
 
 
 def _norm_title(title: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()[:70]
+    return re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()
 
 
 def fetch_stories(cfg: dict, *, since: dt.datetime, now: dt.datetime | None = None,
@@ -134,6 +140,8 @@ def fetch_stories(cfg: dict, *, since: dt.datetime, now: dt.datetime | None = No
         except Exception as exc:
             problems.append(f"news feed '{feed['name']}' unavailable ({type(exc).__name__})")
             continue
+        if not items:
+            problems.append(f"news feed '{feed['name']}' returned no readable stories")
         for s in items:
             if not (since < s.published <= now):
                 continue
@@ -180,12 +188,15 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
         return (dt.datetime.fromtimestamp(ts, UTC) + off).date()
 
     by_date: dict[dt.date, float] = {}          # one close per exchange-local session date
+    def ok(v: Any) -> bool:
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v > 0
+
     for t, c in zip(res["timestamp"], closes):
-        if c is not None:
+        if ok(c):
             by_date[local_date(t)] = float(c)
     # Yahoo often leaves the newest daily bar empty for hours after the close; the meta block
     # has the real last price. Without this the "latest close" is silently a day old.
-    if meta.get("regularMarketPrice") is not None and meta.get("regularMarketTime"):
+    if ok(meta.get("regularMarketPrice")) and meta.get("regularMarketTime"):
         by_date[local_date(meta["regularMarketTime"])] = float(meta["regularMarketPrice"])
     bars = sorted(by_date.items())
     if len(bars) < 2:
@@ -195,10 +206,13 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
     week_c = bars[-6][1] if len(bars) >= 6 else None
     now = now or dt.datetime.now(UTC)
     period = (meta.get("currentTradingPeriod") or {}).get("regular") or {}
-    live = bool(period) and period.get("start", 0) <= now.timestamp() < period.get("end", 0)
+    live = (bool(period) and period.get("start", 0) <= now.timestamp() < period.get("end", 0)
+            and last_d == (now + off).date())            # a holiday has trading hours but no trades
+    prev_d = bars[-2][0]
     return Quote(
         symbol=symbol, label=label, note=note, close=float(last_c),
-        pct_1d=(last_c / prev_c - 1) * 100,
+        # a gap of more than 5 days means a missing bar: the "one-day" change would span several sessions
+        pct_1d=(last_c / prev_c - 1) * 100 if (last_d - prev_d).days <= 5 else None,
         pct_5d=(last_c / week_c - 1) * 100 if week_c else None,
         session_date=last_d.isoformat(),
         live=live,

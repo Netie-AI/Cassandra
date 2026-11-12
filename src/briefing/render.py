@@ -2,14 +2,18 @@
 from __future__ import annotations
 
 import datetime as dt
+import secrets
 from html import escape as e
 from typing import Any
 
-UNSUB_PLACEHOLDER = "__UNSUB_TOKEN__"
+# Random per process: feed or model text cannot contain it, so a hostile link can never
+# receive a subscriber's unsubscribe token when dispatch swaps the placeholder.
+UNSUB_PLACEHOLDER = f"__UNSUB_{secrets.token_hex(12)}__"
 _SITE = "https://crash.netie.ai"
-_H2 = ("font-family:Georgia,serif;font-size:19px;margin:32px 0 12px;padding-top:14px;"
+_H2 = ("font-family:Georgia,serif;font-size:20px;margin:32px 0 12px;padding-top:14px;"
        "border-top:2px solid #1a1a1a;color:#1a1a1a;")
-_SMALL = "font-size:12px;color:#666;"
+_SMALL = "font-size:13px;color:#555;"
+_LINK = "display:inline-block;padding:8px 0;"
 
 
 def _day(iso: str) -> str:
@@ -31,58 +35,80 @@ def _when(ev: dict) -> str:
     return f"{span} ({tag})"
 
 
+def _row_note(r: dict) -> str:
+    note = r["note"]
+    if r.get("old"):
+        note += f" · last traded {_day(r['session_date'])}"
+    if r.get("live"):
+        note += " · still trading"
+    return note
+
+
 def _market_html(block: dict) -> str:
     rows = ""
     for r in block["rows"]:
         pct = r["pct"]
-        color = "#666" if pct is None or abs(pct) < 0.05 else ("#15803D" if pct > 0 else "#B91C1C")
+        color = "#555" if pct is None or r["pct_text"] == "flat" else ("#15803D" if pct > 0 else "#B91C1C")
         rows += (
             "<tr>"
-            f"<td style='padding:6px 0;border-bottom:1px solid #eee;'><strong>{e(r['label'])}</strong>"
-            f"<br><span style='{_SMALL}'>{e(r['note'])}</span></td>"
-            f"<td style='padding:6px 0;border-bottom:1px solid #eee;text-align:right;{_SMALL}'>{e(r['close'])}</td>"
-            f"<td style='padding:6px 0 6px 12px;border-bottom:1px solid #eee;text-align:right;"
+            f"<td style='padding:7px 0;border-bottom:1px solid #eee;width:62%;'><strong>{e(r['label'])}</strong>"
+            f"<br><span style='{_SMALL}'>{e(_row_note(r))}</span></td>"
+            f"<td style='padding:7px 0;border-bottom:1px solid #eee;text-align:right;{_SMALL}'>{e(r['close'])}</td>"
+            f"<td style='padding:7px 0 7px 12px;border-bottom:1px solid #eee;text-align:right;"
             f"font-weight:700;color:{color};white-space:nowrap;'>{e(r['pct_text'])}</td>"
             "</tr>"
         )
-    asof = ("prices still moving, snapshot taken when this email was written" if block["live"]
-            else f"closing prices, {_day(block['asof'])}")
+    asof = ("Snapshot taken when this email was written" if block["live"]
+            else f"Closing prices, {_day(block['asof'])}")
     if block.get("stale"):
         asof += ". Markets have been closed since then"
     return (
-        f"<div style='margin:0 0 18px;'><div style='font-weight:700;font-size:15px;'>{e(block['title'])}</div>"
-        f"<div style='font-size:15px;margin:2px 0 6px;'>{e(block['summary'])}</div>"
+        f"<div style='margin:0 0 18px;'><div style='font-weight:700;'>{e(block['title'])}</div>"
+        f"<div style='margin:2px 0 6px;'>{e(block['summary'])}</div>"
         f"<table role='presentation' width='100%' cellpadding='0' cellspacing='0' "
-        f"style='border-collapse:collapse;font-size:14px;'>{rows}</table>"
+        f"style='border-collapse:collapse;font-size:15px;'>{rows}</table>"
         f"<div style='{_SMALL}margin-top:4px;'>{e(asof)}</div></div>"
     )
 
 
 def _story_html(s: dict) -> str:
-    why = (f"<p style='margin:6px 0 0;'><strong>Why it matters:</strong> {e(s['why'])}</p>" if s.get("why") else "")
+    why = (f"<p style='margin:6px 0 0;'><strong>What it means for you:</strong> {e(s['why'])}</p>"
+           if s.get("why") else "")
     what = f"<p style='margin:6px 0 0;'>{e(s['what'])}</p>" if s.get("what") else ""
     flag = " 🇸🇬" if s.get("region") == "sg" else ""
+    url = e(s["url"], quote=True)
     return (
-        "<div style='margin:0 0 22px;'>"
-        f"<a href='{e(s['url'], quote=True)}' style='font-family:Georgia,serif;font-size:17px;font-weight:700;"
+        "<div style='margin:0 0 20px;'>"
+        f"<a href='{url}' style='font-family:Georgia,serif;font-size:18px;font-weight:700;"
         f"color:#1a1a1a;text-decoration:none;line-height:1.35;'>{e(s['headline'])}{flag}</a>"
         f"{what}{why}"
-        f"<p style='margin:6px 0 0;{_SMALL}'>Source: <a href='{e(s['url'], quote=True)}' "
-        f"style='color:#666;'>{e(s['source'])}</a></p></div>"
+        f"<a href='{url}' style='{_SMALL}{_LINK}'>Read the source: {e(s['source'])}</a></div>"
     )
 
 
 def render_html(ed: dict[str, Any]) -> str:
+    stories = ed["stories"]
+    preheader = ed.get("hook") or (stories[0]["headline"] if stories else "")
     parts = [
-        "<div style=\"max-width:600px;margin:0 auto;font-family:'DM Sans',Arial,sans-serif;"
-        "font-size:15px;line-height:1.6;color:#1a1a1a;\">",
+        f"<div style='display:none;max-height:0;overflow:hidden;'>{e(preheader)}</div>",
+        "<div style=\"max-width:600px;margin:0 auto;padding:0 16px;font-family:'DM Sans',Arial,sans-serif;"
+        "font-size:16px;line-height:1.6;color:#1a1a1a;\">",
         "<div style='border-bottom:2px solid #1a1a1a;padding:16px 0;'>"
         "<span style='font-family:Georgia,serif;font-size:22px;font-weight:700;'>Cassandra</span>"
-        f"<span style='font-size:11px;color:#666;margin-left:12px;'>AI Briefing · {e(ed['title'])} · "
+        f"<span style='font-size:13px;color:#555;margin-left:12px;'>AI Briefing · {e(ed['title'])} · "
         f"{e(ed['date_label'])}</span></div>",
     ]
     if ed.get("hook"):
-        parts.append(f"<p style='font-size:17px;line-height:1.55;margin:20px 0 0;'>{e(ed['hook'])}</p>")
+        parts.append(f"<p style='font-size:18px;line-height:1.5;margin:20px 0 0;'>{e(ed['hook'])}</p>")
+    if ed.get("big_picture"):
+        parts.append(f"<p style='margin:10px 0 0;font-style:italic;color:#333;'>{e(ed['big_picture'])}</p>")
+
+    if stories:      # the biggest story comes before the numbers
+        parts.append(f"<h2 style='{_H2}'>Top story</h2>")
+        parts.append(_story_html(stories[0]))
+        if ed.get("talking_point"):
+            parts.append("<p style='margin:0;padding:12px 14px;background:#f3f1ed;'>"
+                         f"<strong>Say this at lunch:</strong> {e(ed['talking_point'])}</p>")
 
     if ed["markets"]:
         parts.append(f"<h2 style='{_H2}'>Markets in 30 seconds</h2>")
@@ -90,10 +116,10 @@ def render_html(ed: dict[str, Any]) -> str:
         if ed.get("market_take"):
             parts.append(f"<p style='margin:0;'><strong>In plain English:</strong> {e(ed['market_take'])}</p>")
 
-    if ed["stories"]:
-        label = "This week in AI" if ed["edition"] == "weekly" else "What happened in AI"
+    if stories[1:]:
+        label = "More from the week in AI" if ed["edition"] == "weekly" else "Also in AI"
         parts.append(f"<h2 style='{_H2}'>{label}</h2>")
-        parts += [_story_html(s) for s in ed["stories"]]
+        parts += [_story_html(s) for s in stories[1:]]
 
     if ed.get("outlook") or ed["events"]:
         parts.append(f"<h2 style='{_H2}'>What to watch next</h2>")
@@ -114,33 +140,47 @@ def render_html(ed: dict[str, Any]) -> str:
                   for g in ed["glossary"]]
 
     notes = "".join(f"<br>Note: {e(p)}." for p in ed["problems"])
-    writer = ("Stories rewritten in plain English by an AI editor; every number is checked against the "
-              "linked source." if ed["writer"] != "wire" else "")
+    writer = ("Stories are rewritten in plain English by an AI editor, then checked by software against the "
+              "linked source (numbers, direction, quotes). " if ed["writer"] != "wire" else "")
     parts.append(
-        f"<div style='font-size:11px;color:#999;border-top:1px solid #e5e5e5;margin-top:28px;padding:12px 0;'>"
-        f"Prices from Yahoo Finance. {writer} Always open the source link before acting on a story."
-        f"{notes}<br>Cassandra is a research tool. Not financial advice. "
-        f"<a href='{_SITE}/api/digest/unsubscribe?token={UNSUB_PLACEHOLDER}' style='color:#999;'>Unsubscribe</a>"
+        "<p style='margin:28px 0 0;'>Know someone who would like this? Forward it to them.</p>"
+        f"<div style='font-size:12px;color:#767676;border-top:1px solid #e5e5e5;margin-top:16px;padding:12px 0;'>"
+        f"Prices from Yahoo Finance. {writer}Open the source link before acting on a story."
+        f"{notes}<br>Cassandra is a research tool. Not financial advice.<br>"
+        f"<a href='{_SITE}/api/digest/unsubscribe?token={UNSUB_PLACEHOLDER}' "
+        f"style='color:#767676;{_LINK}'>Unsubscribe</a>"
         "</div></div>"
     )
     return "\n".join(parts)
 
 
+def render_page(ed: dict[str, Any]) -> str:
+    """Standalone preview page (browser), same body as the email."""
+    return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<title>{e(ed['subject'])}</title></head><body style='margin:0;background:#fff;'>"
+            f"{render_html(ed)}</body></html>")
+
+
 def render_text(ed: dict[str, Any]) -> str:
     lines = [f"CASSANDRA AI BRIEFING · {ed['title']} · {ed['date_label']}", ""]
-    if ed.get("hook"):
-        lines += [ed["hook"], ""]
-    for b in ed["markets"]:
-        lines.append(f"{b['title'].upper()} (as of {b['asof']}): {b['summary']}")
-        lines += [f"  {r['label']}: {r['pct_text']} ({r['close']})" for r in b["rows"]]
-        lines.append("")
-    if ed.get("market_take"):
-        lines += [f"In plain English: {ed['market_take']}", ""]
-    for s in ed["stories"]:
+    for key in ("hook", "big_picture"):
+        if ed.get(key):
+            lines += [ed[key], ""]
+    for i, s in enumerate(ed["stories"]):
         lines += [s["headline"], s.get("what") or ""]
         if s.get("why"):
-            lines.append(f"Why it matters: {s['why']}")
+            lines.append(f"What it means for you: {s['why']}")
         lines += [f"{s['source']}: {s['url']}", ""]
+        if i == 0:
+            if ed.get("talking_point"):
+                lines += [f"Say this at lunch: {ed['talking_point']}", ""]
+            for b in ed["markets"]:
+                lines.append(f"{b['title'].upper()} (as of {b['asof']}): {b['summary']}")
+                lines += [f"  {r['label']}: {r['pct_text']} ({r['close']})" for r in b["rows"]]
+                lines.append("")
+            if ed.get("market_take"):
+                lines += [f"In plain English: {ed['market_take']}", ""]
     if ed.get("outlook"):
         lines += [f"Our read (opinion): {ed['outlook']}", ""]
     for ev in ed["events"]:
@@ -149,4 +189,4 @@ def render_text(ed: dict[str, Any]) -> str:
         lines.append(f"{g['term']}: {g['plain']}")
     lines += [""] + [f"Note: {p}." for p in ed["problems"]]
     lines += ["Not financial advice.", f"Unsubscribe: {_SITE}/api/digest/unsubscribe?token={UNSUB_PLACEHOLDER}"]
-    return "\n".join(l for l in lines if l is not None)
+    return "\n".join(lines)
