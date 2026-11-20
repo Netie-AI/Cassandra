@@ -7,8 +7,8 @@ It reuses the existing subscriber list and Resend/SMTP sender (`src/newsletter/s
 
 | Edition | When | What is in it |
 |---|---|---|
-| Morning | Tue to Sat 07:30 | How Wall Street closed overnight, Asia's last close, AI news while you slept, what to watch |
-| Evening | Mon to Fri 20:30 | How Asia traded today, US futures (a hint for tonight's open), today's AI news, what to watch |
+| Morning | Mon to Fri 07:30 | Greater China, Singapore and Asia-Pacific first, then how Wall Street closed overnight, AI news while you slept, what to watch (Monday looks back over the weekend) |
+| Evening | Mon to Fri 20:30 | The US first (last close, futures before tonight's open, tonight's data), then how China and Asia traded today, today's AI news |
 | Weekly  | Sun 09:00 | Five-session market moves, the week's biggest AI stories, events in the next 45 days |
 
 Every edition has the same shape: hook, Markets in 30 seconds, What happened in AI

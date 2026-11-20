@@ -2,12 +2,14 @@
 # Times are LOCAL machine time. Malaysia and Singapore share UTC+8, so no conversion is needed
 # on a machine set to either. Keep these in step with config/briefing.yaml (the Python side
 # re-checks the slot, so a task firing on the wrong day sends nothing).
-# Run from an elevated PowerShell.
+# Run from an elevated PowerShell. Pass -WeLink to also post each edition into the WeLink chats
+# listed in config/welink.yaml.
+param([switch]$WeLink)
 $ErrorActionPreference = "Continue"
 $Script = Join-Path $PSScriptRoot "run-briefing.ps1"
-$Action = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$Script`""
+$Action = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$Script`"" + $(if ($WeLink) { " -WeLink" } else { "" })
 $Slots = @(
-    @{ Name = "Cassandra-Briefing-Morning"; Time = "07:30"; Days = "TUE,WED,THU,FRI,SAT" },
+    @{ Name = "Cassandra-Briefing-Morning"; Time = "07:30"; Days = "MON,TUE,WED,THU,FRI" },
     @{ Name = "Cassandra-Briefing-Evening"; Time = "20:30"; Days = "MON,TUE,WED,THU,FRI" },
     @{ Name = "Cassandra-Briefing-Weekly";  Time = "09:00"; Days = "SUN" }
 )

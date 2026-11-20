@@ -2,8 +2,8 @@
 briefing/build.py: assemble one edition (a plain dict, JSON-serialisable).
 
 Editions (Singapore time):
-  morning  07:30 Tue-Sat  what Wall Street did overnight + AI news while you slept + today's watchlist
-  evening  20:30 Mon-Fri  how Asia traded today + today's AI news + what to watch in the US tonight
+  morning  07:30 Mon-Fri  Greater China, Singapore and Asia-Pacific first, then Wall Street overnight + AI news
+  evening  20:30 Mon-Fri  the US (last close, futures, tonight) first, then how China and Asia traded today + AI news
   weekly   09:00 Sun      the week in AI, the week in markets, the week ahead
 
 All market sentences are built here from fetched numbers. The model never writes a number.
