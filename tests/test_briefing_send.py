@@ -266,6 +266,7 @@ def test_welink_gets_one_batch_per_channel_and_dry_run_without_send(env, monkeyp
     fake.deliver = lambda batches, cfg, dry_run, log=print: calls.append((batches, cfg, dry_run)) or \
         {"sent": 0, "skipped": 0, "failed": 1 if len(calls) == 3 else 0, "details": ["x"]}
     monkeypatch.setitem(sys.modules, "src.briefing.welink", fake)
+    monkeypatch.setattr(sys.modules["src.briefing"], "welink", fake, raising=False)   # `from . import welink` reads this first
     env["edition"]["stories"].append({**env["edition"]["stories"][0], "headline": "Fed holds rates", "channel": "markets"})
 
     assert cli.main(["--edition", "morning", "--welink"]) == 0                 # no --send: preview only

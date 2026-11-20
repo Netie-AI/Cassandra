@@ -1,0 +1,106 @@
+# WeLink posting for the Cassandra briefing. Copy to config/welink.yaml (it holds
+# chat names, so keep it out of git). Used by: python -m src.briefing --edition morning --welink [--send]
+#
+# NOTHING IN THIS FILE HAS BEEN VERIFIED AGAINST A REAL WELINK ACCOUNT.
+# Items marked UNVERIFIED are best guesses. Test them on your own machine (steps at the bottom) before relying on them.
+# Never put a webhook URL, token or cookie in this file. Webhook URLs live in environment variables whose NAMES go here.
+
+# ── targets ─────────────────────────────────────────────────────────────────────────────────────
+# channel (ai | markets) -> list of targets. A channel may have several targets. Each needs a unique `name`
+# (the re-run ledger is keyed on name + message text).
+#   transport: webhook   needs url_env: NAME of an environment variable holding the full robot URL
+#   transport: browser   needs chat: the chat or group name exactly as WeLink shows it
+targets:
+  ai:
+    - {name: ai-group-bot, transport: webhook, url_env: WELINK_AI_WEBHOOK}      # remove if you have no robot
+    - {name: ai-chat, transport: browser, chat: "AI Channel"}
+  markets:
+    - {name: markets-chat, transport: browser, chat: "Markets Channel"}
+
+# ── limits ──────────────────────────────────────────────────────────────────────────────────────
+limits:
+  max_message_chars: 2000     # longer text is split at blank lines, never mid-line; one over-long line is hard-split.
+                              # UNVERIFIED: WeLink's real limit is unknown. 2000 is a cautious guess.
+  max_messages_per_run: 6     # per target per run. Chunks beyond this are NOT sent and count as failed.
+  min_interval_s: 3           # pause between any two sends
+
+# Re-run safety. A message (sha256 of target name + text) sent to a target in the last 20 hours is skipped.
+ledger: reports/welink/sent.json          # relative paths are relative to the repo root (reports/* is git-ignored)
+screenshot_dir: reports/welink            # failure and probe screenshots go here
+
+# ── webhook transport ───────────────────────────────────────────────────────────────────────────
+# UNVERIFIED: the whole block. No official WeLink webhook document could be fetched. A third-party blog says WeLink
+# group webhooks exist, are text-only, and are managed by the group owner or an admin (so the group owner must
+# enable it; it may not exist in every tenant). The payload below is a guess based on field names in a community
+# tool. If your robot's setup page shows a request example, copy that shape here and fix `success`.
+# Placeholders in string values: {message}  {uuid}  {timestamp_ms} (a whole-string placeholder keeps its type).
+webhook:
+  method: POST
+  timeout_s: 15
+  headers: {}
+  payload:
+    messageType: text
+    content: {text: "{message}"}
+    timeStamp: "{timestamp_ms}"
+    uuid: "{uuid}"
+    isAt: false
+    isAtAll: false
+  # A send counts as successful only when HTTP is 2xx AND response JSON has `field` equal to one of `ok`.
+  # UNVERIFIED. Set field: null to accept any 2xx (weaker; not recommended).
+  success: {field: code, ok: [0, "0", 200, "200"]}
+
+# ── browser transport (Playwright, your own logged-in session) ───────────────────────────────────
+browser:
+  # UNVERIFIED: the real web address. No browser-based WeLink client was found in official sources (the
+  # official download page lists Windows, macOS, Android, iOS and HarmonyOS clients only). Put the address you use
+  # to reach WeLink in a browser, if your company provides one.
+  url: "https://CHANGE-ME.example/"
+  # Persistent profile holding your login. Must be OUTSIDE the repo. Never commit it, it contains cookies.
+  profile_dir: ~/.cassandra/welink-profile
+  # "msedge" or "chrome" uses the browser already installed on Windows (no download). null uses Playwright's own Chromium.
+  browser_channel: msedge
+  # executable_path: null        # advanced: explicit browser binary instead of browser_channel
+  # args: []                     # advanced: extra browser flags
+  headless: false                # keep false: logins and some chat apps misbehave headless
+  # Selector that exists only when you are logged in. Checked before any send. UNVERIFIED guess:
+  ready: '[placeholder*="Search" i]'
+  timeouts: {step_ms: 8000, ready_ms: 30000}
+  # How a send is confirmed. {line} is replaced by the longest line of the message (max 60 chars). The selector
+  # must match message bubbles in the open conversation, NOT the editor (a draft would look like a sent message).
+  # The count of matches must rise after the send, so an identical older message cannot confirm a new one.
+  # If the check fails the message counts as FAILED, a screenshot is saved and no ledger entry is written.
+  # UNVERIFIED selector:
+  sent_check: {selector: '[class*="message"]:has-text("{line}")', timeout_ms: 10000}
+  # Ordered actions. Placeholders: {chat} and {message}. In selectors, quotes are escaped for you.
+  #   goto url?            open a page (default: browser.url)
+  #   wait_for selector    wait until it exists
+  #   click selector
+  #   fill selector value  clear and type a value (single line)
+  #   insert_text selector value?   click, then type value (default {message}) WITHOUT pressing Enter;
+  #                                 line breaks are typed as Shift+Enter
+  #   press key selector?  keyboard key such as Enter; with selector, focuses it first
+  #   paste selector value?  click, then fire a synthetic paste event carrying the text
+  #   sleep ms
+  # Options on any step: optional: true (ignore failure), timeout_ms: N.
+  # Exactly one step must have `final: true`: the send action. `probe` stops just before it.
+  # UNVERIFIED: every selector below is a guess for a generic chat UI, not read from WeLink.
+  steps:
+    - {action: click,       selector: 'input[type="search"], [placeholder*="Search" i]'}
+    - {action: fill,        selector: 'input[type="search"], [placeholder*="Search" i]', value: "{chat}"}
+    - {action: click,       selector: 'text="{chat}"'}
+    - {action: click,       selector: '[contenteditable="true"]'}
+    - {action: insert_text, selector: '[contenteditable="true"]', value: "{message}"}
+    - {action: press,       key: Enter, final: true}
+
+# ── How to replace the guessed selectors (do this once, on your own machine) ────────────────────
+# 1. pip install playwright   (no "playwright install" needed when browser_channel is msedge or chrome)
+# 2. python -m src.briefing.welink login      sign in once; the profile keeps you signed in.
+# 3. python -m playwright codegen --channel msedge --user-data-dir ~/.cassandra/welink-profile <url>
+#    Click through: search box, type the chat name, click the result, click the message box. The Inspector shows a
+#    selector for each. Copy them into `steps`, `ready` and `sent_check` above. (Close the login browser first;
+#    two processes cannot share a profile.)
+# 4. python -m src.briefing.welink probe --chat "AI Channel"     runs everything except the send; look at the screenshot.
+# 5. First real send, to a PRIVATE chat only you are in:
+#    python -m src.briefing.welink send --chat "My Test Chat" --text "test line 1
+#    test line 2" --yes
+#    Then check the line break appears and the message is not duplicated.

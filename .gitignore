@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 config/settings.yaml
+# WeLink chat names: copy config/welink.example.yaml to config/welink.yaml
+config/welink.yaml
 Cpanel.md
 
 # ═══ Local database (stays on your machine) ════════════════
