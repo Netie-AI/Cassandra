@@ -803,3 +803,11 @@ def test_as_of_is_never_sent_and_must_be_in_the_past(capsys):
     assert cli.main(["--edition", "morning", "--as-of", "2099-01-01 07:30"]) == 1
     assert cli.main(["--edition", "morning", "--as-of", "yesterday"]) == 1
     assert "cannot be sent" in capsys.readouterr().err
+
+
+def test_sensitive_rules_catch_china_ties_and_political_leaders():
+    """Live 2026-11-19: both stories were rewritten by the editor; the Nvidia one lost its China angle."""
+    rules = writer.sensitive_rules(sources.load_config())
+    assert writer._sensitive("Nvidia faces questions over former No 3's China ties after short seller report", rules)
+    assert writer._sensitive("From Shenzhen to Silicon Valley: Xi Jinping calls for global association of bay areas", rules)
+    assert not writer._sensitive("Alibaba tops revenue estimates on AI cloud growth", rules)

@@ -96,12 +96,15 @@ market_keywords: ["shares", "stocks", "stock market", "wall street", "nasdaq", "
 sensitive_terms: ["huawei", "hisilicon", "smic", "export control", "export controls", "export curbs", "export ban",
                   "export restrictions", "chip ban", "sanction", "sanctions", "sanctioned", "entity list",
                   "blacklist", "blacklisted", "national security", "espionage", "spy", "spies", "spying",
-                  "trade war", "tariff", "tariffs", "decoupling", "taiwan strait"]
+                  "trade war", "tariff", "tariffs", "decoupling", "taiwan strait",
+                  "xi jinping", "communist party", "politburo", "xinjiang", "tibet", "uyghur", "uyghurs",
+                  "tiananmen", "dalai lama"]
 
 # ...and combinations: a story that mentions a place in `any` together with a word in `with`.
 sensitive_pairs:
   - any: ["china", "chinese", "beijing", "mainland", "hong kong", "taiwan", "us-china", "sino-us"]
-    with: ["export", "exports", "ban", "bans", "banned", "curb", "curbs", "restriction", "restrictions",
+    with: ["ties", "links", "short seller", "short sellers", "short-seller", "allegation", "allegations",
+           "scrutiny", "export", "exports", "ban", "bans", "banned", "curb", "curbs", "restriction", "restrictions",
            "restrict", "restricts", "military", "military-backed", "pentagon", "congress", "house committee",
            "senate", "security", "sanction", "blacklist", "probe", "probes", "investigation", "crackdown",
            "geopolitical", "geopolitics", "tension", "tensions", "retaliation", "retaliates", "retaliate",
