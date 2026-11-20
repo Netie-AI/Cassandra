@@ -30,9 +30,10 @@ def save(ed: dict) -> Path:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     stem = f"{ed['date']}-{ed['edition']}"
     (OUT_DIR / f"{stem}.json").write_text(json.dumps(ed, indent=2, ensure_ascii=False), encoding="utf-8")
-    page = render.render_page(ed)
     for name in (f"{stem}.html", "latest.html"):
-        (OUT_DIR / name).write_text(page, encoding="utf-8")
+        (OUT_DIR / name).write_text(render.render_page(ed), encoding="utf-8")
+    for ch in ("ai", "markets"):                     # one page per channel, for posting to separate groups
+        (OUT_DIR / f"{stem}-{ch}.html").write_text(render.render_page(ed, ch), encoding="utf-8")
     return OUT_DIR / f"{stem}.html"
 
 
@@ -42,6 +43,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--edition", default="auto", choices=("auto",) + build.EDITIONS)
     ap.add_argument("--send", action="store_true", help="email confirmed subscribers")
     ap.add_argument("--dry-run", action="store_true", help="list recipients, send nothing")
+    ap.add_argument("--channel", default="all", choices=("all", "ai", "markets"),
+                    help="send the full briefing (default) or one channel only")
     ap.add_argument("--allow-wire", action="store_true",
                     help="send even if the AI editor failed and stories are raw headlines")
     args = ap.parse_args(argv)
@@ -76,10 +79,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.send or args.dry_run:
         from src.newsletter.send import dispatch_rendered
 
+        # the channel is part of the subject, so the two channel emails are tracked as separate sends
+        subject = ed["subject"] if args.channel == "all" else f"{render.CHANNEL_NAMES[args.channel]}: {ed['subject']}"
+
         out = dispatch_rendered(
-            subject=ed["subject"], html=render.render_html(ed), text=render.render_text(ed),
+            subject=subject, html=render.render_html(ed, args.channel), text=render.render_text(ed, args.channel),
             unsub_placeholder=render.UNSUB_PLACEHOLDER,
-            tags={"type": f"briefing_{ed['edition']}", "asof": ed["date"]}, dry_run=not args.send,
+            tags={"type": f"briefing_{ed['edition']}_{args.channel}", "asof": ed["date"]}, dry_run=not args.send,
         )
         print(f"[briefing] dispatch: {out}")
         if out.get("failed"):

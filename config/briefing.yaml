@@ -34,6 +34,30 @@ feeds:
   - {name: CNA,                   region: global, ai_only: false, url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"}
   - {name: Google News SG,        region: sg,     ai_only: false, url: "https://news.google.com/rss/search?q=(AI+OR+%22artificial+intelligence%22)+Singapore+when:2d&hl=en-SG&gl=SG&ceid=SG:en"}
 
+  # Markets channel: business and markets desks. Items are kept when they match market_keywords.
+  - {name: The Wall Street Journal, channel: markets, url: "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain"}
+  - {name: Financial Times,       channel: markets, url: "https://www.ft.com/markets?format=rss"}
+  - {name: Bloomberg,             channel: markets, url: "https://feeds.bloomberg.com/markets/news.rss"}
+  - {name: BBC News,              channel: markets, url: "https://feeds.bbci.co.uk/news/business/rss.xml"}
+  - {name: The Business Times,    channel: markets, url: "https://www.businesstimes.com.sg/rss/companies-markets"}
+  - {name: The Guardian,          channel: markets, url: "https://www.theguardian.com/uk/business/rss"}
+  - {name: CNA,                   channel: markets, url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"}
+
+# whole-word matches, lowercase
+market_keywords: ["shares", "stocks", "stock market", "wall street", "nasdaq", "s&p", "dow", "index", "indices",
+                  "federal reserve", "fed", "interest rate", "interest rates", "rate cut", "rate hike", "inflation",
+                  "earnings", "ipo", "bonds", "bond yields", "yields", "treasury", "dollar", "straits times index",
+                  "sti", "nikkei", "hang seng", "kospi", "rally", "sell-off", "selloff", "investors", "profit",
+                  "revenue", "gdp", "oil prices", "gold", "equities", "futures"]
+
+# Topics handled with extra care for this readership. A story that touches one is carried in the
+# publisher's own words with attribution, with no rewrite and no commentary, and the briefing's own
+# commentary lines may not mention these topics at all. Whole-word matches, lowercase.
+sensitive_terms: ["huawei", "hisilicon", "smic", "export control", "export controls", "export curbs", "export ban",
+                  "export restrictions", "chip ban", "sanction", "sanctions", "sanctioned", "entity list",
+                  "blacklist", "blacklisted", "national security", "espionage", "spy", "spies", "spying",
+                  "trade war", "tariff", "tariffs", "decoupling", "taiwan strait"]
+
 # whole-word matches, lowercase
 ai_keywords: ["ai", "a.i.", "artificial intelligence", "openai", "chatgpt", "anthropic", "deepmind", "nvidia",
               "llm", "llms", "chatbot", "chatbots", "machine learning", "data centre", "data centres",

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import smtplib
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any, Iterator
@@ -13,6 +14,7 @@ import httpx
 from .render import render_edition_html, render_edition_text
 
 _BATCH_SIZE = 100
+_BATCH_PAUSE_S = 0.6
 
 
 def is_configured() -> bool:
@@ -127,7 +129,9 @@ def _dispatch_resend_batch(
     failed = 0
     sent_emails: list[str] = []
 
-    for chunk in _chunks(recipients, _BATCH_SIZE):
+    for n, chunk in enumerate(_chunks(recipients, _BATCH_SIZE)):
+        if n:
+            time.sleep(_BATCH_PAUSE_S)          # stay under the provider's requests-per-second limit
         batch: list[dict[str, Any]] = []
         chunk_emails: list[str] = []
         for rec in chunk:

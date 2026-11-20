@@ -149,7 +149,8 @@ def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | N
         skip={(ev["ticker"], ev["start"].isoformat()) for ev in all_events if ev.get("ticker")})
     copy = writer.write_copy(stories, edition=edition, date_label=local.strftime("%A %d %B %Y"),
                              market_facts=_facts(blocks), market_dirs=market_dirs(blocks), events=events,
-                             calendar=calendar, writers=cfg.get("writers"))
+                             calendar=calendar, writers=cfg.get("writers"),
+                             sensitive=cfg.get("sensitive_terms"))
     if copy["writer"] == "wire":
         problems.append(f"stories are shown in their original wording ({copy['writer_note']})")
     if not copy["stories"]:
@@ -172,7 +173,6 @@ def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | N
         "subject": subject,
         "hook": copy.get("hook", ""),
         "big_picture": copy.get("big_picture", ""),
-        "talking_point": copy.get("talking_point", ""),
         "markets": blocks,
         "market_take": copy.get("market_take", ""),
         "stories": copy["stories"],

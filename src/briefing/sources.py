@@ -48,6 +48,7 @@ class Story:
     source: str
     region: str            # "global" | "sg"
     published: dt.datetime  # tz-aware UTC
+    channel: str = "ai"    # "ai" | "markets"
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -114,10 +115,14 @@ def parse_feed(xml_text: str, *, source: str, region: str = "global") -> list[St
     return stories
 
 
-def _is_ai(story: Story, keywords: list[str]) -> bool:
+def has_term(text: str, terms: list[str]) -> bool:
     """Whole-word match, so "chip" does not fire on Chipotle and "ai" not on Dubai-based."""
-    text = f"{story.title} {story.summary}".lower()
-    return any(re.search(rf"(?<![a-z0-9]){re.escape(k)}(?![a-z0-9])", text) for k in keywords)
+    text = text.lower()
+    return any(re.search(rf"(?<![a-z0-9]){re.escape(k)}(?![a-z0-9])", text) for k in terms)
+
+
+def _is_ai(story: Story, keywords: list[str]) -> bool:
+    return has_term(f"{story.title} {story.summary}", keywords)
 
 
 def _norm_title(title: str) -> str:
@@ -146,7 +151,11 @@ def fetch_stories(cfg: dict, *, since: dt.datetime, now: dt.datetime | None = No
         for s in items:
             if not (since < s.published <= now):
                 continue
-            if not feed.get("ai_only") and not _is_ai(s, cfg["ai_keywords"]):
+            if feed.get("channel") == "markets":
+                if not has_term(f"{s.title} {s.summary}", cfg.get("market_keywords", [])):
+                    continue
+                s.channel = "markets"
+            elif not feed.get("ai_only") and not _is_ai(s, cfg["ai_keywords"]):
                 continue
             key = _norm_title(s.title)
             if key in seen:
@@ -192,9 +201,12 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
     def ok(v: Any) -> bool:
         return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v > 0
 
+    missing: set[dt.date] = set()               # sessions Yahoo lists but has no close for
     for t, c in zip(res["timestamp"], closes):
         if ok(c):
             by_date[local_date(t)] = float(c)
+        else:
+            missing.add(local_date(t))
     # Yahoo often leaves the newest daily bar empty for hours after the close; the meta block
     # has the real last price. Without this the "latest close" is silently a day old.
     if ok(meta.get("regularMarketPrice")) and meta.get("regularMarketTime"):
@@ -210,10 +222,21 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
     live = (bool(period) and period.get("start", 0) <= now.timestamp() < period.get("end", 0)
             and last_d == (now + off).date())            # a holiday has trading hours but no trades
     prev_d = bars[-2][0]
+    # One-day change, in order of trust: (1) the figure Yahoo itself reports for the session;
+    # (2) our own, but only when the previous session's close is really there. A missing bar in
+    # between would turn a two-session move into a "one-day" figure (live: Taiwan -8.5% vs real -3.1%).
+    reported = meta.get("regularMarketChangePercent")
+    # An exact 0.0 is what Yahoo shows before a session opens, not a real reading: fall through.
+    if (isinstance(reported, (int, float)) and not isinstance(reported, bool)
+            and math.isfinite(reported) and reported != 0):
+        pct_1d = float(reported)
+    elif (last_d - prev_d).days <= 4 and not any(prev_d < d < last_d for d in missing):
+        pct_1d = (last_c / prev_c - 1) * 100
+    else:
+        pct_1d = None
     return Quote(
         symbol=symbol, label=label, note=note, close=float(last_c),
-        # a gap of more than 4 days means a missing bar: the "one-day" change would span several sessions
-        pct_1d=(last_c / prev_c - 1) * 100 if (last_d - prev_d).days <= 4 else None,   # weekend + 1 holiday
+        pct_1d=pct_1d,
         pct_5d=(last_c / week_c - 1) * 100 if week_c else None,
         session_date=last_d.isoformat(),
         live=live,

@@ -25,65 +25,72 @@ import httpx
 from src.report import _gemini_generate
 from src.tools.copy_lint import lint_no_em_dash
 
-from .sources import Story
+from .sources import Story, has_term
 
 DEFAULT_MODELS = "gemini-3.8-flash,gemini-3.5-flash,gemini-flash-latest"
-MAX_STORIES = 6
-MAX_CANDIDATES = 40
+MAX_AI, MAX_MARKETS = 4, 3            # "a few AI, a few financial"
+MAX_STORIES = MAX_AI + MAX_MARKETS
+CAND_AI, CAND_MARKETS = 28, 18
 RETRY_PAUSE_S = 20
 SUBJECT_MAX = 60
 
-TAGS = ("Big Tech", "Money", "Jobs", "Rules", "Everyday life", "Science")
+CHANNELS = ("ai", "markets")
+TAGS = ("Industry", "Policy", "Enterprise", "Research", "Consumer", "Earnings", "Economy", "Markets")
 
 SYSTEM = """\
 ROLE
-You edit a short AI newsletter for busy, NON-TECHNICAL readers in Singapore: managers, shop and
-business owners, students, retirees, first-time investors. They are smart, short of time, and
-do not know tech or finance jargon. They read on a phone. Your job: make real AI news clear,
-lively and worth forwarding, without ever bending a fact.
+You are the editor of a daily professional briefing on AI and financial markets, read by
+employees of a large technology company in Singapore and worldwide. Many are not engineers
+or finance specialists. They expect the standard of a respected business newspaper:
+accurate, neutral, concise, formal. You never bend a fact and you never take sides.
 
 INPUT
-JSON with candidate stories (id, title, summary, source, region), market_facts,
+JSON with candidate stories (id, channel, title, summary, source, region), market_facts,
 upcoming_events and on_the_calendar_next.
 
 OUTPUT: one JSON object, nothing else
 {
- "subject": "max 55 characters. The single most surprising fact first, then a second hook after a comma. No newsletter name, no date.",
- "hook": "2 sentences. First: the biggest story in plain words. Second: what else is inside. Speak to 'you'.",
+ "subject": "max 55 characters. The two most important developments, separated by a comma. No newsletter name, no date.",
+ "hook": "2 sentences summarising the day: the leading AI development, then the leading market development.",
  "stories": [{"id": "<candidate id>",
-   "tag": "one of: Big Tech | Money | Jobs | Rules | Everyday life | Science",
-   "headline": "max 10 words, a concrete subject and an active verb",
-   "what": "1 or 2 short sentences. Leave it empty if the candidate has no summary.",
-   "why": "1 sentence starting with 'If you' or 'For', naming who is affected and how"}],
- "talking_point": "One sentence a reader could repeat at lunch. It must be about the FIRST story and name its main subject.",
- "big_picture": "1 or 2 sentences linking today's stories into one trend. No digits.",
- "market_take": "2 sentences on the market mood in everyday language",
+   "channel": "ai | markets",
+   "tag": "one of: Industry | Policy | Enterprise | Research | Consumer | Earnings | Economy | Markets",
+   "headline": "max 11 words, a concrete subject and an active verb, newspaper style",
+   "what": "1 or 2 sentences stating what happened. Leave it empty if the candidate has no summary.",
+   "why": "1 sentence on why it matters, starting with 'For' and naming the group affected (enterprises, developers, investors, consumers, regulators)"}],
+ "big_picture": "1 or 2 sentences linking the AI stories into one trend. No digits.",
+ "market_take": "2 sentences describing the market session in plain, formal language",
  "outlook": "2 sentences on what to watch next, tied to on_the_calendar_next and upcoming_events. Do not repeat their descriptions."
 }
 
 PICKING STORIES
-- Choose 4 to 6, biggest first. The first one is the story people will talk about today.
-- Each must clearly be about AI or the AI industry (chips, data centres, AI companies, rules,
-  jobs). If the title alone does not show the AI link, skip it.
-- Aim for a mix: use at least 3 different tags, and no more than 2 stories about the same company.
-- Include 1 or 2 with region "sg" when good ones exist.
-- Prefer candidates that have a summary: you can explain them properly.
-- Skip developer news, rumours, opinion columns and duplicates. Never pick two candidates
-  about the same event.
+- AI channel: 3 or 4 stories, most significant first. Each must clearly be about AI or the AI
+  industry (models, chips, data centres, AI companies, regulation, adoption, jobs).
+- Markets channel: 2 or 3 stories about financial markets and the economy (indices, central
+  banks, results of major companies, listings, currencies, Asian markets). Prefer stories that
+  explain the session described in market_facts.
+- Set "channel" yourself. A story about a share price or company results belongs in "markets"
+  even if the company is an AI company.
+- Prefer primary and established sources, and candidates that have a summary.
+- Include Singapore or Asia stories when they are significant (region "sg").
+- No more than 2 stories about the same company. Never pick two candidates about the same event.
+- Skip developer tooling news, rumours, opinion columns, promotional announcements, celebrity
+  and entertainment news.
 
 WRITING
-- Voice: a well-read friend at a kopitiam. Short sentences. Active voice. British spelling
-  (centre, organisation, travellers).
-- One idea per sentence. No sentence over 22 words.
-- Replace jargon with everyday words, or explain it in brackets the first time:
-  "a benchmark (a standard test)", "data centres (warehouses full of computers)".
+- Register: formal business English, British spelling (centre, organisation, programme).
+  Third person. No slang, no jokes, no exclamation marks, no rhetorical questions, no
+  addressing the reader as "you".
+- Neutral verbs: said, announced, reported, rose, fell. Not: slammed, blasted, soared to
+  dizzying heights, crashed and burned.
+- One idea per sentence. No sentence over 24 words.
+- Explain a technical or financial term in brackets the first time it appears:
+  "inference (running a trained AI model)", "yield (the return on a bond)".
 - No hype or filler: revolutionary, game-changing, shockwaves, landscape, cutting-edge,
-  "digital tools", "advanced services", "the industry", "in today's world".
-- "why" must be concrete. Name a real person in a real situation and what changes for them.
-    Weak:   "For tech users, heavy spending could speed up advanced digital services."
-    Strong: "If you use AI apps at work, more data centres could mean fewer slowdowns at busy hours."
-    Weak:   "For businesses, this could help adopt reliable tools safely."
-    Strong: "For a law firm in Singapore, this may show which AI tools get local rules right."
+  unprecedented, "in today's world".
+- "why" must be specific:
+    Weak:   "For businesses, this could have a significant impact on the industry."
+    Strong: "For enterprises running AI workloads, added data-centre capacity could ease the shortage of computing power."
 
 ACCURACY, never broken
 - Use only facts in that candidate's title and summary. Never add numbers, names, dates,
@@ -93,19 +100,20 @@ ACCURACY, never broken
   "S$3 billion"). Never spell them out, convert currency or round.
 - Keep the direction (rose or fell) and keep any hedge in the source headline (denies, may,
   in talks, reportedly, plans to).
-- "why", "big_picture", "talking_point": word consequences as possible (could, may).
+- "why" and "big_picture": word consequences as possible (could, may).
 - "market_take", "outlook", "big_picture": NO digits. Describe direction only as market_facts
   show it; if an index moved less than 0.2%, call it flat. Do not say a story caused a market
   move. No price predictions. No buy, sell or avoid advice. No certainty (will rise, certain).
 
-RESPECT, never broken
-- Report what a person did in their job (resigned, was appointed, was charged, announced).
-  Never repeat claims about anyone's private life (relationships, family, health, looks),
-  even if the source does. Say "after allegations" at most.
-- Never mock, shame or insult a person, a company or a group. No sarcasm about people.
-- Skip gossip, personal attacks and rants. Skip video-game and entertainment news unless it
-  is really about AI.
-- "talking_point" is a useful fact or idea, never gossip about a person.
+NEUTRALITY AND RESPECT, never broken
+- Geopolitics, trade restrictions, sanctions, export controls, national security and any
+  story naming Huawei are carried in the publisher's own words by the system. Do not
+  characterise, judge or comment on them anywhere, including "hook", "big_picture",
+  "market_take" and "outlook".
+- Do not praise or criticise any company, government or person. Report, do not judge.
+- Report what a person did in their role (resigned, was appointed, was charged, announced).
+  Never repeat claims about anyone's private life, even if the source does.
+- Never mock, shame or insult a person, a company or a group.
 
 FORMAT
 - No em-dashes or en-dashes. No markdown. JSON only.
@@ -227,61 +235,83 @@ def _is_opinion(s: Story) -> bool:
     return s.title.rstrip().endswith("?") or s.summary.startswith(("I ", "I'", "My "))
 
 
+def _sensitive(text: str, terms: list[str] | None) -> bool:
+    return bool(terms) and has_term(text, terms)
+
+
+def _verbatim(src: Story) -> dict[str, Any]:
+    """Publisher's own words, attributed, no commentary."""
+    return {**src.to_dict(), "headline": src.title, "what": _clip(src.summary, 280), "why": "",
+            "edited": False, "verbatim": True, "tag": ""}
+
+
 def wire_copy(stories: list[Story], reason: str) -> dict[str, Any]:
-    """Unedited fallback: newest news stories, at most 2 per source, original wording."""
-    picked, per_source = [], {}
+    """Unedited fallback: newest news stories per channel, at most 2 per source, original wording."""
+    picked, per_source, per_channel = [], {}, {"ai": 0, "markets": 0}
+    cap = {"ai": MAX_AI, "markets": MAX_MARKETS}
     for s in stories:
-        if per_source.get(s.source, 0) >= 2 or _is_opinion(s) or disrespectful(f"{s.title} {s.summary}"):
+        if (per_source.get(s.source, 0) >= 2 or per_channel[s.channel] >= cap[s.channel]
+                or _is_opinion(s) or disrespectful(f"{s.title} {s.summary}")):
             continue
         per_source[s.source] = per_source.get(s.source, 0) + 1
-        picked.append({**s.to_dict(), "headline": s.title, "what": _clip(s.summary, 280), "why": "",
-                       "edited": False, "tag": ""})
-        if len(picked) >= MAX_STORIES:
-            break
-    return {"subject": "", "hook": "", "big_picture": "", "talking_point": "", "stories": picked,
+        per_channel[s.channel] += 1
+        picked.append(_verbatim(s))
+    return {"subject": "", "hook": "", "big_picture": "", "stories": picked,
             "market_take": "", "outlook": "", "writer": "wire", "writer_note": reason, "rejected": []}
 
 
-def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str]) -> dict[str, Any]:
+def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str],
+           sensitive: list[str] | None = None) -> dict[str, Any]:
     """Validate model output against sources. Returns clean copy + a list of what was rejected."""
     by_id = {s.id: s for s in stories}
     rejected: list[str] = []
     out_stories: list[dict[str, Any]] = []
-    for item in (raw.get("stories") or [])[:MAX_STORIES]:
+    room = {"ai": MAX_AI, "markets": MAX_MARKETS}
+    for item in (raw.get("stories") or []):
         src = by_id.pop(str(item.get("id", "")), None) if isinstance(item, dict) else None
         if src is None:                                   # unknown or repeated id: invented story
             rejected.append("story with unknown id dropped")
             continue
+        channel = str(item.get("channel") or "").strip().lower()
+        channel = channel if channel in CHANNELS else src.channel
+        if room[channel] <= 0:
+            continue
         corpus = f"{src.title} {src.summary}"
-        tag = str(item.get("tag") or "").strip()
-        row = {**src.to_dict(), "edited": True, "tag": tag if tag in TAGS else ""}   # fixed set, never free text
-        for field, fallback in (("headline", src.title), ("what", src.summary), ("why", "")):
-            text = lint_no_em_dash(str(item.get(field) or "").strip())
-            if field == "why":       # a possible consequence: must not state new facts or advice
-                bad = check_story_text(text, corpus)
-                if _ADVICE.search(text):
-                    bad.append("contains advice or certainty wording")
-            else:
-                bad = check_story_text(text, corpus, title=src.title)
-            if disrespectful(text):
-                bad.append("gossip or insult wording")
-            if field == "what" and text and not src.summary:
-                # a title-only source gives the editor nothing to summarise: any "what" is embellishment
-                bad.append("source has a headline only, nothing to summarise")
-            if bad or not text:
-                rejected += [f"{src.id}.{field}: {b}" for b in bad]
-                text = fallback
-                row["edited"] = row["edited"] and field == "why"
-            row[field] = text
+        if _sensitive(corpus, sensitive):
+            # extra care: no rewrite and no commentary, the source speaks for itself
+            row = {**_verbatim(src), "channel": channel}
+            rejected.append(f"{src.id}: sensitive topic, carried in the publisher's own words")
+        else:
+            tag = str(item.get("tag") or "").strip()
+            row = {**src.to_dict(), "channel": channel, "edited": True, "verbatim": False,
+                   "tag": tag if tag in TAGS else ""}     # fixed set, never free text
+            for field, fallback in (("headline", src.title), ("what", src.summary), ("why", "")):
+                text = lint_no_em_dash(str(item.get(field) or "").strip())
+                if field == "why":       # a possible consequence: must not state new facts or advice
+                    bad = check_story_text(text, corpus)
+                    if _ADVICE.search(text):
+                        bad.append("contains advice or certainty wording")
+                else:
+                    bad = check_story_text(text, corpus, title=src.title)
+                if disrespectful(text):
+                    bad.append("gossip or insult wording")
+                if field == "what" and text and not src.summary:
+                    # a title-only source gives the editor nothing to summarise: any "what" is embellishment
+                    bad.append("source has a headline only, nothing to summarise")
+                if bad or not text:
+                    rejected += [f"{src.id}.{field}: {b}" for b in bad]
+                    text = fallback
+                    row["edited"] = row["edited"] and field == "why"
+                row[field] = text
         # the publisher's own wording can be the problem: then the story does not run at all
         if disrespectful(f"{row['headline']} {row['what']}"):
             rejected.append(f"{src.id}: dropped, only available wording is gossip or insult")
             continue
+        room[channel] -= 1
         out_stories.append(row)
+    out_stories.sort(key=lambda r: CHANNELS.index(r["channel"]))      # stable: AI first, then markets
 
     copy: dict[str, Any] = {"stories": out_stories}
-    pooled = " ".join(f"{s['title']} {s['summary']}" for s in out_stories)
-    first = f"{out_stories[0]['title']} {out_stories[0]['summary']}" if out_stories else ""
 
     def take(field: str, reasons_for) -> None:
         text = lint_no_em_dash(str(raw.get(field) or "").strip())
@@ -290,28 +320,24 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str]) -> 
         bad = reasons_for(text) if text else []
         if disrespectful(text):
             bad.append("gossip or insult wording")
+        if _sensitive(text, sensitive):
+            bad.append("comments on a sensitive topic")
         rejected.extend(f"{field}: {b}" for b in bad)
         copy[field] = "" if bad else text
 
     corpora = [f"{s['title']} {s['summary']}" for s in out_stories]
     take("subject", lambda t: check_spanning(t, corpora))
     take("hook", lambda t: check_spanning(t, corpora))
-    def about_top_story(t: str) -> list[str]:
-        bad = check_story_text(t, first, title=out_stories[0]["title"] if out_stories else None)
-        names = {w for w in re.findall(r"\b[A-Z][A-Za-z]{3,}\b", first)}
-        if not any(n in t for n in names):
-            bad.append("is not about the top story")
-        return bad
-
-    take("talking_point", about_top_story)
     take("big_picture", check_free_text)
     take("outlook", check_free_text)
     take("market_take", lambda t: check_free_text(t, market_dirs))
     if any(": dropped," in r for r in rejected):
         # the opening lines were written for a line-up that no longer exists
-        copy["hook"] = copy["big_picture"] = copy["talking_point"] = ""
-        copy["subject"] = _clip(out_stories[0]["headline"], SUBJECT_MAX) if out_stories else ""
+        copy["hook"] = copy["big_picture"] = ""
+        copy["subject"] = ""
         rejected.append("subject and hook rebuilt: a picked story was dropped")
+    if not copy["subject"] and out_stories:
+        copy["subject"] = _clip(out_stories[0]["headline"], SUBJECT_MAX)
     copy["rejected"] = rejected
     return copy
 
@@ -363,7 +389,7 @@ def _editors(gemini_key: str | None, writers: list[dict]) -> list[tuple[str, Any
 
 def write_copy(stories: list[Story], *, edition: str, date_label: str, market_facts: list[str],
                market_dirs: set[str], events: list[dict], calendar: list[dict] | None = None,
-               writers: list[dict] | None = None) -> dict[str, Any]:
+               writers: list[dict] | None = None, sensitive: list[str] | None = None) -> dict[str, Any]:
     """Model-edited copy, fact-checked. Falls back to wire_copy() loudly."""
     if not stories:
         return wire_copy([], "no stories in the window")
@@ -373,14 +399,15 @@ def write_copy(stories: list[Story], *, edition: str, date_label: str, market_fa
 
     # Gossip and opinion pieces are never offered to the editor. A big event is covered by many
     # sources, so it then picks a respectful one instead of losing the story at the check stage.
-    candidates = [s for s in stories
-                  if not _is_opinion(s) and not disrespectful(f"{s.title} {s.summary}")][:MAX_CANDIDATES]
+    clean = [s for s in stories if not _is_opinion(s) and not disrespectful(f"{s.title} {s.summary}")]
+    candidates = ([s for s in clean if s.channel == "ai"][:CAND_AI]
+                  + [s for s in clean if s.channel == "markets"][:CAND_MARKETS])
     if not candidates:
         return wire_copy(stories, "no usable stories in the window")
     prompt = json.dumps({
         "edition": edition,
         "date": date_label,
-        "candidates": [{"id": s.id, "title": s.title, "summary": s.summary[:400],
+        "candidates": [{"id": s.id, "channel": s.channel, "title": s.title, "summary": s.summary[:400],
                         "source": s.source, "region": s.region} for s in candidates],
         "market_facts": market_facts,
         "upcoming_events": [{"name": e["name"], "in_days": e["days_away"], "why": e["why"]} for e in events],
@@ -396,7 +423,7 @@ def write_copy(stories: list[Story], *, edition: str, date_label: str, market_fa
             raw = json.loads(_strip_fences(call(prompt)))
             if not isinstance(raw, dict):
                 raise ValueError("model did not return a JSON object")
-            copy = ground(raw, candidates, market_dirs)
+            copy = ground(raw, candidates, market_dirs, sensitive)
             if len(copy["stories"]) < min(3, len(candidates)):
                 raise ValueError(f"only {len(copy['stories'])} usable stories")
             copy["writer"] = label

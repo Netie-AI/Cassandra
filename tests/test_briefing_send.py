@@ -35,7 +35,7 @@ def _edition(**over) -> dict:
     ed = {
         "edition": "morning", "title": "Morning Edition", "date": "2026-11-13", "date_label": "Fri 13 Nov 2026",
         "subject": SUBJECT, "hook": "Chips are heading to Singapore.", "market_take": "Calm.",
-        "big_picture": "AI spending keeps rising.", "talking_point": "Singapore is buying a lot of chips.",
+        "big_picture": "AI spending keeps rising.", "_unused": "Singapore is buying a lot of chips.",
         "markets": [build.market_block("Wall Street overnight", [q], today=dt.date(2026, 11, 13))],
         "stories": [{**story.to_dict(), "headline": HEADLINE, "what": "A big order.", "why": "More capacity.",
                      "edited": True}],
@@ -226,4 +226,15 @@ def test_rerun_of_the_same_edition_does_not_double_send(env):
 
 def test_batch_emails_carry_edition_tags(env):
     assert cli.main(["--edition", "morning", "--send"]) == 0
-    assert {"name": "type", "value": "briefing_morning"} in _emails(env)[0]["tags"]
+    assert {"name": "type", "value": "briefing_morning_all"} in _emails(env)[0]["tags"]
+
+
+def test_single_channel_send_has_its_own_subject_and_content(env):
+    env["edition"]["stories"].append({**env["edition"]["stories"][0], "headline": "Fed holds rates", "channel": "markets"})
+    assert cli.main(["--edition", "morning", "--send", "--channel", "markets"]) == 0
+    mail = _emails(env)[0]
+    assert mail["subject"].startswith("Markets Channel: ") and "Fed holds rates" in mail["html"]
+    assert "AI Channel" not in mail["html"]
+    env["posts"].clear()
+    assert cli.main(["--edition", "morning", "--send", "--channel", "ai"]) == 0       # not blocked as a re-run
+    assert len(_emails(env)) == 3 and _emails(env)[0]["subject"].startswith("AI Channel: ")

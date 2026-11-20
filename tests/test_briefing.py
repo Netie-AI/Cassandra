@@ -95,6 +95,18 @@ def test_quote_rejects_bad_closes_and_multi_session_gaps():
     assert sources.parse_chart(gap, symbol="X", label="X", note="").pct_1d is None            # not a 1-day move
 
 
+def test_one_day_change_never_spans_a_missing_session():
+    """Live 2026-11-20: Taiwan's previous bar was empty, so the edition printed -8.5% for a -3.1% day."""
+    day0 = 1793926800
+    payload = _chart([100.0, 110.0, None, 99.0], 99.0, day0 + 3 * 86400 + 3600)        # day 2 has no close
+    assert sources.parse_chart(payload, symbol="X", label="X", note="").pct_1d is None
+    payload["chart"]["result"][0]["meta"]["regularMarketChangePercent"] = -3.114        # Yahoo's own figure wins
+    assert sources.parse_chart(payload, symbol="X", label="X", note="").pct_1d == pytest.approx(-3.114)
+    ok = _chart([100.0, 110.0], 110.0, day0 + 86400 + 3600)
+    ok["chart"]["result"][0]["meta"]["regularMarketChangePercent"] = 0.0               # pre-open placeholder
+    assert sources.parse_chart(ok, symbol="X", label="X", note="").pct_1d == pytest.approx(10.0)
+
+
 def test_quote_needs_two_sessions():
     with pytest.raises(ValueError):
         sources.parse_chart(_chart([None, None], 5.0, 1793926800), symbol="X", label="X", note="")
@@ -224,7 +236,6 @@ def test_ground_keeps_good_copy_and_rejects_invented_facts():
         "market_take": "Stocks slipped today.",                      # data shows only risers
         "outlook": "Watch chip makers closely.",
         "big_picture": "AI spending keeps growing.",
-        "talking_point": "Nvidia paid $3 billion.",
         "stories": [
             {"id": "s1", "headline": "Nvidia sells 250 chips", "what": "It paid $3 billion.", "why": "This matters."},
             {"id": "s2", "headline": "Google glasses cost $99", "what": "Google launched glasses.", "why": "Try it."},
@@ -239,7 +250,7 @@ def test_ground_keeps_good_copy_and_rejects_invented_facts():
     assert out["stories"][1]["edited"] is False
     assert out["hook"] == "" and out["market_take"] == ""
     assert out["outlook"] == "Watch chip makers closely."
-    assert out["big_picture"] and out["talking_point"] == "Nvidia paid $3 billion."
+    assert out["big_picture"] == "AI spending keeps growing."
     assert len(out["subject"]) <= writer.SUBJECT_MAX and not out["subject"].endswith(" ")
     assert len(out["rejected"]) == 6                                          # incl. title-only "what"
 
@@ -249,7 +260,7 @@ def test_gossip_and_insults_never_run():
     src = _story(1, title="Nvidia CEO resigns amid affair scandal", summary="The board accepted his resignation.")
     rude = _story(2, title="Founder's pathetic pivot mocked online", summary="")
     ok = _story(3, title="Google launches glasses", summary="")
-    raw = {"talking_point": "Did you hear the boss had an affair?", "hook": "A chief executive quit.",
+    raw = {"big_picture": "The boss had an affair, people say.", "hook": "A chief executive quit.",
            "stories": [
                {"id": "s1", "headline": "Nvidia chief executive resigns after a scandal",
                 "what": "He quit after an extramarital affair.", "why": "For investors, leadership may change."},
@@ -260,7 +271,7 @@ def test_gossip_and_insults_never_run():
     top = out["stories"][0]
     assert top["headline"] == "Nvidia chief executive resigns after a scandal"
     assert top["what"] == "The board accepted his resignation."          # gossip line replaced by the source summary
-    assert out["talking_point"] == "" and out["hook"] == ""             # hook rebuilt: s2 was dropped
+    assert out["big_picture"] == "" and out["hook"] == ""               # hook rebuilt: s2 was dropped
     assert not writer.disrespectful("Nvidia's chief executive resigned after a scandal, and the board named a successor.")
     wire = writer.wire_copy([src, rude, ok], "x")
     assert [s["id"] for s in wire["stories"]] == ["s3"]
@@ -274,15 +285,6 @@ def test_title_only_source_gets_no_invented_summary():
                         "why": "For businesses, local testing could help."}]}
     row = writer.ground(raw, [src], set())["stories"][0]
     assert row["what"] == "" and row["headline"].startswith("Scale AI launches") and row["why"]
-
-
-def test_talking_point_must_be_about_the_top_story():
-    top = _story(1, title="Scale AI launches benchmark", summary="It tests legal reasoning.")
-    raw = {"talking_point": "Nvidia's chief executive has resigned.",
-           "stories": [{"id": "s1", "headline": "Scale AI launches benchmark", "what": "It tests legal reasoning.", "why": ""}]}
-    assert writer.ground(raw, [top], set())["talking_point"] == ""
-    raw["talking_point"] = "Scale AI now tests how well software reasons about law."
-    assert writer.ground(raw, [top], set())["talking_point"]
 
 
 def test_gossip_and_opinion_sources_are_never_offered_to_the_editor(monkeypatch):
@@ -431,7 +433,7 @@ def _edition(**over):
     ed = {
         "edition": "morning", "title": "Morning Edition", "date": "2026-11-13", "date_label": "Fri 13 Nov 2026",
         "subject": "s", "hook": "Hook <script>", "market_take": "Calm.", "big_picture": "BP",
-        "talking_point": "TP",
+
         "markets": [build.market_block("Wall Street overnight", [q], today=dt.date(2026, 11, 13))],
         "stories": [{**_story().to_dict(), "headline": "H <b>x</b>", "what": "W", "why": "Y", "edited": True,
                      "url": "https://ex.com/?a=1&b='2'"}],
@@ -448,8 +450,8 @@ def test_render_html_escapes_untrusted_text_and_shows_everything():
     assert "<script>" not in html and "<b>x</b>" not in html
     assert "href='https://ex.com/?a=1&amp;b=&#x27;2&#x27;'" in html           # quote cannot break the attribute
     assert "0.0%" not in html and ">flat<" in html                             # no "-0.0%"
-    assert "Say this at lunch" in html and "What it means for you" in html
-    assert "Jargon buster" in html and "In plain English: the US inflation report." in html
+    assert "Why it matters" in html and "AI Channel" in html and "Markets Channel" in html
+    assert "Glossary" in html and "The US inflation report." in html
     assert "date not yet confirmed" in html                                    # Computex 2027 flag
     assert "price for Nikkei unavailable" in html                              # degradation is visible
     assert render.UNSUB_PLACEHOLDER in html
@@ -458,21 +460,88 @@ def test_render_html_escapes_untrusted_text_and_shows_everything():
 
 def test_email_layout_order_and_labels():
     ed = _edition()
-    ed["stories"][0]["tag"] = "Big Tech"
+    ed["stories"][0]["tag"] = "Industry"
     ed["stories"].append({**ed["stories"][0], "headline": "Second story", "tag": "<b>bad</b>"})
     html = render.render_html(ed)
-    order = [html.index(x) for x in ("Top story", "Say this at lunch", "Markets in 30 seconds", "Also in AI",
-                                     "The big picture", "What to watch next", "Jargon buster", "Unsubscribe")]
+    ed["stories"].append({**ed["stories"][0], "headline": "Fed holds rates", "channel": "markets", "tag": "Economy"})
+    html = render.render_html(ed)
+    order = [html.index(x) for x in ("Summary.", "AI Channel", "The wider trend", "Markets Channel", "Market summary",
+                                     "Market news", "Fed holds rates", "Looking ahead", "Glossary", "Unsubscribe")]
     assert order == sorted(order)                                  # reading order on a phone
-    assert "min&nbsp;read" in html and ">Big Tech<" in html and "<b>bad</b>" not in html
+    assert "min&nbsp;read" in html and ">Industry<" in html and "<b>bad</b>" not in html
     assert "padding:12px 0" in html                                # 44px tap targets on links
 
 
 def test_story_tag_must_come_from_the_fixed_set():
     raw = {"stories": [{"id": "s1", "tag": "Gossip", "headline": "Nvidia sells 250 chips", "what": "It paid $3 billion.", "why": ""},
-                       {"id": "s2", "tag": "Money", "headline": "Nvidia sells 250 chips", "what": "It paid $3 billion.", "why": ""}]}
+                       {"id": "s2", "tag": "Policy", "headline": "Nvidia sells 250 chips", "what": "It paid $3 billion.", "why": ""}]}
     out = writer.ground(raw, [_story(1), _story(2)], set())
-    assert [s["tag"] for s in out["stories"]] == ["", "Money"]
+    assert [s["tag"] for s in out["stories"]] == ["", "Policy"]
+
+
+def test_formal_register_no_casual_labels_or_emoji():
+    html = render.render_html(_edition())
+    for casual in ("Say this at lunch", "Jargon buster", "What it means for you", "30 seconds", "\U0001F1F8"):
+        assert casual not in html
+    assert "not an official communication of any company" in html and "not investment advice" in html
+
+
+def test_each_channel_renders_on_its_own():
+    ed = _edition()
+    ed["stories"].append({**ed["stories"][0], "headline": "Fed holds rates", "channel": "markets"})
+    ai, mk = render.render_html(ed, "ai"), render.render_html(ed, "markets")
+    assert "AI Channel" in ai and "Markets Channel" not in ai and "Fed holds rates" not in ai and "S&amp;P 500" not in ai
+    assert "Markets Channel" in mk and "Fed holds rates" in mk and "S&amp;P 500" in mk and "H &lt;b&gt;x" not in mk
+    assert render.UNSUB_PLACEHOLDER in ai and render.UNSUB_PLACEHOLDER in mk
+    assert "== MARKETS CHANNEL ==" in render.render_text(ed, "markets") and "== AI CHANNEL ==" not in render.render_text(ed, "markets")
+
+
+SENSITIVE = sources.load_config()["sensitive_terms"]
+
+
+def test_sensitive_story_runs_in_the_publishers_words_without_commentary():
+    """Readership rule: no rewrite and no opinion on Huawei, sanctions, export controls or security."""
+    src = _story(1, title="US weighs new export controls on AI chips to China",
+                 summary="Officials are considering tighter rules, people familiar said.")
+    plain = _story(2, title="Google launches glasses", summary="They cost $395.")
+    raw = {"hook": "New export controls could reshape the chip trade.", "subject": "Export controls loom, Google launches glasses",
+           "big_picture": "AI hardware keeps reaching consumers.", "outlook": "Sanctions may tighten further.",
+           "stories": [{"id": "s1", "channel": "ai", "tag": "Policy", "headline": "Washington moves to choke China's AI chips",
+                        "what": "The US is tightening the screws.", "why": "For chip makers, this could hurt sales."},
+                       {"id": "s2", "channel": "ai", "headline": "Google launches glasses", "what": "They cost $395.", "why": ""}]}
+    out = writer.ground(raw, [src, plain], set(), SENSITIVE)
+    s1 = out["stories"][0]
+    assert s1["verbatim"] and s1["headline"] == src.title and s1["what"] == src.summary and s1["why"] == ""
+    assert out["hook"] == "" and out["outlook"] == ""                     # commentary on the topic is refused
+    assert out["big_picture"] == "AI hardware keeps reaching consumers."  # unrelated commentary stays
+    assert out["subject"] == src.title[:60].rsplit(" ", 1)[0] or out["subject"] == src.title
+    html = render.render_html({**_edition(), "stories": [{**s1, "channel": "ai"}]})
+    assert "As reported by Src" in html and "Why it matters" not in html
+    assert writer.ground({"stories": [{"id": "s9"}]}, [_story(9, title="Huawei unveils new AI chip")], set(), SENSITIVE)["stories"][0]["verbatim"]
+
+
+def test_channels_have_a_few_stories_each_ai_first():
+    stories = [_story(i, title=f"Nvidia sells 250 chips {i}") for i in range(1, 11)]
+    raw = {"stories": [{"id": f"s{i}", "channel": "markets" if i % 2 else "ai", "headline": f"Nvidia sells 250 chips {i}",
+                        "what": "It paid $3 billion.", "why": ""} for i in range(1, 11)]
+           + [{"id": "s99", "channel": "sports"}]}
+    out = writer.ground(raw, stories, set())
+    chans = [s["channel"] for s in out["stories"]]
+    assert chans == ["ai"] * writer.MAX_AI + ["markets"] * writer.MAX_MARKETS
+
+
+def test_markets_feed_items_go_to_the_markets_channel(monkeypatch):
+    cfg = {"feeds": [{"name": "WSJ", "channel": "markets", "url": "u"}], "ai_keywords": ["ai"],
+           "market_keywords": ["shares", "fed"]}
+    now = dt.datetime(2026, 11, 12, 12, tzinfo=UTC)
+    rss = RSS.replace("OpenAI ships &lt;b&gt;new&lt;/b&gt; model - Reuters", "Shares fall as Fed holds rates")
+
+    class R:
+        text = rss; content = rss.encode()
+        def raise_for_status(self): pass
+    monkeypatch.setattr(sources.httpx, "get", lambda *a, **k: R())
+    got = sources.fetch_stories(cfg, since=now - dt.timedelta(days=1), now=now)
+    assert [(s.title, s.channel) for s in got] == [("Shares fall as Fed holds rates", "markets")]   # AI plan item skipped
 
 
 def test_render_text_has_links_and_unsub():
