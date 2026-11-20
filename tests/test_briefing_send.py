@@ -238,3 +238,49 @@ def test_single_channel_send_has_its_own_subject_and_content(env):
     env["posts"].clear()
     assert cli.main(["--edition", "morning", "--send", "--channel", "ai"]) == 0       # not blocked as a re-run
     assert len(_emails(env)) == 3 and _emails(env)[0]["subject"].startswith("AI Channel: ")
+
+
+def test_chat_text_files_are_saved_for_each_channel(env):
+    assert cli.main(["--edition", "morning"]) == 0
+    out = env["tmp"] / "briefings"
+    ai = (out / f"{env['edition']['date']}-morning-ai.txt").read_text(encoding="utf-8")
+    assert ai.startswith("Cassandra AI Channel | ") and env["edition"]["stories"][0]["headline"] in ai
+    assert (out / f"{env['edition']['date']}-morning-markets.txt").is_file()
+
+
+def test_welink_needs_its_config_file(env, capsys, monkeypatch, tmp_path):
+    monkeypatch.setattr(cli, "WELINK_CFG", tmp_path / "welink.yaml")            # no such file
+    assert cli.main(["--edition", "morning", "--welink"]) == 1
+    assert "welink.example.yaml" in capsys.readouterr().err
+    assert env["posts"] == []
+
+
+def test_welink_gets_one_batch_per_channel_and_dry_run_without_send(env, monkeypatch, tmp_path):
+    import sys
+    import types
+
+    (tmp_path / "welink.yaml").write_text("targets: {}\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "WELINK_CFG", tmp_path / "welink.yaml")
+    calls = []
+    fake = types.ModuleType("src.briefing.welink")
+    fake.deliver = lambda batches, cfg, dry_run, log=print: calls.append((batches, cfg, dry_run)) or \
+        {"sent": 0, "skipped": 0, "failed": 1 if len(calls) == 3 else 0, "details": ["x"]}
+    monkeypatch.setitem(sys.modules, "src.briefing.welink", fake)
+    env["edition"]["stories"].append({**env["edition"]["stories"][0], "headline": "Fed holds rates", "channel": "markets"})
+
+    assert cli.main(["--edition", "morning", "--welink"]) == 0                 # no --send: preview only
+    batches, cfg, dry = calls[0]
+    assert dry is True and [b["channel"] for b in batches] == ["ai", "markets"] and cfg == {"targets": {}}
+    assert batches[0]["messages"][0].startswith("Cassandra AI Channel | ")
+    assert env["posts"] == []                                                   # and no email either
+
+    assert cli.main(["--edition", "morning", "--welink", "--send", "--no-email", "--channel", "markets"]) == 0
+    batches, _, dry = calls[1]
+    assert dry is False and [b["channel"] for b in batches] == ["markets"] and env["posts"] == []
+
+    assert cli.main(["--edition", "morning", "--welink", "--send", "--no-email"]) == 1     # a failed post is an error
+
+
+def test_welink_never_posts_a_raw_headline_edition(env, monkeypatch, tmp_path):
+    env["edition"]["writer"] = "wire"
+    assert cli.main(["--edition", "morning", "--welink", "--send", "--no-email"]) == 1

@@ -305,6 +305,34 @@ def test_gossip_and_opinion_sources_are_never_offered_to_the_editor(monkeypatch)
     assert seen["ids"] == ["s3"] and [s["id"] for s in out["stories"]] == ["s3"]
 
 
+def test_editor_sees_a_fair_spread_of_sources_with_tiers_and_the_edition_brief(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    seen = {}
+
+    def fake(key, prompt, system, **kw):
+        seen.update(json.loads(prompt))
+        return json.dumps({"stories": [{"id": f"s{i}", "headline": "Nvidia sells 250 chips", "what": "It paid $3 billion.",
+                                        "why": ""} for i in (1, 2, 3)]})
+
+    monkeypatch.setattr(writer, "_gemini_generate", fake)
+    monkeypatch.setattr(writer, "RETRY_PAUSE_S", 0)
+    stories = []
+    for i in range(1, 9):                                   # 8 from one busy desk, then 1 from another
+        st = _story(i, title=f"Nvidia sells 250 chips {i}")
+        st.source, st.tier = "Busy Desk", 2
+        stories.append(st)
+    other = _story(9, title="Fed holds rates as shares fall")
+    other.source, other.tier, other.channel = "FT", 1, "markets"
+    stories.append(other)
+    writer.write_copy(stories, edition="morning", date_label="x", market_facts=[], market_dirs=set(), events=[],
+                      focus="Morning edition, before Asian markets open.")
+    cands = seen["candidates"]
+    assert [c["id"] for c in cands] == ["s1", "s2", "s3", "s4", "s9"]        # 4 per source at most
+    assert cands[-1] == {"id": "s9", "channel": "markets", "tier": 1, "title": "Fed holds rates as shares fall",
+                         "summary": "It paid $3 billion.", "source": "FT", "region": "global"}
+    assert seen["edition_brief"].startswith("Morning edition")
+
+
 def test_no_key_falls_back_to_labelled_wire_copy(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     stories = [_story(i) for i in range(1, 6)] + [_story(7, title="Is AI over?"), _story(8, summary="I think so.")]
@@ -365,11 +393,12 @@ def test_model_failure_note_never_leaks_api_key(monkeypatch):
 def test_pick_edition():
     sched = sources.load_config()["schedule"]
     at = lambda d, h, m: dt.datetime(2026, 11, d, h, m)          # 9 Nov 2026 is a Monday
-    assert build.pick_edition(at(10, 7, 35), sched) == "morning"     # Tue
-    assert build.pick_edition(at(9, 7, 35), sched) is None           # Mon morning: US was shut on Sunday
+    assert build.pick_edition(at(9, 7, 35), sched) == "morning"      # Monday: a working day for the readers
+    assert build.pick_edition(at(13, 7, 35), sched) == "morning"     # Friday
+    assert build.pick_edition(at(14, 7, 35), sched) is None          # Saturday: no weekday edition
     assert build.pick_edition(at(9, 20, 40), sched) == "evening"
-    assert build.pick_edition(at(14, 20, 40), sched) is None         # Sat evening
-    assert build.pick_edition(at(15, 9, 0), sched) == "weekly"       # Sun
+    assert build.pick_edition(at(14, 20, 40), sched) is None
+    assert build.pick_edition(at(15, 9, 0), sched) == "weekly"       # Sunday
     assert build.pick_edition(at(10, 7, 29), sched) is None          # before the slot
     assert build.pick_edition(at(10, 12, 0), sched) is None          # too late
 
@@ -401,6 +430,16 @@ def test_calendar_parsing_explains_and_filters():
     ]
     (row,) = sources.parse_econ(ff, start=now, end=now + dt.timedelta(hours=30), tz=sgt, explain=cal["explain"])
     assert row["when"] == "Thu 12 Nov, 21:30 Singapore time" and "inflation" in row["plain"]
+    assert row["title"] == "US: CPI m/m"
+
+    china = [{"title": "1-y Loan Prime Rate", "country": "CNY", "date": "2026-11-13T09:15:00+08:00", "impact": "High"},
+             {"title": "5-y Loan Prime Rate", "country": "CNY", "date": "2026-11-13T09:15:00+08:00", "impact": "High"},
+             {"title": "Manufacturing PMI", "country": "CNY", "date": "2026-11-13T09:30:00+08:00", "impact": "Medium"},
+             {"title": "CPI y/y", "country": "JPY", "date": "2026-11-13T09:30:00+08:00", "impact": "High"}]
+    rows = sources.parse_econ(china, start=now, end=now + dt.timedelta(hours=30), tz=sgt, explain=cal["explain"],
+                              countries=cal["countries"])
+    assert [r["title"] for r in rows] == ["China: 1-y Loan Prime Rate", "China: Manufacturing PMI"]   # LPR pair = one event
+    assert rows[0]["when"] == "Fri 13 Nov, 09:15 Singapore time" and "lending rate" in rows[0]["plain"]
 
     assert sources.parse_econ([{"title": "NFIB Small Business Optimism", "country": "USD", "impact": "High",
                                 "date": "2026-11-12T08:30:00-05:00"},                       # "ism" inside a word
@@ -440,7 +479,8 @@ def _edition(**over):
         "outlook": "Watch.", "glossary": [{"term": "GPU", "plain": "A chip."}],
         "events": sources.upcoming_events(dt.date(2027, 5, 30)),
         "calendar": [{"title": "CPI m/m", "when": "Thu 12 Nov, 21:30 Singapore time", "plain": "the US inflation report"}],
-        "writer": "gemini", "rejected": [], "problems": ["price for Nikkei unavailable (Timeout)"],
+        "writer": "gemini", "rejected": [], "problems": ["price for Nikkei unavailable (Timeout)", "news feed 'X' unavailable"],
+        "notes": ["price for Nikkei unavailable (Timeout)"],
     }
     return {**ed, **over}
 
@@ -454,6 +494,7 @@ def test_render_html_escapes_untrusted_text_and_shows_everything():
     assert "Glossary" in html and "The US inflation report." in html
     assert "date not yet confirmed" in html                                    # Computex 2027 flag
     assert "price for Nikkei unavailable" in html                              # degradation is visible
+    assert "news feed" not in html                                             # operator noise stays in the log
     assert render.UNSUB_PLACEHOLDER in html
     assert "—" not in html
 
@@ -496,7 +537,7 @@ def test_each_channel_renders_on_its_own():
     assert "== MARKETS CHANNEL ==" in render.render_text(ed, "markets") and "== AI CHANNEL ==" not in render.render_text(ed, "markets")
 
 
-SENSITIVE = sources.load_config()["sensitive_terms"]
+SENSITIVE = writer.sensitive_rules(sources.load_config())
 
 
 def test_sensitive_story_runs_in_the_publishers_words_without_commentary():
@@ -518,6 +559,35 @@ def test_sensitive_story_runs_in_the_publishers_words_without_commentary():
     html = render.render_html({**_edition(), "stories": [{**s1, "channel": "ai"}]})
     assert "As reported by Src" in html and "Why it matters" not in html
     assert writer.ground({"stories": [{"id": "s9"}]}, [_story(9, title="Huawei unveils new AI chip")], set(), SENSITIVE)["stories"][0]["verbatim"]
+
+
+def test_sensitive_combinations_and_drafted_copy_are_caught():
+    """Live 2026-11-20: 'US signed off on sales of AI chips to China ... Pentagon's list of alleged Chinese
+    military-backed companies' named no listed term, was rewritten, and the commentary mentioned export controls."""
+    src = _story(1, title="US signed off on sales of nearly 900,000 AI chips to China in six months, House committee says",
+                 summary="The US approved shipments of AI chips to companies on the Pentagon's list of alleged Chinese military-backed companies.")
+    raw = {"stories": [{"id": "s1", "channel": "ai", "headline": "US approves export of AI chips to Chinese entities",
+                        "what": "The US government approved shipments.", "why": "For regulators, this matters."}]}
+    row = writer.ground(raw, [src], set(), SENSITIVE)["stories"][0]
+    assert row["verbatim"] and row["headline"] == src.title and row["why"] == ""
+    # a neutral source, but the editor's own draft strays into a listed topic: also carried verbatim
+    plain = _story(2, title="Chip maker reports record quarter", summary="Revenue was $35 billion.")
+    raw = {"stories": [{"id": "s2", "headline": "Chip maker reports record quarter", "what": "Revenue was $35 billion.",
+                        "why": "For investors, sanctions remain the main risk."}]}
+    assert writer.ground(raw, [plain], set(), SENSITIVE)["stories"][0]["verbatim"]
+    # ordinary China market news is not swept up
+    for ok in ("Hong Kong stocks fall as China tech slides", "China's central bank holds its loan prime rate",
+               "Shanghai Composite closes higher on property rally", "Taiwan Weighted index drops 3%"):
+        assert not writer._sensitive(ok, SENSITIVE), ok
+    for hit in ("China probes US chip maker", "Beijing tightens rare earth export rules", "US-China tensions weigh on shares"):
+        assert writer._sensitive(hit, SENSITIVE), hit
+
+
+def test_index_names_are_not_quantities():
+    """Live 2026-11-20: 'Nikkei 225 falls' was rejected because the source said only 'Nikkei'."""
+    assert writer.check_story_text("Nikkei 225 falls 2.9% as chip shares drop", "Nikkei Falls 2.9%, Dragged by Chip Stocks") == []
+    assert writer.check_story_text("The S&P 500 fell 500 points", "S&P 500 fell 2%")          # a real 500 still counts
+    assert writer.check_story_text("Inflation rose in October", "Japan's core inflation accelerates in October") == []
 
 
 def test_channels_have_a_few_stories_each_ai_first():
@@ -542,6 +612,22 @@ def test_markets_feed_items_go_to_the_markets_channel(monkeypatch):
     monkeypatch.setattr(sources.httpx, "get", lambda *a, **k: R())
     got = sources.fetch_stories(cfg, since=now - dt.timedelta(days=1), now=now)
     assert [(s.title, s.channel) for s in got] == [("Shares fall as Fed holds rates", "markets")]   # AI plan item skipped
+
+
+def test_chat_text_per_channel_for_messengers():
+    ed = _edition()
+    ed["stories"][0].update(tag="Industry", verbatim=False)
+    ed["stories"].append({**ed["stories"][0], "headline": "Fed holds rates", "channel": "markets", "verbatim": True})
+    fx = sources.Quote("SGD=X", "US dollar in SGD", "", 1.28721, 0.0, 0.0, "2026-11-13", False, fx=True)
+    ed["markets"] = [build.market_block("Singapore, last close", [_q("Straits Times Index", -1.3), fx])]
+    ai, mk = render.render_chat(ed, "ai"), render.render_chat(ed, "markets")
+    assert ai.startswith("Cassandra AI Channel | Morning Edition | Fri 13 Nov 2026")
+    assert "1. H <b>x</b>" in ai and "Why it matters: Y" in ai and "Source: Src https://ex.com/?a=1&b='2'" in ai
+    assert "Fed holds rates" not in ai and "Straits Times" not in ai
+    assert "Singapore, last close (Thu 12 Nov): Straits Times Index -1.3%, US dollar in SGD 1.2872" in mk
+    assert "As reported by Src" in mk and "Looking ahead" in mk and "Not investment advice" in mk
+    assert "not an official company communication" in ai and render.UNSUB_PLACEHOLDER not in ai + mk
+    assert render.render_chat({**ed, "stories": []}, "ai") == ""               # nothing to say: nothing to post
 
 
 def test_render_text_has_links_and_unsub():
@@ -577,6 +663,97 @@ def test_market_block_marks_rows_from_an_older_session():
     assert block["summary"].startswith("STI did not trade in the latest session.")
     html = render.render_html(_edition(markets=[block]))
     assert "last traded Wed 11 Nov" in html
+
+
+def test_currency_rows_do_not_decide_the_session_and_show_the_level():
+    """A currency trades round the clock: its newer date must not mark every index as 'last traded' earlier."""
+    fx = sources.Quote("CNY=X", "US dollar in yuan", "", 6.66721, 0.01, 0.2, "2026-11-20", True, fx=True)
+    block = build.market_block("Greater China, last close", [_q("Shanghai Composite", -0.3, "2026-11-19"), fx])
+    assert block["asof"] == "2026-11-19" and not any(r["old"] for r in block["rows"]) and not block["live"]
+    live = _q("Shanghai Composite", -1.4, "2026-11-20")
+    live.live = True
+    now = build.market_block("", [live, _q("Shenzhen Component", -1.8, "2026-11-20")])
+    assert now["summary"] == "Shanghai Composite is down (-1.4%). Biggest move: Shenzhen Component is down sharply (-1.8%)."
+    assert block["rows"][1]["close"] == "6.6672" and block["summary"] == "Shanghai Composite fell slightly (-0.3%)."
+
+
+def test_figure_is_withheld_when_two_sources_disagree():
+    q = _q("Taiwan Weighted", -8.5)
+    q.check, q.check_note = "conflict", "second source shows -3.1%"
+    ok = _q("Nikkei 225", -3.8)
+    ok.check = "confirmed"
+    block = build.market_block("Asia-Pacific today", [ok, q])
+    row = block["rows"][1]
+    assert row["pct"] is None and row["pct_text"] == "n/a" and "sources disagree" in row["note"]
+    assert "Taiwan" not in block["summary"]                       # a withheld figure is never the "biggest move"
+    assert (block["confirmed"], block["checked"]) == (1, 1)
+    assert "1 of 1 figures confirmed against a second source" in render.render_html(_edition(markets=[block]))
+
+
+def test_market_tables_follow_the_edition_plan(monkeypatch):
+    """Morning: Greater China, Asia-Pacific, Singapore, then Wall Street. Evening: US first, then China's day.
+    Titles come from the data: a market that is trading is never called 'last close'."""
+    cfg = sources.load_config()
+    today = dt.date(2026, 11, 20)
+    us = {"S&P 500", "Nasdaq Composite", "Dow Jones", "Semiconductors (SOX)", "Nvidia", "TSMC (US-listed)",
+          "S&P 500 futures", "Nasdaq futures"}
+
+    def quotes(asia_date, live=False):
+        def fetch(rows, problems=None):
+            out = []
+            for r in rows:
+                q = _q(r["label"], -1.0, "2026-11-19" if r["label"] in us else asia_date)
+                q.fx, q.live = bool(r.get("fx")), live and r["label"] not in us
+                out.append(q)
+            return out
+        return fetch
+
+    monkeypatch.setattr(sources, "fetch_quotes", quotes("2026-11-19"))                     # 07:30: nothing open yet
+    morning = build.build_markets("morning", cfg, today=today, problems=[])
+    assert [b["title"] for b in morning] == ["Greater China, last close", "Asia-Pacific, last close",
+                                              "Singapore, last close", "Wall Street overnight"]
+    assert morning[0]["rows"][0]["label"] == "Shanghai Composite"
+
+    monkeypatch.setattr(sources, "fetch_quotes", quotes("2026-11-20", live=True))          # a late run at 10:00
+    late = build.build_markets("morning", cfg, today=today, problems=[])
+    assert [b["title"] for b in late][:3] == ["Greater China, trading now", "Asia-Pacific, trading now",
+                                              "Singapore, trading now"]
+
+    monkeypatch.setattr(sources, "fetch_quotes", quotes("2026-11-20"))                     # 20:30: Asia has closed
+    evening = build.build_markets("evening", cfg, today=today, problems=[])
+    assert [b["title"] for b in evening] == ["Wall Street, last close", "US futures before tonight's open",
+                                              "Greater China today", "Singapore today", "Asia-Pacific today"]
+    monkeypatch.setattr(sources, "fetch_quotes", quotes("2026-11-19"))                     # an Asian holiday
+    holiday = build.build_markets("evening", cfg, today=today, problems=[])
+    assert holiday[2]["title"] == "Greater China, last close (no trading today)"
+    monkeypatch.setattr(sources, "fetch_quotes", quotes("2026-11-19"))
+    monday = build.build_markets("morning", cfg, today=dt.date(2026, 11, 23), problems=[])
+    assert monday[3]["title"] == "Wall Street, last close (no US trading overnight)"
+    probs: list[str] = []
+    monkeypatch.setattr(sources, "fetch_quotes", lambda rows, problems=None: [])
+    assert build.build_markets("morning", cfg, today=today, problems=probs) == [] and "no market data" in probs[0]
+
+
+def test_readers_see_what_affects_them_not_feed_noise():
+    probs = ["news feed 'X' unavailable (Timeout)", "news feed 'X' unavailable (Timeout)", "price for CSI 300 unavailable (ValueError)"]
+    assert build.reader_notes(probs, 33) == ["price for CSI 300 unavailable (ValueError)"]
+    many = [f"news feed 'F{i}' unavailable (Timeout)" for i in range(12)]
+    assert build.reader_notes(many, 33) == ["12 of 33 news sources were unavailable, so coverage is thinner than usual"]
+
+
+def test_monday_morning_looks_back_over_the_weekend(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(sources, "fetch_quotes", lambda rows, problems=None: [])
+    monkeypatch.setattr(sources, "fetch_calendar", lambda *a, **k: [])
+
+    def stories(cfg, since, now, problems=None):
+        seen["hours"] = round((now - since).total_seconds() / 3600)
+        return []
+    monkeypatch.setattr(sources, "fetch_stories", stories)
+    build.build_edition("morning", now=dt.datetime(2026, 11, 16, 23, 30, tzinfo=UTC))     # Tue 07:30 SGT
+    assert seen["hours"] == 16
+    build.build_edition("morning", now=dt.datetime(2026, 11, 15, 23, 30, tzinfo=UTC))     # Mon 07:30 SGT
+    assert seen["hours"] == 62
 
 
 def test_unsub_placeholder_cannot_be_forged_by_feed_text():

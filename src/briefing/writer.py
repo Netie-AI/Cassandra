@@ -30,7 +30,7 @@ from .sources import Story, has_term
 DEFAULT_MODELS = "gemini-3.8-flash,gemini-3.5-flash,gemini-flash-latest"
 MAX_AI, MAX_MARKETS = 4, 3            # "a few AI, a few financial"
 MAX_STORIES = MAX_AI + MAX_MARKETS
-CAND_AI, CAND_MARKETS = 28, 18
+CAND_AI, CAND_MARKETS, PER_SOURCE = 28, 22, 4
 RETRY_PAUSE_S = 20
 SUBJECT_MAX = 60
 
@@ -45,7 +45,8 @@ or finance specialists. They expect the standard of a respected business newspap
 accurate, neutral, concise, formal. You never bend a fact and you never take sides.
 
 INPUT
-JSON with candidate stories (id, channel, title, summary, source, region), market_facts,
+JSON with edition_brief (what this edition is for: follow it when choosing and ordering market
+stories), candidate stories (id, channel, tier, title, summary, source, region), market_facts,
 upcoming_events and on_the_calendar_next.
 
 OUTPUT: one JSON object, nothing else
@@ -67,11 +68,13 @@ PICKING STORIES
 - AI channel: 3 or 4 stories, most significant first. Each must clearly be about AI or the AI
   industry (models, chips, data centres, AI companies, regulation, adoption, jobs).
 - Markets channel: 2 or 3 stories about financial markets and the economy (indices, central
-  banks, results of major companies, listings, currencies, Asian markets). Prefer stories that
-  explain the session described in market_facts.
+  banks, results of major companies, listings, currencies). Follow edition_brief for which
+  regions come first, and prefer stories that explain the sessions described in market_facts.
 - Set "channel" yourself. A story about a share price or company results belongs in "markets"
   even if the company is an AI company.
-- Prefer primary and established sources, and candidates that have a summary.
+- When several candidates report the same event, take the one with the lowest tier number
+  (1 = established newsroom, 2 = trade press or company newsroom, 3 = aggregator headline),
+  and prefer candidates that have a summary.
 - Include Singapore or Asia stories when they are significant (region "sg").
 - No more than 2 stories about the same company. Never pick two candidates about the same event.
 - Skip developer tooling news, rumours, opinion columns, promotional announcements, celebrity
@@ -130,10 +133,11 @@ _NUM_WORDS = re.compile(
     r"thousands?|millions?|billions?|trillions?|dozens?|half|halved|doubl\w+|tripl\w+)\b", re.I)
 # "up 8%" / "down 8%" count as direction words only when a figure follows ("sign up" must not).
 _UP = re.compile(r"\b(?:rose|rises?|risen|rising|soar\w*|jump\w*|gain\w*|surg\w*|climb\w*|rall(?:y|ied|ies)|"
-                 r"higher|grew|grows?|increas\w+|rebound\w*|spik\w+|up\s+(?:by\s+)?[\d$£€])", re.I)
+                 r"higher|grew|grows?|increas\w+|rebound\w*|spik\w+|accelerat\w+|up\s+(?:by\s+)?[\d$£€])", re.I)
 _DOWN = re.compile(r"\b(?:fell|falls?|fallen|falling|drop\w*|slump\w*|plung\w*|slid\w*|slip\w*|tumbl\w*|"
                    r"declin\w*|sank|sinks?|sinking|crash\w*|lower|lost|loses?|losing|shed|shrank|shrink\w*|"
-                   r"dip(?:s|ped|ping)?|plummet\w*|decreas\w+|collaps\w+|down\s+(?:by\s+)?[\d$£€])", re.I)
+                   r"dip(?:s|ped|ping)?|plummet\w*|decreas\w+|collaps\w+|slow(?:s|ed|ing)|cool(?:s|ed|ing)|"
+                   r"down\s+(?:by\s+)?[\d$£€])", re.I)
 # Hedges in a HEADLINE that make the claim less than a done fact. Copy must keep one of them.
 # Looked up in the source title only: a stray "could" or "not" deep in a summary is not a hedge
 # on the main claim, and demanding it there rejected most faithful rewrites.
@@ -159,8 +163,14 @@ def disrespectful(text: str) -> bool:
     return bool(_DISRESPECT.search(text or ""))
 
 
+# A number that is part of a name is not a quantity: "Nikkei" and "Nikkei 225" are the same index.
+_NAMES = re.compile(r"\b(?:Nikkei 225|S&P 500|S&P/ASX 200|ASX 200|CSI 300|CSI 500|FTSE 100|FTSE China A50|"
+                    r"Nasdaq[ -]100|Russell 2000|Nifty 50|Euro Stoxx 50|Stoxx 600|DAX 40|CAC 40|KOSPI 200)\b", re.I)
+
+
 def _numbers(text: str) -> set:
     """Every quantity in the text as (value, unit), plus spelled-out quantity words."""
+    text = _NAMES.sub(" ", text or "")
     out: set = set()
     for cur, value, pct, unit in _NUM.findall(text or ""):
         cur = "$" if cur.upper() == "US$" else cur.upper()      # "$3bn" is not "S$3bn" or "£3bn"
@@ -235,8 +245,17 @@ def _is_opinion(s: Story) -> bool:
     return s.title.rstrip().endswith("?") or s.summary.startswith(("I ", "I'", "My "))
 
 
-def _sensitive(text: str, terms: list[str] | None) -> bool:
-    return bool(terms) and has_term(text, terms)
+def sensitive_rules(cfg: dict) -> dict:
+    return {"terms": cfg.get("sensitive_terms") or [], "pairs": cfg.get("sensitive_pairs") or []}
+
+
+def _sensitive(text: str, rules: dict | None) -> bool:
+    """A listed term, or a listed combination (for example a country together with "export",
+    "military" or "probe"). Deliberately broad: a false alarm only costs a rewrite."""
+    if not rules or not text:
+        return False
+    return has_term(text, rules.get("terms", [])) or any(
+        has_term(text, p["any"]) and has_term(text, p["with"]) for p in rules.get("pairs", []))
 
 
 def _verbatim(src: Story) -> dict[str, Any]:
@@ -261,7 +280,7 @@ def wire_copy(stories: list[Story], reason: str) -> dict[str, Any]:
 
 
 def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str],
-           sensitive: list[str] | None = None) -> dict[str, Any]:
+           sensitive: dict | None = None) -> dict[str, Any]:
     """Validate model output against sources. Returns clean copy + a list of what was rejected."""
     by_id = {s.id: s for s in stories}
     rejected: list[str] = []
@@ -277,7 +296,8 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str],
         if room[channel] <= 0:
             continue
         corpus = f"{src.title} {src.summary}"
-        if _sensitive(corpus, sensitive):
+        drafted = " ".join(str(item.get(k) or "") for k in ("headline", "what", "why"))
+        if _sensitive(corpus, sensitive) or _sensitive(drafted, sensitive):
             # extra care: no rewrite and no commentary, the source speaks for itself
             row = {**_verbatim(src), "channel": channel}
             rejected.append(f"{src.id}: sensitive topic, carried in the publisher's own words")
@@ -389,7 +409,8 @@ def _editors(gemini_key: str | None, writers: list[dict]) -> list[tuple[str, Any
 
 def write_copy(stories: list[Story], *, edition: str, date_label: str, market_facts: list[str],
                market_dirs: set[str], events: list[dict], calendar: list[dict] | None = None,
-               writers: list[dict] | None = None, sensitive: list[str] | None = None) -> dict[str, Any]:
+               writers: list[dict] | None = None, sensitive: dict | None = None,
+               focus: str = "") -> dict[str, Any]:
     """Model-edited copy, fact-checked. Falls back to wire_copy() loudly."""
     if not stories:
         return wire_copy([], "no stories in the window")
@@ -399,15 +420,24 @@ def write_copy(stories: list[Story], *, edition: str, date_label: str, market_fa
 
     # Gossip and opinion pieces are never offered to the editor. A big event is covered by many
     # sources, so it then picks a respectful one instead of losing the story at the check stage.
-    clean = [s for s in stories if not _is_opinion(s) and not disrespectful(f"{s.title} {s.summary}")]
-    candidates = ([s for s in clean if s.channel == "ai"][:CAND_AI]
-                  + [s for s in clean if s.channel == "markets"][:CAND_MARKETS])
+    # At most PER_SOURCE candidates per publisher and channel, newest first, so no single desk
+    # crowds the others out of the editor's view.
+    candidates, seen = [], {}
+    cap = {"ai": CAND_AI, "markets": CAND_MARKETS}
+    for s in stories:
+        k = (s.channel, s.source)
+        if (_is_opinion(s) or disrespectful(f"{s.title} {s.summary}") or seen.get(k, 0) >= PER_SOURCE
+                or sum(1 for c in candidates if c.channel == s.channel) >= cap[s.channel]):
+            continue
+        seen[k] = seen.get(k, 0) + 1
+        candidates.append(s)
     if not candidates:
         return wire_copy(stories, "no usable stories in the window")
     prompt = json.dumps({
         "edition": edition,
+        "edition_brief": focus,
         "date": date_label,
-        "candidates": [{"id": s.id, "channel": s.channel, "title": s.title, "summary": s.summary[:400],
+        "candidates": [{"id": s.id, "channel": s.channel, "tier": s.tier, "title": s.title, "summary": s.summary[:400],
                         "source": s.source, "region": s.region} for s in candidates],
         "market_facts": market_facts,
         "upcoming_events": [{"name": e["name"], "in_days": e["days_away"], "why": e["why"]} for e in events],

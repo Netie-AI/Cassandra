@@ -24,6 +24,7 @@ from src.tools._env import load_env
 from . import build, render, sources
 
 OUT_DIR = sources.ROOT / "reports" / "briefings"
+WELINK_CFG = sources.ROOT / "config" / "welink.yaml"      # local file, never committed (chat names)
 
 
 def save(ed: dict) -> Path:
@@ -32,8 +33,9 @@ def save(ed: dict) -> Path:
     (OUT_DIR / f"{stem}.json").write_text(json.dumps(ed, indent=2, ensure_ascii=False), encoding="utf-8")
     for name in (f"{stem}.html", "latest.html"):
         (OUT_DIR / name).write_text(render.render_page(ed), encoding="utf-8")
-    for ch in ("ai", "markets"):                     # one page per channel, for posting to separate groups
+    for ch in ("ai", "markets"):                     # one page and one chat text per channel
         (OUT_DIR / f"{stem}-{ch}.html").write_text(render.render_page(ed, ch), encoding="utf-8")
+        (OUT_DIR / f"{stem}-{ch}.txt").write_text(render.render_chat(ed, ch), encoding="utf-8")
     return OUT_DIR / f"{stem}.html"
 
 
@@ -45,6 +47,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="list recipients, send nothing")
     ap.add_argument("--channel", default="all", choices=("all", "ai", "markets"),
                     help="send the full briefing (default) or one channel only")
+    ap.add_argument("--welink", action="store_true",
+                    help="post each channel's chat text to WeLink (config/welink.yaml); "
+                         "without --send it only shows what would be posted")
+    ap.add_argument("--no-email", action="store_true", help="with --send: skip the email dispatch")
     ap.add_argument("--allow-wire", action="store_true",
                     help="send even if the AI editor failed and stories are raw headlines")
     args = ap.parse_args(argv)
@@ -76,7 +82,11 @@ def main(argv: list[str] | None = None) -> int:
               "Re-run, or pass --allow-wire to send it anyway.", file=sys.stderr)
         return 1
 
-    if args.send or args.dry_run:
+    rc = 0
+    if args.welink:
+        rc = _post_welink(ed, args) or rc
+
+    if (args.send and not args.no_email) or args.dry_run:
         from src.newsletter.send import dispatch_rendered
 
         # the channel is part of the subject, so the two channel emails are tracked as separate sends
@@ -90,7 +100,26 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[briefing] dispatch: {out}")
         if out.get("failed"):
             return 1
-    return 0
+    return rc
+
+
+def _post_welink(ed: dict, args) -> int:
+    """Post the chat text of each channel into its WeLink chats. Returns 1 if anything failed."""
+    import yaml
+
+    if not WELINK_CFG.is_file():
+        print("[briefing] FAIL config/welink.yaml not found. Copy config/welink.example.yaml and fill it in.",
+              file=sys.stderr)
+        return 1
+    from . import welink
+    channels = ("ai", "markets") if args.channel == "all" else (args.channel,)
+    batches = [{"channel": ch, "messages": [text]} for ch in channels if (text := render.render_chat(ed, ch))]
+    wcfg = yaml.safe_load(WELINK_CFG.read_text(encoding="utf-8")) or {}
+    out = welink.deliver(batches, wcfg, dry_run=not args.send)
+    for line in out.get("details", []):
+        print(f"[briefing] welink: {line}")
+    print(f"[briefing] welink: sent={out.get('sent', 0)} skipped={out.get('skipped', 0)} failed={out.get('failed', 0)}")
+    return 1 if out.get("failed") else 0
 
 
 if __name__ == "__main__":

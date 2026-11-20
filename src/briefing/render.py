@@ -69,6 +69,20 @@ def _row_note(r: dict) -> str:
     return note
 
 
+def _asof_line(block: dict) -> str:
+    asof = ("Prices at the time of writing" if block["live"] else f"Closing prices, {_day(block['asof'])}")
+    if block.get("stale"):
+        asof += ". Markets have been closed since then"
+    if block.get("confirmed"):
+        asof += f". {block['confirmed']} of {block['checked']} figures confirmed against a second source"
+    return asof
+
+
+def providers(ed: dict[str, Any]) -> str:
+    names = sorted({p for b in ed["markets"] for p in b.get("providers", ["Yahoo Finance"])})
+    return " and ".join(names) if names else "Yahoo Finance"
+
+
 def _market_html(block: dict) -> str:
     rows = ""
     for r in block["rows"]:
@@ -83,9 +97,7 @@ def _market_html(block: dict) -> str:
             f"font-weight:700;color:{color};white-space:nowrap;'>{e(r['pct_text'])}</td>"
             "</tr>"
         )
-    asof = ("Prices at the time of writing" if block["live"] else f"Closing prices, {_day(block['asof'])}")
-    if block.get("stale"):
-        asof += ". Markets have been closed since then"
+    asof = _asof_line(block)
     return (
         f"<div style='margin:0 0 18px;'><div style='font-weight:700;'>{e(block['title'])}</div>"
         f"<div style='margin:2px 0 6px;'>{e(block['summary'])}</div>"
@@ -184,8 +196,8 @@ def render_html(ed: dict[str, Any], channel: str = "all") -> str:
         parts += [f"<p style='margin:0 0 8px;'><strong>{e(g['term'])}:</strong> {e(g['plain'])}</p>"
                   for g in ed["glossary"]]
 
-    notes = "".join(f"<br>Note: {e(p)}." for p in ed["problems"])
-    prices = "Prices from Yahoo Finance. " if channel != "ai" else ""
+    notes = "".join(f"<br>Note: {e(p)}." for p in ed.get("notes", ed["problems"]))
+    prices = f"Prices from {e(providers(ed))}. " if channel != "ai" and ed["markets"] else ""
     parts.append(
         f"<div style='font-size:13px;color:#666;border-top:1px solid #e5e5e5;margin-top:28px;padding:12px 0;'>"
         f"{prices}{DISCLAIMER}{notes}<br>"
@@ -242,6 +254,70 @@ def render_text(ed: dict[str, Any], channel: str = "all") -> str:
             lines += [f"{ev['name']}, {_when(ev)}: {ev['why']}", ""]
     for g in ed["glossary"]:
         lines.append(f"{g['term']}: {g['plain']}")
-    lines += [""] + [f"Note: {p}." for p in ed["problems"]]
+    lines += [""] + [f"Note: {p}." for p in ed.get("notes", ed["problems"])]
     lines += [DISCLAIMER, f"Unsubscribe: {_SITE}/api/digest/unsubscribe?token={UNSUB_PLACEHOLDER}"]
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------- #
+# Chat text (WeLink and other messengers): one compact plain-text message per channel
+# --------------------------------------------------------------------------- #
+def _chat_row(r: dict) -> str:
+    if r.get("fx"):                       # a currency: the level is the news, the move is tiny
+        return f"{r['label']} {r['close']}"
+    return f"{r['label']} {r['pct_text']}"
+
+
+def _chat_story(i: int, s: dict) -> list[str]:
+    lines = [f"{i}. {s['headline']}"]
+    if s.get("what"):
+        lines.append(s["what"])
+    if s.get("why"):
+        lines.append(f"Why it matters: {s['why']}")
+    return lines + [f"{'As reported by' if s.get('verbatim') else 'Source:'} {s['source']} {s['url']}", ""]
+
+
+CHAT_NOTE = ("Compiled from public sources by an automated editor; every item links to its source. "
+             "Independent publication, not an official company communication.")
+
+
+def render_chat(ed: dict[str, Any], channel: str) -> str:
+    """Plain text for one channel, short enough to read in a chat window. Empty string when the
+    channel has nothing to say (the caller must not post an empty message)."""
+    head = f"Cassandra {CHANNEL_NAMES[channel]} | {ed['title']} | {ed['date_label']}"
+    lines: list[str] = []
+    if channel == "ai":
+        stories = channel_stories(ed, "ai")
+        if not stories:
+            return ""
+        for i, s in enumerate(stories, 1):
+            lines += _chat_story(i, s)
+        if ed.get("big_picture"):
+            lines += [f"The wider trend: {ed['big_picture']}", ""]
+        lines.append(CHAT_NOTE)
+    else:
+        stories = channel_stories(ed, "markets")
+        if not (ed["markets"] or stories):
+            return ""
+        for b in ed["markets"]:
+            when = "" if b["live"] else f" ({_day(b['asof'])})"
+            lines.append(f"{b['title']}{when}: " + ", ".join(_chat_row(r) for r in b["rows"]))
+        if ed["markets"]:
+            lines.append("")
+        if ed.get("market_take"):
+            lines += [f"In brief: {ed['market_take']}", ""]
+        if stories:
+            lines.append("Market news")
+            for i, s in enumerate(stories, 1):
+                lines += _chat_story(i, s)
+        ahead = [f"- {c['title']}, {c['when']}. {c['plain'][:1].upper() + c['plain'][1:]}." for c in ed.get("calendar", [])]
+        ahead += [f"- {ev['name']}, {_when(ev)}." for ev in ed["events"]]
+        if ahead or ed.get("outlook"):
+            lines.append("Looking ahead")
+            lines += ahead
+            if ed.get("outlook"):
+                lines.append(f"{ed['outlook']} (editorial view, not a forecast)")
+            lines.append("")
+        notes = [f"Note: {p}." for p in ed.get("notes", ed["problems"])]
+        lines += notes + [f"Prices from {providers(ed)}. Not investment advice. {CHAT_NOTE}"]
+    return "\n".join([head, ""] + lines).strip()

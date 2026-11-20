@@ -49,6 +49,7 @@ class Story:
     region: str            # "global" | "sg"
     published: dt.datetime  # tz-aware UTC
     channel: str = "ai"    # "ai" | "markets"
+    tier: int = 2          # 1 established newsroom, 2 trade press / company newsroom, 3 aggregator
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -151,6 +152,7 @@ def fetch_stories(cfg: dict, *, since: dt.datetime, now: dt.datetime | None = No
         for s in items:
             if not (since < s.published <= now):
                 continue
+            s.tier = int(feed.get("tier", 2))
             if feed.get("channel") == "markets":
                 if not has_term(f"{s.title} {s.summary}", cfg.get("market_keywords", [])):
                     continue
@@ -181,6 +183,10 @@ class Quote:
     pct_5d: float | None
     session_date: str       # exchange-local date of the last bar (YYYY-MM-DD)
     live: bool              # True when the bar is still forming (market open / futures)
+    fx: bool = False        # currency pair: trades around the clock, no "session"
+    provider: str = "Yahoo Finance"
+    check: str = "single"   # confirmed | single | conflict | stale  (see crosscheck.reconcile)
+    check_note: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -253,7 +259,9 @@ def fetch_quotes(rows: list[dict], *, problems: list[str] | None = None) -> list
                 params={"range": "1mo", "interval": "1d"}, headers=_UA, timeout=20,
             )
             r.raise_for_status()
-            out.append(parse_chart(r.json(), symbol=row["symbol"], label=row["label"], note=row.get("note", "")))
+            q = parse_chart(r.json(), symbol=row["symbol"], label=row["label"], note=row.get("note", ""))
+            q.fx = bool(row.get("fx"))
+            out.append(q)
         except Exception as exc:
             problems.append(f"price for {row['label']} unavailable ({type(exc).__name__})")
     return out
@@ -263,12 +271,16 @@ def fetch_quotes(rows: list[dict], *, problems: list[str] | None = None) -> list
 # Calendar: scheduled US data releases + big-tech earnings ("what to expect")
 # --------------------------------------------------------------------------- #
 def parse_econ(payload: list, *, start: dt.datetime, end: dt.datetime, tz: dt.tzinfo,
-               explain: list[dict]) -> list[dict]:
-    """US High/Medium-impact releases (and market holidays) in (start, end], with a plain meaning.
+               explain: list[dict], countries: dict[str, str] | None = None) -> list[dict]:
+    """High/Medium-impact releases (and market holidays) in (start, end] for the configured
+    countries, with a plain meaning. `countries` maps the calendar's currency code to the label
+    printed in front of the title, e.g. {"USD": "US", "CNY": "China"}.
     Releases we cannot explain in plain English are left out: this audience would not know them."""
+    countries = countries or {"USD": "US"}
     out, seen = [], set()
     for ev in payload:
-        if ev.get("country") != "USD" or ev.get("impact") not in ("High", "Medium", "Holiday"):
+        country = countries.get(ev.get("country"))
+        if not country or ev.get("impact") not in ("High", "Medium", "Holiday"):
             continue
         try:
             when = dt.datetime.fromisoformat(ev["date"])
@@ -279,14 +291,14 @@ def parse_econ(payload: list, *, start: dt.datetime, end: dt.datetime, tz: dt.tz
         title = str(ev.get("title", "")).strip()
         plain = next((x["plain"] for x in explain
                       if re.search(rf"(?<![a-z]){re.escape(x['match'])}(?![a-z])", title.lower())), None)
-        key = (plain, when.date())                    # "CPI m/m" + "Core CPI m/m" are one event to a reader
+        key = (country, plain, when.date())           # "CPI m/m" + "Core CPI m/m" are one event to a reader
         if not plain or key in seen:
             continue
         seen.add(key)
         local = when.astimezone(tz)
         stamp = (local.strftime("%a %d %b") if ev["impact"] == "Holiday"          # all-day, the clock time is noise
                  else local.strftime("%a %d %b, %H:%M") + " Singapore time")
-        out.append({"kind": "data", "sort": when.astimezone(UTC).isoformat(), "title": title,
+        out.append({"kind": "data", "sort": when.astimezone(UTC).isoformat(), "title": f"{country}: {title}",
                     "when": stamp, "plain": plain})
     return out
 
@@ -329,9 +341,9 @@ def fetch_calendar(cfg: dict, *, now: dt.datetime, hours: int, tz: dt.tzinfo,
         r = httpx.get(cal["econ_url"], headers=_UA, timeout=20)
         r.raise_for_status()
         items += parse_econ(r.json(), start=now, end=now + dt.timedelta(hours=hours), tz=tz,
-                            explain=cal.get("explain", []))
+                            explain=cal.get("explain", []), countries=cal.get("countries"))
     except Exception as exc:
-        problems.append(f"US economic calendar unavailable ({type(exc).__name__})")
+        problems.append(f"economic calendar unavailable ({type(exc).__name__})")
     us_today = now.astimezone(_NY).date()
     failed = 0
     for i in range(int(cal.get("earnings_days_ahead", 5)) + 1):
