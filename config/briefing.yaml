@@ -117,17 +117,19 @@ ai_keywords: ["ai", "a.i.", "artificial intelligence", "openai", "chatgpt", "ant
 # ---------------------------------------------------------------------------------------------
 # Market tables. symbol = Yahoo Finance symbol. label is what a non-specialist reader sees.
 #   fx: true      a currency pair: trades around the clock, so it is left out of "which session" logic
-#   verify: ...   second-source code used to confirm the figure (see src/briefing/crosscheck.py)
+#   verify: ...   second-source code used to confirm the figure (see src/briefing/crosscheck.py).
+#                 Singapore rows, the SOX index, currencies and futures have no reliable second
+#                 source (Sina's Singapore and SOX rows were measured to be stale), so they stand alone.
 # ---------------------------------------------------------------------------------------------
 markets:
   china:
     name: Greater China
     rows:
-      - {symbol: "000001.SS", label: "Shanghai Composite",  note: "mainland China's main index"}
-      - {symbol: "399001.SZ", label: "Shenzhen Component",  note: "Shenzhen-listed companies, more technology"}
-      - {symbol: "000300.SS", label: "CSI 300",             note: "300 largest mainland companies"}
-      - {symbol: "^HSI",      label: "Hang Seng",           note: "Hong Kong's main index"}
-      - {symbol: "HSTECH.HK", label: "Hang Seng TECH",      note: "large Chinese technology companies listed in Hong Kong"}
+      - {symbol: "000001.SS", label: "Shanghai Composite",  note: "mainland China's main index", verify: "tencent:sh000001"}
+      - {symbol: "399001.SZ", label: "Shenzhen Component",  note: "Shenzhen-listed companies, more technology", verify: "tencent:sz399001"}
+      - {symbol: "000300.SS", label: "CSI 300",             note: "300 largest mainland companies", verify: "tencent:sh000300"}
+      - {symbol: "^HSI",      label: "Hang Seng",           note: "Hong Kong's main index", verify: "tencent:hkHSI"}
+      - {symbol: "HSTECH.HK", label: "Hang Seng TECH",      note: "large Chinese technology companies listed in Hong Kong", verify: "tencent:hkHSTECH"}
       - {symbol: "CNY=X",     label: "US dollar in yuan",   note: "yuan needed to buy one US dollar", fx: true}
   singapore:
     name: Singapore
@@ -138,19 +140,19 @@ markets:
   apac:
     name: Asia-Pacific
     rows:
-      - {symbol: "^N225",   label: "Nikkei 225",          note: "Japan"}
-      - {symbol: "^KS11",   label: "KOSPI",               note: "South Korea, home of Samsung and SK Hynix"}
-      - {symbol: "^TWII",   label: "Taiwan Weighted",     note: "Taiwan, home of TSMC"}
-      - {symbol: "^AXJO",   label: "S&P/ASX 200",         note: "Australia"}
+      - {symbol: "^N225",   label: "Nikkei 225",          note: "Japan", verify: "sina:b_NKY"}
+      - {symbol: "^KS11",   label: "KOSPI",               note: "South Korea, home of Samsung and SK Hynix", verify: "sina:b_KOSPI"}
+      - {symbol: "^TWII",   label: "Taiwan Weighted",     note: "Taiwan, home of TSMC", verify: "sina:znb_TWJQ"}
+      - {symbol: "^AXJO",   label: "S&P/ASX 200",         note: "Australia", verify: "sina:b_AS51"}
   us:
     name: Wall Street
     rows:
-      - {symbol: "^GSPC", label: "S&P 500",             note: "500 biggest US companies"}
-      - {symbol: "^IXIC", label: "Nasdaq Composite",    note: "technology-heavy US index"}
-      - {symbol: "^DJI",  label: "Dow Jones",           note: "30 large US companies"}
+      - {symbol: "^GSPC", label: "S&P 500",             note: "500 biggest US companies", verify: "tencent:usINX"}
+      - {symbol: "^IXIC", label: "Nasdaq Composite",    note: "technology-heavy US index", verify: "tencent:usIXIC"}
+      - {symbol: "^DJI",  label: "Dow Jones",           note: "30 large US companies", verify: "tencent:usDJI"}
       - {symbol: "^SOX",  label: "Semiconductors (SOX)", note: "US-listed chip companies"}
-      - {symbol: "NVDA",  label: "Nvidia",              note: "the biggest AI chip maker"}
-      - {symbol: "TSM",   label: "TSMC (US-listed)",    note: "the Taiwan firm that manufactures most AI chips"}
+      - {symbol: "NVDA",  label: "Nvidia",              note: "the biggest AI chip maker", verify: "tencent:usNVDA"}
+      - {symbol: "TSM",   label: "TSMC (US-listed)",    note: "the Taiwan firm that manufactures most AI chips", verify: "tencent:usTSM"}
   futures:
     name: US futures
     rows:

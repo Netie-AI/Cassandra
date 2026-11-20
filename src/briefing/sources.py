@@ -25,6 +25,8 @@ from zoneinfo import ZoneInfo
 import httpx
 import yaml
 
+from . import crosscheck
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 _UA = {"User-Agent": "Mozilla/5.0 (compatible; newsreader/1.0)"}
 _ATOM = "{http://www.w3.org/2005/Atom}"
@@ -185,8 +187,9 @@ class Quote:
     live: bool              # True when the bar is still forming (market open / futures)
     fx: bool = False        # currency pair: trades around the clock, no "session"
     provider: str = "Yahoo Finance"
-    check: str = "single"   # confirmed | single | conflict | stale  (see crosscheck.reconcile)
+    check: str = "single"   # confirmed | single | conflict  (see crosscheck.reconcile)
     check_note: str = ""
+    in_hours: bool = False  # the exchange's regular hours contain "now", whatever the last bar says
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -225,8 +228,8 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
     week_c = bars[-6][1] if len(bars) >= 6 else None
     now = now or dt.datetime.now(UTC)
     period = (meta.get("currentTradingPeriod") or {}).get("regular") or {}
-    live = (bool(period) and period.get("start", 0) <= now.timestamp() < period.get("end", 0)
-            and last_d == (now + off).date())            # a holiday has trading hours but no trades
+    in_hours = bool(period) and period.get("start", 0) <= now.timestamp() < period.get("end", 0)
+    live = in_hours and last_d == (now + off).date()     # a holiday has trading hours but no trades
     prev_d = bars[-2][0]
     # One-day change, in order of trust: (1) the figure Yahoo itself reports for the session;
     # (2) our own, but only when the previous session's close is really there. A missing bar in
@@ -246,24 +249,48 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
         pct_5d=(last_c / week_c - 1) * 100 if week_c else None,
         session_date=last_d.isoformat(),
         live=live,
+        in_hours=in_hours,
     )
 
 
+def _yahoo_quote(row: dict) -> Quote:
+    r = httpx.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{row['symbol']}",
+                  params={"range": "1mo", "interval": "1d"}, headers=_UA, timeout=20)
+    r.raise_for_status()
+    q = parse_chart(r.json(), symbol=row["symbol"], label=row["label"], note=row.get("note", ""))
+    q.fx = bool(row.get("fx"))
+    return q
+
+
 def fetch_quotes(rows: list[dict], *, problems: list[str] | None = None) -> list[Quote]:
+    """Yahoo quote per row, then a second opinion for rows that name one (`verify:` in config).
+    See crosscheck.reconcile for what happens when the two disagree."""
     problems = problems if problems is not None else []
+    readings = crosscheck.fetch_readings([r["verify"] for r in rows if r.get("verify")], problems)
     out: list[Quote] = []
     for row in rows:
+        reading = readings.get(row.get("verify", ""))
         try:
-            r = httpx.get(
-                f"https://query1.finance.yahoo.com/v8/finance/chart/{row['symbol']}",
-                params={"range": "1mo", "interval": "1d"}, headers=_UA, timeout=20,
-            )
-            r.raise_for_status()
-            q = parse_chart(r.json(), symbol=row["symbol"], label=row["label"], note=row.get("note", ""))
-            q.fx = bool(row.get("fx"))
-            out.append(q)
+            q = _yahoo_quote(row)
         except Exception as exc:
-            problems.append(f"price for {row['label']} unavailable ({type(exc).__name__})")
+            if reading is None:
+                problems.append(f"price for {row['label']} unavailable ({type(exc).__name__})")
+                continue
+            # Yahoo cannot serve this instrument (CSI 300, Hang Seng TECH): the second source stands alone
+            out.append(Quote(symbol=row["symbol"], label=row["label"], note=row.get("note", ""),
+                             close=reading.price, pct_1d=reading.pct_1d, pct_5d=None,
+                             session_date=reading.session_date, live=False, fx=bool(row.get("fx")),
+                             provider=crosscheck.NAMES[reading.provider]))
+            continue
+        status, note = crosscheck.reconcile(q.pct_1d, q.session_date, q.live, reading)
+        if status == "newer":                      # Yahoo has not caught up with the latest session yet
+            q.close, q.pct_1d, q.session_date = reading.price, reading.pct_1d, reading.session_date
+            q.live, q.provider, status, note = q.in_hours, crosscheck.NAMES[reading.provider], "single", ""
+        elif status == "conflict":
+            problems.append(f"{row['label']}: figure withheld because sources disagree "
+                            f"({q.provider} shows {q.pct_1d:+.1f}%, {note})")
+        q.check, q.check_note = status, note
+        out.append(q)
     return out
 
 
