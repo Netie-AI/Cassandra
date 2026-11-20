@@ -31,7 +31,7 @@ Schedule on Windows: `scripts/register-briefing-tasks.ps1` (calls `scripts/run-b
 | Part | Source | Key needed |
 |---|---|---|
 | AI news | 18 RSS feeds listed in `config/briefing.yaml`: general press (BBC, NYT, Guardian, SCMP), tech press, Singapore and regional press, and company blogs (OpenAI, Google, Nvidia) | none |
-| Prices | Yahoo Finance chart API | none |
+| Prices | Yahoo Finance chart API, checked against Tencent Finance (China, Hong Kong, US) and Sina Finance (Japan, Korea, Taiwan, Australia) where a row names `verify:` in `config/briefing.yaml`. CSI 300 and Hang Seng TECH come from Tencent alone (Yahoo has no daily history for them) | none |
 | What to expect next | US data releases from the ForexFactory weekly calendar (US, high and medium impact, only those with a plain-English meaning in `config/briefing.yaml`), and results dates for a watchlist of big tech names from Nasdaq's public calendar | none |
 | Events | `config/events.yaml`, hand-curated with a source URL per event | none |
 | Jargon buster | `config/glossary.yaml`, hand-written definitions | none |
@@ -43,6 +43,11 @@ Schedule on Windows: `scripts/register-briefing-tasks.ps1` (calls `scripts/run-b
 1. The model never writes a market number. Prices, percentages and the market summary sentence
    are built in Python, each table prints the date of the close it shows, and a row from an
    older session (local holiday) or one still trading is labelled.
+   A second, independent provider checks each figure where one exists (`src/briefing/crosscheck.py`):
+   same closed session and within 0.25 points is "confirmed"; a larger gap withholds the figure
+   ("sources disagree") and logs both numbers; while a market trades the two are only compared
+   for gross errors (1 point). Singapore rows, the SOX index, currencies and futures have no
+   reliable second source (Sina's rows for them were measured stale by months) and are single-source.
 2. The model may only pick from fetched stories. A story id it invents, or repeats, is dropped.
 3. Each headline and summary is checked against that story's source text
    (`writer.check_story_text`): every number with its unit and currency ($3 million is not
@@ -58,6 +63,11 @@ Schedule on Windows: `scripts/register-briefing-tasks.ps1` (calls `scripts/run-b
 7. Respect: nothing about anyone's private life and no insults (`writer.disrespectful`). The
    editor is told to report what a person did in their job only. Copy that fails is replaced,
    and a story whose only available wording fails does not run.
+7a. Sensitive topics: commentary and the editor's own draft are checked against
+   `sensitive_terms` and `sensitive_pairs` (a place such as China or Taiwan together with a word
+   such as export, ban, probe or military) in `config/briefing.yaml`. A matching story runs in
+   the publisher's own words, attributed, with no "why it matters"; a matching commentary line
+   (subject, opening line, our read) is dropped (`writer._sensitive`).
 8. Event dates come only from `config/events.yaml`. Unconfirmed dates say so. Calendar items
    that have already happened are left off.
 9. Nothing degrades silently. A dead feed, a missing price or a failed AI editor is printed in the
@@ -79,6 +89,9 @@ Known limits (open, from two adversarial reviews on 2026-11-13):
   configured under `writers:` in `config/briefing.yaml` (Mistral, Cerebras, OpenRouter) and are
   unit-tested, but none has produced a live edition yet: Mistral returned an unusable reply on
   the full prompt and then rate-limited, and the Cerebras key had no credit (2026-11-13).
+- CSI 300 and Hang Seng TECH (Tencent only) are always marked as closed, so a run during Asian
+  trading hours uses past tense for those two rows. The scheduled 07:30 and 20:30 runs are outside
+  those hours.
 - Stories from some feeds have a title only. They run as headline, "what it means for you" and
   source link, with no summary (the editor is not allowed to invent one).
 
