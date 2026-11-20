@@ -53,6 +53,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-email", action="store_true", help="with --send: skip the email dispatch")
     ap.add_argument("--allow-wire", action="store_true",
                     help="send even if the AI editor failed and stories are raw headlines")
+    ap.add_argument("--as-of", metavar="'YYYY-MM-DD HH:MM'",
+                    help="rebuild a past edition as it would have read then (Singapore time); never sent")
     args = ap.parse_args(argv)
 
     cfg = sources.load_config()
@@ -64,7 +66,22 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[briefing] nothing due at {local:%a %H:%M} local")
             return 0
 
-    ed = build.build_edition(edition, cfg=cfg)
+    tz = ZoneInfo(cfg.get("timezone", "Asia/Singapore"))
+    if args.as_of:
+        if args.edition == "auto" or args.send or args.welink or args.dry_run:
+            print("[briefing] FAIL --as-of needs an explicit --edition and cannot be sent or posted", file=sys.stderr)
+            return 1
+        try:
+            when = dt.datetime.strptime(args.as_of, "%Y-%m-%d %H:%M").replace(tzinfo=tz)
+        except ValueError:
+            print("[briefing] FAIL --as-of must look like '2026-11-19 07:30'", file=sys.stderr)
+            return 1
+        if when >= dt.datetime.now(tz):
+            print("[briefing] FAIL --as-of must be in the past", file=sys.stderr)
+            return 1
+        ed = build.build_edition(edition, cfg=cfg, now=when, reconstruct=True)
+    else:
+        ed = build.build_edition(edition, cfg=cfg)
     path = save(ed)
     print(f"[briefing] {ed['title']} {ed['date']}: {len(ed['stories'])} stories "
           f"(from {ed['candidates']} candidates), {len(ed['markets'])} market blocks, writer={ed['writer']}")

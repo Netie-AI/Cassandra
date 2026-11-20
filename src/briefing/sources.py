@@ -196,8 +196,11 @@ class Quote:
 
 
 def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
-                now: dt.datetime | None = None) -> Quote:
-    """Turn a Yahoo v8 chart payload (range=1mo, interval=1d) into a Quote. Raises on bad data."""
+                now: dt.datetime | None = None, as_of: dt.datetime | None = None) -> Quote:
+    """Turn a Yahoo v8 chart payload (range=1mo, interval=1d) into a Quote. Raises on bad data.
+    With `as_of` (a past moment) the quote is rebuilt as it stood then, from daily closes only:
+    a session that had not closed by `as_of` is dropped, and the meta block (today's live price
+    and today's change) is ignored."""
     res = payload["chart"]["result"][0]
     meta = res["meta"]
     closes = res["indicators"]["quote"][0]["close"]
@@ -216,9 +219,19 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
             by_date[local_date(t)] = float(c)
         else:
             missing.add(local_date(t))
+    period = (meta.get("currentTradingPeriod") or {}).get("regular") or {}
+    if as_of is not None:
+        # the exchange's closing time of day, from today's trading hours (16:00 New York, 15:00 Shanghai ...)
+        close_at = ((dt.datetime.fromtimestamp(period["end"], UTC) + off).time() if period.get("end")
+                    else dt.time(23, 59))
+        cut = as_of.astimezone(UTC) + off
+        def closed(d: dt.date) -> bool:
+            return d < cut.date() or (d == cut.date() and cut.time() >= close_at)
+        by_date = {d: c for d, c in by_date.items() if closed(d)}
+        missing = {d for d in missing if closed(d)}
     # Yahoo often leaves the newest daily bar empty for hours after the close; the meta block
     # has the real last price. Without this the "latest close" is silently a day old.
-    if ok(meta.get("regularMarketPrice")) and meta.get("regularMarketTime"):
+    elif ok(meta.get("regularMarketPrice")) and meta.get("regularMarketTime"):
         by_date[local_date(meta["regularMarketTime"])] = float(meta["regularMarketPrice"])
     bars = sorted(by_date.items())
     if len(bars) < 2:
@@ -227,14 +240,14 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
     prev_c = bars[-2][1]
     week_c = bars[-6][1] if len(bars) >= 6 else None
     now = now or dt.datetime.now(UTC)
-    period = (meta.get("currentTradingPeriod") or {}).get("regular") or {}
-    in_hours = bool(period) and period.get("start", 0) <= now.timestamp() < period.get("end", 0)
+    in_hours = (as_of is None and bool(period)
+                and period.get("start", 0) <= now.timestamp() < period.get("end", 0))
     live = in_hours and last_d == (now + off).date()     # a holiday has trading hours but no trades
     prev_d = bars[-2][0]
     # One-day change, in order of trust: (1) the figure Yahoo itself reports for the session;
     # (2) our own, but only when the previous session's close is really there. A missing bar in
     # between would turn a two-session move into a "one-day" figure (live: Taiwan -8.5% vs real -3.1%).
-    reported = meta.get("regularMarketChangePercent")
+    reported = None if as_of is not None else meta.get("regularMarketChangePercent")   # today's, not then
     # An exact 0.0 is what Yahoo shows before a session opens, not a real reading: fall through.
     if (isinstance(reported, (int, float)) and not isinstance(reported, bool)
             and math.isfinite(reported) and reported != 0):
@@ -253,25 +266,28 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
     )
 
 
-def _yahoo_quote(row: dict) -> Quote:
+def _yahoo_quote(row: dict, as_of: dt.datetime | None = None) -> Quote:
     r = httpx.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{row['symbol']}",
                   params={"range": "1mo", "interval": "1d"}, headers=_UA, timeout=20)
     r.raise_for_status()
-    q = parse_chart(r.json(), symbol=row["symbol"], label=row["label"], note=row.get("note", ""))
+    q = parse_chart(r.json(), symbol=row["symbol"], label=row["label"], note=row.get("note", ""), as_of=as_of)
     q.fx = bool(row.get("fx"))
     return q
 
 
-def fetch_quotes(rows: list[dict], *, problems: list[str] | None = None) -> list[Quote]:
+def fetch_quotes(rows: list[dict], *, problems: list[str] | None = None,
+                 as_of: dt.datetime | None = None) -> list[Quote]:
     """Yahoo quote per row, then a second opinion for rows that name one (`verify:` in config).
-    See crosscheck.reconcile for what happens when the two disagree."""
+    See crosscheck.reconcile for what happens when the two disagree. With `as_of` (a past moment)
+    there is no second opinion: the second providers only serve the latest price."""
     problems = problems if problems is not None else []
-    readings = crosscheck.fetch_readings([r["verify"] for r in rows if r.get("verify")], problems)
+    readings = ({} if as_of is not None else
+                crosscheck.fetch_readings([r["verify"] for r in rows if r.get("verify")], problems))
     out: list[Quote] = []
     for row in rows:
         reading = readings.get(row.get("verify", ""))
         try:
-            q = _yahoo_quote(row)
+            q = _yahoo_quote(row, as_of)
         except Exception as exc:
             if reading is None:
                 problems.append(f"price for {row['label']} unavailable ({type(exc).__name__})")

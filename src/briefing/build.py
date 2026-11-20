@@ -140,12 +140,17 @@ def _block_title(edition: str, key: str, name: str, block: dict, today: dt.date)
     return f"{name}, last close (no trading today)" if edition == "evening" else f"{name}, last close"
 
 
-def build_markets(edition: str, cfg: dict, *, today: dt.date, problems: list[str]) -> list[dict]:
-    """Market tables for this edition, in the order config/briefing.yaml gives for it."""
+def build_markets(edition: str, cfg: dict, *, today: dt.date, problems: list[str],
+                  as_of: dt.datetime | None = None) -> list[dict]:
+    """Market tables for this edition, in the order config/briefing.yaml gives for it.
+    With `as_of` (a reconstructed past edition) only closing prices up to that moment are used."""
     blocks = []
     for key in cfg["editions"][edition]["blocks"]:
         group = cfg["markets"][key]
-        block = market_block("", sources.fetch_quotes(group["rows"], problems=problems),
+        if as_of is not None and key == "futures":
+            problems.append("US futures left out: a past pre-open reading cannot be rebuilt from daily prices")
+            continue
+        block = market_block("", sources.fetch_quotes(group["rows"], problems=problems, as_of=as_of),
                              weekly=edition == "weekly", today=today)
         if not block:
             continue
@@ -168,7 +173,10 @@ def reader_notes(problems: list[str], n_feeds: int) -> list[str]:
     return notes
 
 
-def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | None = None) -> dict[str, Any]:
+def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | None = None,
+                  reconstruct: bool = False) -> dict[str, Any]:
+    """One edition as of `now`. reconstruct=True rebuilds a past edition: news published up to
+    `now`, prices as they had closed by `now`, and a note saying so on the edition itself."""
     if edition not in EDITIONS:
         raise ValueError(f"unknown edition {edition!r}")
     cfg = cfg or sources.load_config()
@@ -177,8 +185,12 @@ def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | N
     local = now.astimezone(tz)
     today = local.date()
     problems: list[str] = []
+    if reconstruct:
+        problems.append(f"reconstructed on {dt.datetime.now(tz):%d %b %Y} from the news and closing prices "
+                        f"available at {local:%H:%M %a %d %b} Singapore time; figures were not checked "
+                        "against a second source")
     weekly = edition == "weekly"
-    blocks = build_markets(edition, cfg, today=today, problems=problems)
+    blocks = build_markets(edition, cfg, today=today, problems=problems, as_of=now if reconstruct else None)
     futures = any(b["key"] == "futures" for b in blocks)
 
     hours = cfg["lookback_hours"][edition]

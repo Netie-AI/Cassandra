@@ -699,7 +699,7 @@ def test_market_tables_follow_the_edition_plan(monkeypatch):
           "S&P 500 futures", "Nasdaq futures"}
 
     def quotes(asia_date, live=False):
-        def fetch(rows, problems=None):
+        def fetch(rows, problems=None, as_of=None):
             out = []
             for r in rows:
                 q = _q(r["label"], -1.0, "2026-11-19" if r["label"] in us else asia_date)
@@ -730,7 +730,7 @@ def test_market_tables_follow_the_edition_plan(monkeypatch):
     monday = build.build_markets("morning", cfg, today=dt.date(2026, 11, 23), problems=[])
     assert monday[3]["title"] == "Wall Street, last close (no US trading overnight)"
     probs: list[str] = []
-    monkeypatch.setattr(sources, "fetch_quotes", lambda rows, problems=None: [])
+    monkeypatch.setattr(sources, "fetch_quotes", lambda rows, problems=None, as_of=None: [])
     assert build.build_markets("morning", cfg, today=today, problems=probs) == [] and "no market data" in probs[0]
 
 
@@ -743,7 +743,7 @@ def test_readers_see_what_affects_them_not_feed_noise():
 
 def test_monday_morning_looks_back_over_the_weekend(monkeypatch):
     seen = {}
-    monkeypatch.setattr(sources, "fetch_quotes", lambda rows, problems=None: [])
+    monkeypatch.setattr(sources, "fetch_quotes", lambda rows, problems=None, as_of=None: [])
     monkeypatch.setattr(sources, "fetch_calendar", lambda *a, **k: [])
 
     def stories(cfg, since, now, problems=None):
@@ -778,3 +778,28 @@ def test_dispatch_rendered_swaps_unsub_token(monkeypatch):
     assert sent == [("<a href='?token=tok-a'>", "u tok-a")]
     dry = send.dispatch_rendered(subject="s", html="", text="", unsub_placeholder="__T__", tags={}, dry_run=True)
     assert dry["dry_run"] and dry["recipients"] == ["a@x.com"] and len(sent) == 1
+
+
+def test_as_of_rebuilds_a_past_quote_from_closes_only():
+    """A reconstructed edition must show the close as it stood then, never today's live price."""
+    day0 = 1793926800                                    # 2026-11-06 09:00 SGT (bar timestamps = session start)
+    payload = _chart([100.0, 110.0, 99.0], 120.0, day0 + 5 * 86400)       # meta: a much later live price
+    meta = payload["chart"]["result"][0]["meta"]
+    meta["regularMarketChangePercent"] = 21.2                            # today's change: must be ignored
+    meta["currentTradingPeriod"] = {"regular": {"start": day0, "end": day0 + 8 * 3600}}   # closes 17:00 SGT
+    sgt = dt.timezone(dt.timedelta(hours=8))
+    before_close = dt.datetime(2026, 11, 8, 12, 0, tzinfo=sgt)          # day 3 still trading
+    q = sources.parse_chart(payload, symbol="X", label="X", note="", as_of=before_close)
+    assert (q.session_date, q.close, q.live, q.in_hours) == ("2026-11-07", 110.0, False, False)
+    assert q.pct_1d == pytest.approx(10.0)
+    after_close = dt.datetime(2026, 11, 8, 20, 30, tzinfo=sgt)
+    q = sources.parse_chart(payload, symbol="X", label="X", note="", as_of=after_close)
+    assert (q.session_date, q.close) == ("2026-11-08", 99.0) and q.pct_1d == pytest.approx(-10.0)
+
+
+def test_as_of_is_never_sent_and_must_be_in_the_past(capsys):
+    from src.briefing import __main__ as cli
+    assert cli.main(["--edition", "morning", "--as-of", "2026-11-19 07:30", "--send"]) == 1
+    assert cli.main(["--edition", "morning", "--as-of", "2099-01-01 07:30"]) == 1
+    assert cli.main(["--edition", "morning", "--as-of", "yesterday"]) == 1
+    assert "cannot be sent" in capsys.readouterr().err

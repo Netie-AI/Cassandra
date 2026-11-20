@@ -104,7 +104,7 @@ def test_fetch_quotes_uses_the_second_source(monkeypatch):
     yahoo = {"A": _yq(-2.0), "B": _yq(-8.5), "C": _yq(-0.3), "F": _yq(0.4)}
     yahoo["C"].in_hours = True
 
-    def fake_yahoo(row):
+    def fake_yahoo(row, as_of=None):
         if row["symbol"] not in yahoo:
             raise ValueError("fewer than 2 daily bars")
         q = yahoo[row["symbol"]]
