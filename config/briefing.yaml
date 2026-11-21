@@ -56,7 +56,7 @@ feeds:
   - {name: IEEE Spectrum,         tier: 1, ai_only: true,  url: "https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss"}
   - {name: South China Morning Post, tier: 1, ai_only: false, url: "https://www.scmp.com/rss/320663/feed"}   # China tech
   - {name: CGTN,                  tier: 2, ai_only: false, url: "https://www.cgtn.com/subscribe/rss/section/tech-sci.xml"}
-  - {name: TechNode,              tier: 2, ai_only: false, url: "https://technode.com/feed/"}                # China tech
+  - {name: TechNode,              tier: 2, ai_only: false, max_bytes: 15000000, url: "https://technode.com/feed/"}  # China tech; serves ~12 MB
   - {name: Pandaily,              tier: 2, ai_only: false, url: "https://pandaily.com/feed/"}                # China tech
   - {name: Defense One,           tier: 1, ai_only: false, url: "https://www.defenseone.com/rss/all/"}       # AI in defence
   - {name: Breaking Defense,      tier: 2, ai_only: false, url: "https://breakingdefense.com/feed/"}
@@ -136,7 +136,7 @@ priority_topics:
             "tencent", "bytedance", "deepseek", "qwen", "kimi", "moonshot", "zhipu", "minimax", "hunyuan",
             "doubao", "byd", "xiaomi", "unitree", "cambricon"]
   - name: Frontier AI and what comes next
-    words: ["agi", "superintelligence", "self-improving", "self-improvement", "recursive", "frontier model",
+    words: ["agi", "superintelligence", "superintelligent", "self-improve", "self-improves", "self-improving", "self-improvement", "recursive", "frontier model",
             "frontier models", "reasoning model", "world model", "ai scientist", "automated research",
             "breakthrough", "benchmark", "scaling"]
   - name: Hardware and power shortage

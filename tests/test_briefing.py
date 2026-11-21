@@ -840,3 +840,30 @@ def test_sensitive_stories_never_reach_the_editor_and_priority_topics_come_first
     wire = writer.write_copy([huawei, china], edition="morning", date_label="x", market_facts=[], market_dirs=set(),
                              events=[], sensitive=writer.sensitive_rules(cfg), priorities=cfg["priority_topics"])
     assert [s["id"] for s in wire["stories"]] == ["s2"]
+
+
+def test_machine_sounding_stock_phrases_are_refused():
+    """Live 2026-11-20 rebuild: 'safety challenges ... highlight the need for governance' got through a prompt-only ban."""
+    assert writer.check_free_text("Safety challenges highlight the need for governance.")
+    assert writer.check_free_text("This is not just a chip story but a power story.")
+    assert writer.check_free_text("Chip makers are building more memory.") == []
+    raw = {"stories": [{"id": "s1", "headline": "Nvidia sells 250 chips", "what": "It paid $3 billion.",
+                        "why": "For investors, this underscores demand."}]}
+    assert writer.ground(raw, [_story(1)], set())["stories"][0]["why"] == ""
+
+
+def test_a_feed_may_raise_its_own_size_limit(monkeypatch):
+    big = ("<rss><channel>" + "<item><title>China AI chip news</title><link>https://ex.com/a</link>"
+           "<pubDate>Fri, 20 Nov 2026 01:00:00 GMT</pubDate></item>" * 1 + " " * 3_100_000 + "</channel></rss>")
+
+    class R:
+        content = big.encode(); text = big; status_code = 200
+        def raise_for_status(self): pass
+
+    monkeypatch.setattr(sources.httpx, "get", lambda *a, **k: R())
+    cfg = {"feeds": [{"name": "Big", "url": "u", "tier": 2, "ai_only": True}], "ai_keywords": ["ai"], "market_keywords": []}
+    when = dict(since=dt.datetime(2026, 11, 19, tzinfo=dt.timezone.utc), now=dt.datetime(2026, 11, 21, tzinfo=dt.timezone.utc))
+    probs = []
+    assert sources.fetch_stories(cfg, problems=probs, **when) == [] and "unavailable (ValueError)" in probs[0]
+    cfg["feeds"][0]["max_bytes"] = 4_000_000
+    assert [s.title for s in sources.fetch_stories(cfg, problems=[], **when)] == ["China AI chip news"]

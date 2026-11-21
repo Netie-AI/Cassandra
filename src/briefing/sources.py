@@ -143,7 +143,7 @@ def fetch_stories(cfg: dict, *, since: dt.datetime, now: dt.datetime | None = No
         try:
             r = httpx.get(feed["url"], headers=_UA, timeout=20, follow_redirects=True)
             r.raise_for_status()
-            if len(r.content) > _MAX_FEED_BYTES:
+            if len(r.content) > int(feed.get("max_bytes", _MAX_FEED_BYTES)):
                 raise ValueError("feed too large")
             items = parse_feed(r.text, source=feed["name"], region=feed.get("region", "global"))
         except Exception as exc:

@@ -229,9 +229,22 @@ def check_spanning(text: str, corpora: list[str]) -> list[str]:
     return why
 
 
+# Stock phrases that make copy read as machine-written (owner, 2026-11-21). The editor is told not
+# to use them; a commentary or "why it matters" line that still does is dropped.
+_STOCK = re.compile(r"\b(underscor\w*|highlight\w*|showcas\w*|pivotal|crucial|robust|seamless\w*|delv\w*|"
+                    r"notably|furthermore|moreover|marks a significant|in a move that|not just\b[^.]*\bbut\b)",
+                    re.IGNORECASE)
+
+
+def stock_phrase(text: str) -> list[str]:
+    m = _STOCK.search(text or "")
+    return [f"stock phrase '{m.group(0).lower()}'"] if m else []
+
+
 def check_free_text(text: str, market_dirs: set[str] | None = None) -> list[str]:
-    """Checks for commentary fields: no quantities, no advice or certainty, mood must match the data."""
-    why = []
+    """Checks for commentary fields: no quantities, no advice or certainty, mood must match the data,
+    no stock machine-written phrases."""
+    why = stock_phrase(text)
     if _numbers(text):
         why.append("contains numbers")
     if _ADVICE.search(text):
@@ -320,7 +333,7 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str],
             for field, fallback in (("headline", src.title), ("what", src.summary), ("why", "")):
                 text = lint_no_em_dash(str(item.get(field) or "").strip())
                 if field == "why":       # a possible consequence: must not state new facts or advice
-                    bad = check_story_text(text, corpus)
+                    bad = check_story_text(text, corpus) + stock_phrase(text)
                     if _ADVICE.search(text):
                         bad.append("contains advice or certainty wording")
                 else:
@@ -359,7 +372,7 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str],
 
     corpora = [f"{s['title']} {s['summary']}" for s in out_stories]
     take("subject", lambda t: check_spanning(t, corpora))
-    take("hook", lambda t: check_spanning(t, corpora))
+    take("hook", lambda t: check_spanning(t, corpora) + stock_phrase(t))
     take("big_picture", check_free_text)
     take("outlook", check_free_text)
     take("market_take", lambda t: check_free_text(t, market_dirs))
