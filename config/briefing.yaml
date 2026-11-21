@@ -107,7 +107,8 @@ sensitive_terms: ["huawei", "hisilicon", "smic", "export control", "export contr
                   "blacklist", "blacklisted", "national security", "espionage", "spy", "spies", "spying",
                   "trade war", "tariff", "tariffs", "decoupling", "taiwan strait",
                   "xi jinping", "communist party", "politburo", "xinjiang", "tibet", "uyghur", "uyghurs",
-                  "tiananmen", "dalai lama"]
+                  "tiananmen", "dalai lama", "chips for china", "chips to china", "chip sales to china",
+                  "chips sold to china", "chips bound for china", "chip exports"]
 
 # ...and combinations: a story that mentions a place in `any` together with a word in `with`.
 sensitive_pairs:

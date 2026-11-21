@@ -878,3 +878,12 @@ def test_signed_columns_are_opinion_and_never_offered():
                  "Alibaba tops revenue estimates on AI cloud growth; profit up on investment gains",
                  "AI | Nvidia sells chips to Gulf buyers"):
         assert not writer._is_opinion(_story(title=news)), news
+
+
+def test_us_chip_sales_to_china_are_sensitive():
+    """Live 2026-11-20 rebuild: 'US approved 879,000 Nvidia, AMD AI chips for China' reached the editor and
+    the subject line ('US chip approvals for China') though the story itself was not run."""
+    rules = writer.sensitive_rules(sources.load_config())
+    assert writer._sensitive("US approved 879,000 Nvidia, AMD AI chips for China", rules)
+    assert writer._sensitive("US signed off on sales of nearly 900,000 AI chips to China in six months", rules)
+    assert not writer._sensitive("Alibaba trains AI models on its own chips", rules)
