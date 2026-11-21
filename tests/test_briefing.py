@@ -867,3 +867,14 @@ def test_a_feed_may_raise_its_own_size_limit(monkeypatch):
     assert sources.fetch_stories(cfg, problems=probs, **when) == [] and "unavailable (ValueError)" in probs[0]
     cfg["feeds"][0]["max_bytes"] = 4_000_000
     assert [s.title for s in sources.fetch_stories(cfg, problems=[], **when)] == ["China AI chip news"]
+
+
+def test_signed_columns_are_opinion_and_never_offered():
+    """Live 2026-11-20 rebuild: 'Will AI break the internet? | Garrison Lovely' (a column) ran and the hook
+    stated its argument as fact."""
+    assert writer._is_opinion(_story(title="Will AI break the internet? | Garrison Lovely"))
+    assert writer._is_opinion(_story(title="The AI boom is a bubble | Jane Smith"))
+    for news in ("Nvidia sells 250 chips", "Stock Market News, Nov. 19, 2026: Anthropic Shares Jump",
+                 "Alibaba tops revenue estimates on AI cloud growth; profit up on investment gains",
+                 "AI | Nvidia sells chips to Gulf buyers"):
+        assert not writer._is_opinion(_story(title=news)), news

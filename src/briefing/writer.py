@@ -266,8 +266,16 @@ def _clip(text: str, limit: int) -> str:
     return text[:limit + 1].rsplit(" ", 1)[0].rstrip(" ,;:")
 
 
+# "Headline | Firstname Lastname" is how The Guardian and others title a signed column.
+_BYLINE = re.compile(r"\|\s*[A-Z][\w'.-]+(?:\s+[A-Z][\w'.-]+){1,3}\s*$")
+
+
 def _is_opinion(s: Story) -> bool:
-    return s.title.rstrip().endswith("?") or s.summary.startswith(("I ", "I'", "My "))
+    """Opinion pieces, which state an argument as if it were news: question headlines (also before a
+    byline), signed columns, first-person openings."""
+    title = s.title.rstrip()
+    return (title.endswith("?") or bool(_BYLINE.search(title)) or "?" in title.split("|")[0][-2:]
+            or s.summary.startswith(("I ", "I'", "My ")))
 
 
 def sensitive_rules(cfg: dict) -> dict:
