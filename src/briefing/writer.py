@@ -42,7 +42,7 @@ ROLE
 You are the editor of a daily professional briefing on AI and financial markets, read by
 employees of a large technology company in Singapore and worldwide. Many are not engineers
 or finance specialists. They expect the standard of a respected business newspaper:
-accurate, neutral, concise, formal. You never bend a fact and you never take sides.
+accurate, concise, formal. You never bend a fact.
 
 INPUT
 JSON with edition_brief (what this edition is for: follow it when choosing and ordering market
@@ -79,6 +79,15 @@ PICKING STORIES
 - No more than 2 stories about the same company. Never pick two candidates about the same event.
 - Skip developer tooling news, rumours, opinion columns, promotional announcements, celebrity
   and entertainment news.
+- PRIORITY TOPICS. A candidate with a non-empty "priority" is on a topic the readers asked for:
+  China technology progress, frontier AI and what comes next (self-improving systems, new
+  reasoning models, research breakthroughs), the hardware and power shortage, and AI in defence.
+  In the AI channel pick at least 2 priority candidates when significant ones exist, and lead
+  with one when it is among the day's most significant stories.
+- CHINA FIRST. Give China's technology and business progress at least one place in each channel
+  when a candidate exists: launches, research results, investment, company results, new models.
+  Prefer the constructive China story over a negative one of similar weight. This is a choice of
+  which stories to run; the wording stays factual.
 
 WRITING
 - Register: formal business English, British spelling (centre, organisation, programme).
@@ -91,6 +100,10 @@ WRITING
   "inference (running a trained AI model)", "yield (the return on a bond)".
 - No hype or filler: revolutionary, game-changing, shockwaves, landscape, cutting-edge,
   unprecedented, "in today's world".
+- Sound like a person wrote it, not a machine. Vary sentence length. Use plain verbs (said,
+  made, plans, sold, built). Never use: underscores, highlights, showcases, pivotal, crucial,
+  robust, seamless, delve, notably, furthermore, moreover, "marks a significant", "not just X
+  but Y", "in a move that", or a list of three adjectives.
 - "why" must be specific:
     Weak:   "For businesses, this could have a significant impact on the industry."
     Strong: "For enterprises running AI workloads, added data-centre capacity could ease the shortage of computing power."
@@ -109,10 +122,9 @@ ACCURACY, never broken
   move. No price predictions. No buy, sell or avoid advice. No certainty (will rise, certain).
 
 NEUTRALITY AND RESPECT, never broken
-- Geopolitics, trade restrictions, sanctions, export controls, national security and any
-  story naming Huawei are carried in the publisher's own words by the system. Do not
-  characterise, judge or comment on them anywhere, including "hook", "big_picture",
-  "market_take" and "outlook".
+- Stories on geopolitics, trade restrictions, sanctions, export controls, national security,
+  political leaders or naming Huawei have been removed before you see them. Never raise these
+  topics anywhere, including "hook", "big_picture", "market_take" and "outlook".
 - Do not praise or criticise any company, government or person. Report, do not judge.
 - Report what a person did in their role (resigned, was appointed, was charged, announced).
   Never repeat claims about anyone's private life, even if the source does.
@@ -298,9 +310,9 @@ def ground(raw: dict[str, Any], stories: list[Story], market_dirs: set[str],
         corpus = f"{src.title} {src.summary}"
         drafted = " ".join(str(item.get(k) or "") for k in ("headline", "what", "why"))
         if _sensitive(corpus, sensitive) or _sensitive(drafted, sensitive):
-            # extra care: no rewrite and no commentary, the source speaks for itself
-            row = {**_verbatim(src), "channel": channel}
-            rejected.append(f"{src.id}: sensitive topic, carried in the publisher's own words")
+            # owner's rule (2026-11-21): sensitive stories are left out altogether
+            rejected.append(f"{src.id}: sensitive topic, left out")
+            continue
         else:
             tag = str(item.get("tag") or "").strip()
             row = {**src.to_dict(), "channel": channel, "edited": True, "verbatim": False,
@@ -407,11 +419,34 @@ def _editors(gemini_key: str | None, writers: list[dict]) -> list[tuple[str, Any
     return out
 
 
+def priority_of(s: Story, topics: list[dict] | None) -> str:
+    """Name of the first priority topic the story matches, else ""."""
+    text = f"{s.title} {s.summary}"
+    return next((t["name"] for t in (topics or []) if has_term(text, t["words"])), "")
+
+
 def write_copy(stories: list[Story], *, edition: str, date_label: str, market_facts: list[str],
                market_dirs: set[str], events: list[dict], calendar: list[dict] | None = None,
                writers: list[dict] | None = None, sensitive: dict | None = None,
-               focus: str = "") -> dict[str, Any]:
-    """Model-edited copy, fact-checked. Falls back to wire_copy() loudly."""
+               focus: str = "", priorities: list[dict] | None = None) -> dict[str, Any]:
+    """Model-edited copy, fact-checked. Falls back to wire_copy() loudly.
+    Sensitive stories never reach the editor or the wire fallback. Stories on a priority topic are
+    offered to the editor first (newest first within each group) and marked with the topic."""
+    kept = [s for s in stories if not _sensitive(f"{s.title} {s.summary}", sensitive)]
+    left_out = len(stories) - len(kept)
+    copy = _write_copy(sorted(kept, key=lambda s: not priority_of(s, priorities)),  # stable: keeps newest first
+                       edition=edition, date_label=date_label, market_facts=market_facts,
+                       market_dirs=market_dirs, events=events, calendar=calendar, writers=writers,
+                       sensitive=sensitive, focus=focus, priorities=priorities)
+    if left_out:
+        copy["rejected"] = [f"{left_out} sensitive stories left out before editing"] + copy.get("rejected", [])
+    return copy
+
+
+def _write_copy(stories: list[Story], *, edition: str, date_label: str, market_facts: list[str],
+                market_dirs: set[str], events: list[dict], calendar: list[dict] | None,
+                writers: list[dict] | None, sensitive: dict | None, focus: str,
+                priorities: list[dict] | None) -> dict[str, Any]:
     if not stories:
         return wire_copy([], "no stories in the window")
     key = os.getenv("GEMINI_API_KEY")
@@ -438,7 +473,8 @@ def write_copy(stories: list[Story], *, edition: str, date_label: str, market_fa
         "edition_brief": focus,
         "date": date_label,
         "candidates": [{"id": s.id, "channel": s.channel, "tier": s.tier, "title": s.title, "summary": s.summary[:400],
-                        "source": s.source, "region": s.region} for s in candidates],
+                        "source": s.source, "region": s.region, "priority": priority_of(s, priorities)}
+                       for s in candidates],
         "market_facts": market_facts,
         "upcoming_events": [{"name": e["name"], "in_days": e["days_away"], "why": e["why"]} for e in events],
         "on_the_calendar_next": [{"what": c["title"], "meaning": c["plain"]} for c in (calendar or [])],

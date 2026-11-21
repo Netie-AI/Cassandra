@@ -30,7 +30,7 @@ Schedule on Windows: `scripts/register-briefing-tasks.ps1` (calls `scripts/run-b
 
 | Part | Source | Key needed |
 |---|---|---|
-| AI news | 18 RSS feeds listed in `config/briefing.yaml`: general press (BBC, NYT, Guardian, SCMP), tech press, Singapore and regional press, and company blogs (OpenAI, Google, Nvidia) | none |
+| AI news | RSS feeds listed in `config/briefing.yaml`: general press (BBC, NYT, Guardian, SCMP), tech press, Singapore and regional press, China tech (SCMP China tech, CGTN, TechNode, Pandaily), defence (Defense One, Breaking Defense), research (IEEE Spectrum, Google DeepMind, Import AI) and company blogs (OpenAI, Google, Nvidia) | none |
 | Prices | Yahoo Finance chart API, checked against Tencent Finance (China, Hong Kong, US) and Sina Finance (Japan, Korea, Taiwan, Australia) where a row names `verify:` in `config/briefing.yaml`. CSI 300 and Hang Seng TECH come from Tencent alone (Yahoo has no daily history for them) | none |
 | What to expect next | US data releases from the ForexFactory weekly calendar (US, high and medium impact, only those with a plain-English meaning in `config/briefing.yaml`), and results dates for a watchlist of big tech names from Nasdaq's public calendar | none |
 | Events | `config/events.yaml`, hand-curated with a source URL per event | none |
@@ -63,11 +63,16 @@ Schedule on Windows: `scripts/register-briefing-tasks.ps1` (calls `scripts/run-b
 7. Respect: nothing about anyone's private life and no insults (`writer.disrespectful`). The
    editor is told to report what a person did in their job only. Copy that fails is replaced,
    and a story whose only available wording fails does not run.
-7a. Sensitive topics: commentary and the editor's own draft are checked against
-   `sensitive_terms` and `sensitive_pairs` (a place such as China or Taiwan together with a word
-   such as export, ban, probe or military) in `config/briefing.yaml`. A matching story runs in
-   the publisher's own words, attributed, with no "why it matters"; a matching commentary line
-   (subject, opening line, our read) is dropped (`writer._sensitive`).
+7a. Sensitive topics (owner's rule, 2026-11-21): a story that matches `sensitive_terms` or
+   `sensitive_pairs` (a place such as China or Taiwan together with a word such as export, ban,
+   probe, military, ties or short seller; political leaders) in `config/briefing.yaml` is left
+   out before the editor sees it, and so is any story whose edited draft strays into one. No
+   commentary line may touch these topics (`writer._sensitive`).
+7b. Priority topics (owner's choice, `priority_topics` in the config): China technology progress,
+   frontier AI and what comes next, the hardware and power shortage, and AI in defence. Matching
+   stories are offered to the editor first and marked; the editor gives China's progress a place
+   in each channel when a story exists. This decides which stories run, not what they say: the
+   checks above apply to every word.
 8. Event dates come only from `config/events.yaml`. Unconfirmed dates say so. Calendar items
    that have already happened are left off.
 9. Nothing degrades silently. A dead feed, a missing price or a failed AI editor is printed in the

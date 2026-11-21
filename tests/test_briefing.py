@@ -329,7 +329,7 @@ def test_editor_sees_a_fair_spread_of_sources_with_tiers_and_the_edition_brief(m
     cands = seen["candidates"]
     assert [c["id"] for c in cands] == ["s1", "s2", "s3", "s4", "s9"]        # 4 per source at most
     assert cands[-1] == {"id": "s9", "channel": "markets", "tier": 1, "title": "Fed holds rates as shares fall",
-                         "summary": "It paid $3 billion.", "source": "FT", "region": "global"}
+                         "summary": "It paid $3 billion.", "source": "FT", "region": "global", "priority": ""}
     assert seen["edition_brief"].startswith("Morning edition")
 
 
@@ -540,8 +540,9 @@ def test_each_channel_renders_on_its_own():
 SENSITIVE = writer.sensitive_rules(sources.load_config())
 
 
-def test_sensitive_story_runs_in_the_publishers_words_without_commentary():
-    """Readership rule: no rewrite and no opinion on Huawei, sanctions, export controls or security."""
+def test_sensitive_story_is_left_out_with_its_commentary():
+    """Readership rule (owner, 2026-11-21): stories on Huawei, sanctions, export controls or security are
+    left out altogether, and no commentary may touch them."""
     src = _story(1, title="US weighs new export controls on AI chips to China",
                  summary="Officials are considering tighter rules, people familiar said.")
     plain = _story(2, title="Google launches glasses", summary="They cost $395.")
@@ -551,14 +552,11 @@ def test_sensitive_story_runs_in_the_publishers_words_without_commentary():
                         "what": "The US is tightening the screws.", "why": "For chip makers, this could hurt sales."},
                        {"id": "s2", "channel": "ai", "headline": "Google launches glasses", "what": "They cost $395.", "why": ""}]}
     out = writer.ground(raw, [src, plain], set(), SENSITIVE)
-    s1 = out["stories"][0]
-    assert s1["verbatim"] and s1["headline"] == src.title and s1["what"] == src.summary and s1["why"] == ""
+    assert [s["id"] for s in out["stories"]] == ["s2"] and "s1: sensitive topic, left out" in out["rejected"]
     assert out["hook"] == "" and out["outlook"] == ""                     # commentary on the topic is refused
     assert out["big_picture"] == "AI hardware keeps reaching consumers."  # unrelated commentary stays
-    assert out["subject"] == src.title[:60].rsplit(" ", 1)[0] or out["subject"] == src.title
-    html = render.render_html({**_edition(), "stories": [{**s1, "channel": "ai"}]})
-    assert "As reported by Src" in html and "Why it matters" not in html
-    assert writer.ground({"stories": [{"id": "s9"}]}, [_story(9, title="Huawei unveils new AI chip")], set(), SENSITIVE)["stories"][0]["verbatim"]
+    assert "xport" not in out["subject"]
+    assert writer.ground({"stories": [{"id": "s9"}]}, [_story(9, title="Huawei unveils new AI chip")], set(), SENSITIVE)["stories"] == []
 
 
 def test_sensitive_combinations_and_drafted_copy_are_caught():
@@ -568,13 +566,12 @@ def test_sensitive_combinations_and_drafted_copy_are_caught():
                  summary="The US approved shipments of AI chips to companies on the Pentagon's list of alleged Chinese military-backed companies.")
     raw = {"stories": [{"id": "s1", "channel": "ai", "headline": "US approves export of AI chips to Chinese entities",
                         "what": "The US government approved shipments.", "why": "For regulators, this matters."}]}
-    row = writer.ground(raw, [src], set(), SENSITIVE)["stories"][0]
-    assert row["verbatim"] and row["headline"] == src.title and row["why"] == ""
-    # a neutral source, but the editor's own draft strays into a listed topic: also carried verbatim
+    assert writer.ground(raw, [src], set(), SENSITIVE)["stories"] == []
+    # a neutral source, but the editor's own draft strays into a listed topic: also left out
     plain = _story(2, title="Chip maker reports record quarter", summary="Revenue was $35 billion.")
     raw = {"stories": [{"id": "s2", "headline": "Chip maker reports record quarter", "what": "Revenue was $35 billion.",
                         "why": "For investors, sanctions remain the main risk."}]}
-    assert writer.ground(raw, [plain], set(), SENSITIVE)["stories"][0]["verbatim"]
+    assert writer.ground(raw, [plain], set(), SENSITIVE)["stories"] == []
     # ordinary China market news is not swept up
     for ok in ("Hong Kong stocks fall as China tech slides", "China's central bank holds its loan prime rate",
                "Shanghai Composite closes higher on property rally", "Taiwan Weighted index drops 3%"):
@@ -811,3 +808,35 @@ def test_sensitive_rules_catch_china_ties_and_political_leaders():
     assert writer._sensitive("Nvidia faces questions over former No 3's China ties after short seller report", rules)
     assert writer._sensitive("From Shenzhen to Silicon Valley: Xi Jinping calls for global association of bay areas", rules)
     assert not writer._sensitive("Alibaba tops revenue estimates on AI cloud growth", rules)
+
+
+def test_sensitive_stories_never_reach_the_editor_and_priority_topics_come_first(monkeypatch):
+    """Owner's rules (2026-11-21): sensitive stories are left out; China progress, frontier AI,
+    hardware shortage and AI in defence are offered to the editor first and marked."""
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr(writer, "RETRY_PAUSE_S", 0)
+    seen = {}
+
+    def fake(key, prompt, system, **kw):
+        seen.update(json.loads(prompt))
+        return json.dumps({"stories": [{"id": c["id"], "headline": c["title"], "what": "", "why": ""}
+                                       for c in json.loads(prompt)["candidates"][:3]]})
+
+    monkeypatch.setattr(writer, "_gemini_generate", fake)
+    cfg = sources.load_config()
+    newest = _story(1, title="Startup launches note-taking app with AI")                 # newest, no priority
+    china = _story(2, title="DeepSeek releases a new open model")
+    hw = _story(3, title="Memory chip shortage delays AI servers")
+    huawei = _story(4, title="Huawei unveils new AI chip")                              # sensitive
+    out = writer.write_copy([newest, china, hw, huawei], edition="morning", date_label="x", market_facts=[],
+                            market_dirs=set(), events=[], sensitive=writer.sensitive_rules(cfg),
+                            priorities=cfg["priority_topics"])
+    cands = seen["candidates"]
+    assert [c["id"] for c in cands] == ["s2", "s3", "s1"]                                # priority first, Huawei gone
+    assert [c["priority"] for c in cands] == ["China technology progress", "Hardware and power shortage", ""]
+    assert "1 sensitive stories left out before editing" in out["rejected"]
+    monkeypatch.delenv("GEMINI_API_KEY")
+    monkeypatch.setattr(writer, "_editors", lambda key, writers: [])
+    wire = writer.write_copy([huawei, china], edition="morning", date_label="x", market_facts=[], market_dirs=set(),
+                             events=[], sensitive=writer.sensitive_rules(cfg), priorities=cfg["priority_topics"])
+    assert [s["id"] for s in wire["stories"]] == ["s2"]

@@ -206,7 +206,8 @@ def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | N
     copy = writer.write_copy(stories, edition=edition, date_label=local.strftime("%A %d %B %Y"),
                              market_facts=_facts(blocks), market_dirs=market_dirs(blocks), events=events,
                              calendar=calendar, writers=cfg.get("writers"),
-                             sensitive=writer.sensitive_rules(cfg), focus=cfg["editions"][edition].get("focus", ""))
+                             sensitive=writer.sensitive_rules(cfg), focus=cfg["editions"][edition].get("focus", ""),
+                             priorities=cfg.get("priority_topics"))
     if copy["writer"] == "wire":
         problems.append(f"stories are shown in their original wording ({copy['writer_note']})")
     if not copy["stories"]:

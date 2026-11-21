@@ -53,6 +53,15 @@ feeds:
   - {name: The Business Times,    tier: 1, ai_only: false, url: "https://www.businesstimes.com.sg/rss/technology"}
   - {name: CNA,                   tier: 1, ai_only: false, url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"}
   - {name: MIT Technology Review, tier: 1, ai_only: true,  url: "https://www.technologyreview.com/topic/artificial-intelligence/feed"}
+  - {name: IEEE Spectrum,         tier: 1, ai_only: true,  url: "https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss"}
+  - {name: South China Morning Post, tier: 1, ai_only: false, url: "https://www.scmp.com/rss/320663/feed"}   # China tech
+  - {name: CGTN,                  tier: 2, ai_only: false, url: "https://www.cgtn.com/subscribe/rss/section/tech-sci.xml"}
+  - {name: TechNode,              tier: 2, ai_only: false, url: "https://technode.com/feed/"}                # China tech
+  - {name: Pandaily,              tier: 2, ai_only: false, url: "https://pandaily.com/feed/"}                # China tech
+  - {name: Defense One,           tier: 1, ai_only: false, url: "https://www.defenseone.com/rss/all/"}       # AI in defence
+  - {name: Breaking Defense,      tier: 2, ai_only: false, url: "https://breakingdefense.com/feed/"}
+  - {name: Google DeepMind,       tier: 2, ai_only: true,  url: "https://deepmind.google/blog/rss.xml"}
+  - {name: Import AI,             tier: 2, ai_only: true,  url: "https://importai.substack.com/feed"}        # frontier research, weekly
   - {name: TechCrunch,            tier: 2, ai_only: true,  url: "https://techcrunch.com/category/artificial-intelligence/feed/"}
   - {name: The Verge,             tier: 2, ai_only: true,  url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"}
   - {name: Ars Technica,          tier: 2, ai_only: true,  url: "https://arstechnica.com/ai/feed/"}
@@ -115,7 +124,26 @@ ai_keywords: ["ai", "a.i.", "artificial intelligence", "openai", "chatgpt", "ant
               "llm", "llms", "chatbot", "chatbots", "machine learning", "data centre", "data centres",
               "data center", "data centers", "gpu", "gpus", "semiconductor", "semiconductors", "chip", "chips",
               "chipmaker", "chipmakers", "robot", "robots", "agentic", "deepseek", "tsmc", "generative", "copilot",
-              "gemini", "xai", "qwen", "ernie", "doubao", "kimi"]
+              "gemini", "xai", "qwen", "ernie", "doubao", "kimi", "hunyuan", "agi", "superintelligence",
+              "self-improving", "frontier model", "frontier models", "hbm", "autonomous weapons"]
+
+# Topics the editor puts first (owner's choice, 2026-11-21). Matching stories are offered to the
+# editor ahead of newer ones and marked with the topic name. Selection only: every fact is still
+# checked against its source, and sensitive stories are still dropped. Whole-word matches, lowercase.
+priority_topics:
+  - name: China technology progress
+    words: ["china", "chinese", "beijing", "shanghai", "shenzhen", "hangzhou", "hong kong", "alibaba", "baidu",
+            "tencent", "bytedance", "deepseek", "qwen", "kimi", "moonshot", "zhipu", "minimax", "hunyuan",
+            "doubao", "byd", "xiaomi", "unitree", "cambricon"]
+  - name: Frontier AI and what comes next
+    words: ["agi", "superintelligence", "self-improving", "self-improvement", "recursive", "frontier model",
+            "frontier models", "reasoning model", "world model", "ai scientist", "automated research",
+            "breakthrough", "benchmark", "scaling"]
+  - name: Hardware and power shortage
+    words: ["chip shortage", "shortage", "shortages", "memory chip", "memory chips", "hbm", "dram", "supply chain",
+            "power grid", "electricity", "gigawatt", "data centre power", "data center power", "capacity crunch"]
+  - name: AI in defence
+    words: ["military", "defence", "defense", "pentagon", "drone", "drones", "autonomous weapons", "battlefield"]
 
 # ---------------------------------------------------------------------------------------------
 # Market tables. symbol = Yahoo Finance symbol. label is what a non-specialist reader sees.
