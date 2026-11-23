@@ -1,0 +1,67 @@
+# Daily AI Briefing: build the edition in the cloud and publish it to GitHub Pages.
+#   Link readers open (always the latest): https://netie-ai.github.io/Cassandra/briefing/
+#   The message to paste into the group chat is shown in each run's summary and at .../briefing/message.txt
+# Needs repository secrets: GEMINI_API_KEY (required), MISTRAL_API_KEY and CEREBRAS_API_KEY (fallback editors).
+# GitHub runs schedules only from the default branch, so this starts once it is merged into master.
+name: Daily AI Briefing
+
+on:
+  schedule:
+    - cron: "35 23 * * 0-4"   # Mon-Fri 07:35 Singapore time: morning edition
+    - cron: "35 12 * * 1-5"   # Mon-Fri 20:35 Singapore time: evening edition
+  workflow_dispatch:
+    inputs:
+      edition:
+        description: "morning or evening (leave empty for whichever is due now)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: briefing
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+      SITE_URL: https://netie-ai.github.io/Cassandra/briefing/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "httpx>=0.27" "pyyaml>=6.0" "python-dotenv>=1.0"
+
+      - name: Build the edition
+        run: |
+          test -n "$GEMINI_API_KEY" || { echo "::error::GEMINI_API_KEY secret is not set"; exit 1; }
+          mkdir -p reports/briefings site/briefing/data
+          cp site/briefing/data/*.json reports/briefings/ 2>/dev/null || true    # earlier editions
+          python -m src.briefing --edition "${{ inputs.edition || 'auto' }}"
+          cp reports/briefings/????-??-??-*.json site/briefing/data/
+
+      - name: Build the page and the group message
+        run: |
+          python scripts/briefing_site.py site/briefing site/briefing/data "$SITE_URL"
+          { echo '### Message for the group chat'; echo '```'; cat site/briefing/message.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish
+        working-directory: site
+        run: |
+          git config user.name "cassandra-briefing"
+          git config user.email "cassandra-briefing@users.noreply.github.com"
+          git add briefing
+          if git diff --cached --quiet; then echo "nothing new to publish"; exit 0; fi
+          git commit -m "briefing: $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push

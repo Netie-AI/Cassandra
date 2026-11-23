@@ -26,6 +26,19 @@ python -m src.briefing --edition auto --send        # what the scheduler calls
 Preview the last build at `/briefing` on the local API, or open `reports/briefings/latest.html`.
 Schedule on Windows: `scripts/register-briefing-tasks.ps1` (calls `scripts/run-briefing.ps1`).
 
+## Daily website (one link for phone and laptop)
+
+`.github/workflows/briefing.yml` builds each edition in the cloud (Mon to Fri, 07:35 and 20:35
+Singapore time) and publishes it to GitHub Pages at https://netie-ai.github.io/Cassandra/briefing/.
+The link never changes: readers bookmark it or use "Add to Home Screen" (Android and iPhone get a
+Cassandra app icon). Each run's summary shows the message to paste into the group chat; it is also
+at `.../briefing/message.txt`. Edition JSON files are kept in `briefing/data/` on `gh-pages`.
+
+One-time setup: merge into `master` (GitHub runs schedules only from the default branch), and add
+repository secrets `GEMINI_API_KEY` (required), `MISTRAL_API_KEY` and `CEREBRAS_API_KEY`. To run it
+by hand: Actions tab, "Daily AI Briefing", Run workflow. The page is public: it carries public
+news and links only. Build it locally with `python scripts/briefing_site.py OUT_DIR reports/briefings URL`.
+
 ## Where the information comes from
 
 | Part | Source | Key needed |

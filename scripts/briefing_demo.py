@@ -1,5 +1,6 @@
-"""Build the shareable demo page (Morning + Evening tabs) from the latest edition JSON files.
-Usage: python scripts/briefing_demo.py OUT.html   (run python -m src.briefing --edition ... first)
+"""Build the shareable page (Morning + Evening tabs) from the latest edition JSON files.
+Usage: python scripts/briefing_demo.py OUT.html [DATA_DIR]   (run python -m src.briefing --edition ... first;
+DATA_DIR defaults to reports/briefings). The newest edition is the first, selected tab.
 
 Layout: two channels. One column on phones (AI Channel, then Markets Channel, then glossary);
 from 980px the AI Channel is the main column and the Markets Channel a right-hand rail.
@@ -9,11 +10,19 @@ from html import escape as e
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from src.briefing.render import _when, _day, _row_note, read_minutes
+from src.briefing.render import _when, _day, _row_note, providers, read_minutes
 
-OUT = sys.argv[1]
-eds = [json.load(open(sorted(glob.glob(str(ROOT / "reports" / "briefings" / f"*-{k}.json")))[-1]))
-       for k in ("morning", "evening")]
+
+def load_editions(data_dir) -> list[dict]:
+    """Latest morning and latest evening edition, newest first. Raises if there is none at all."""
+    eds = []
+    for k in ("morning", "evening"):
+        files = sorted(glob.glob(str(pathlib.Path(data_dir) / f"????-??-??-{k}.json")))
+        if files:
+            eds.append(json.load(open(files[-1], encoding="utf-8")))
+    if not eds:
+        raise SystemExit(f"no edition JSON in {data_dir}")
+    return sorted(eds, key=lambda ed: ed["generated_at"], reverse=True)
 
 
 def story(s, top=False):
@@ -87,16 +96,22 @@ def edition(ed, hidden):
         '<details class="audit"><summary>How this edition was checked</summary><ul>'
         f'<li>Email subject line: {e(ed["subject"])}</li>'
         f'<li>{ed["candidates"]} reports read, {len(ed["stories"])} selected, edited by {e(ed["writer"])}.</li>'
-        f'<li>Built {e(ed["generated_at"].replace("T", " ")[:16])} UTC. Prices from Yahoo Finance.</li>'
+        f'<li>Built {e(ed["generated_at"].replace("T", " ")[:16])} UTC. Prices from {e(providers(ed))}.</li>'
         f'{notes or "<li>No source failed and the editorial check rejected nothing.</li>"}</ul></details>',
         "</section>"])
 
 
-tabs = "".join(f'<button type="button" role="tab" id="tab-{ed["edition"]}" aria-controls="ed-{ed["edition"]}" '
-               f'aria-selected="{"true" if i == 0 else "false"}">{e(ed["title"].replace(" Edition", ""))}'
-               f'<small>{"07:30" if ed["edition"] == "morning" else "20:30"} SGT</small></button>'
-               for i, ed in enumerate(eds))
-body = "\n".join(edition(ed, i > 0) for i, ed in enumerate(eds))
-page = open(ROOT / "scripts" / "briefing_demo_shell.html").read()
-open(OUT, "w").write(page.replace("{{DATE}}", e(eds[0]["date_label"])).replace("{{TABS}}", tabs).replace("{{BODY}}", body))
-print("ok", len(page))
+def render(eds: list[dict]) -> str:
+    tabs = "".join(f'<button type="button" role="tab" id="tab-{ed["edition"]}" aria-controls="ed-{ed["edition"]}" '
+                   f'aria-selected="{"true" if i == 0 else "false"}">{e(ed["title"].replace(" Edition", ""))}'
+                   f'<small>{e(_day(ed["date"]))}, {"07:30" if ed["edition"] == "morning" else "20:30"} SGT</small></button>'
+                   for i, ed in enumerate(eds))
+    body = "\n".join(edition(ed, i > 0) for i, ed in enumerate(eds))
+    page = open(ROOT / "scripts" / "briefing_demo_shell.html", encoding="utf-8").read()
+    return page.replace("{{DATE}}", e(eds[0]["date_label"])).replace("{{TABS}}", tabs).replace("{{BODY}}", body)
+
+
+if __name__ == "__main__":
+    html = render(load_editions(sys.argv[2] if len(sys.argv) > 2 else ROOT / "reports" / "briefings"))
+    open(sys.argv[1], "w", encoding="utf-8").write(html)
+    print("ok", len(html))
