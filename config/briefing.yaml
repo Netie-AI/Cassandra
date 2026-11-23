@@ -53,6 +53,7 @@ feeds:
   - {name: The Business Times,    tier: 1, ai_only: false, url: "https://www.businesstimes.com.sg/rss/technology"}
   - {name: CNA,                   tier: 1, ai_only: false, url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"}
   - {name: MIT Technology Review, tier: 1, ai_only: true,  url: "https://www.technologyreview.com/topic/artificial-intelligence/feed"}
+  - {name: Financial Times,       tier: 1, ai_only: true,  url: "https://www.ft.com/artificial-intelligence?format=rss"}   # public headlines + standfirst
   - {name: IEEE Spectrum,         tier: 1, ai_only: true,  url: "https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss"}
   - {name: South China Morning Post, tier: 1, ai_only: false, url: "https://www.scmp.com/rss/320663/feed"}   # China tech
   - {name: CGTN,                  tier: 2, ai_only: false, url: "https://www.cgtn.com/subscribe/rss/section/tech-sci.xml"}
@@ -91,6 +92,7 @@ feeds:
   - {name: CNA,                   tier: 1, channel: markets, url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"}
   - {name: The Wall Street Journal, tier: 1, channel: markets, url: "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain"}
   - {name: Financial Times,       tier: 1, channel: markets, url: "https://www.ft.com/markets?format=rss"}
+  - {name: Financial Times,       tier: 1, channel: markets, url: "https://www.ft.com/china?format=rss"}
   - {name: Bloomberg,             tier: 1, channel: markets, url: "https://feeds.bloomberg.com/markets/news.rss"}
   - {name: BBC News,              tier: 1, channel: markets, url: "https://feeds.bbci.co.uk/news/business/rss.xml"}
   - {name: The Guardian,          tier: 1, channel: markets, url: "https://www.theguardian.com/uk/business/rss"}
