@@ -889,7 +889,7 @@ def test_us_chip_sales_to_china_are_sensitive():
     assert not writer._sensitive("Alibaba trains AI models on its own chips", rules)
 
 
-def test_blocked_publishers_never_reach_the_editor(monkeypatch):
+def test_search_feeds_keep_only_trusted_publishers(monkeypatch):
     xml = ("<rss><channel>"
            "<item><title>HBM shortage deepens - BigGo Finance</title><link>https://ex.com/a</link><source url='x'>BigGo Finance</source>"
            "<pubDate>Fri, 20 Nov 2026 01:00:00 GMT</pubDate></item>"
@@ -901,8 +901,8 @@ def test_blocked_publishers_never_reach_the_editor(monkeypatch):
         def raise_for_status(self): pass
 
     monkeypatch.setattr(sources.httpx, "get", lambda *a, **k: R())
-    cfg = {"feeds": [{"name": "Google News: AI hardware", "url": "u", "tier": 3, "ai_only": True}],
-           "ai_keywords": ["ai"], "market_keywords": [], "block_sources": ["BigGo Finance"]}
+    cfg = {"feeds": [{"name": "Google News: AI hardware", "url": "u", "tier": 3, "ai_only": True, "trusted_only": True}],
+           "ai_keywords": ["ai"], "market_keywords": [], "trusted_publishers": ["Fortune"]}
     got = sources.fetch_stories(cfg, since=dt.datetime(2026, 11, 19, tzinfo=dt.timezone.utc),
                                 now=dt.datetime(2026, 11, 21, tzinfo=dt.timezone.utc), problems=[])
     assert [(s.source, s.title) for s in got] == [("Fortune", "HBM shortage deepens for AI servers")]

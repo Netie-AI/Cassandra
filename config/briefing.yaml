@@ -72,13 +72,13 @@ feeds:
   - {name: OpenAI,                tier: 2, ai_only: true,  url: "https://openai.com/news/rss.xml"}
   - {name: Google,                tier: 2, ai_only: true,  url: "https://blog.google/technology/ai/rss/"}
   - {name: Nvidia,                tier: 2, ai_only: false, url: "https://nvidianews.nvidia.com/releases.xml"}
-  - {name: Google News SG,        tier: 3, region: sg, ai_only: false, url: "https://news.google.com/rss/search?q=(AI+OR+%22artificial+intelligence%22)+Singapore+when:2d&hl=en-SG&gl=SG&ceid=SG:en"}
+  - {name: Google News SG,        tier: 3, region: sg, ai_only: false, trusted_only: true, url: "https://news.google.com/rss/search?q=(AI+OR+%22artificial+intelligence%22)+Singapore+when:2d&hl=en-SG&gl=SG&ceid=SG:en"}
   # Google News searches for the priority topics (keyless). Stories carry the real publisher's
   # headline only: the editor writes no summary for them and they rank below direct feeds.
-  - {name: "Google News: China AI", tier: 3, ai_only: false, url: "https://news.google.com/rss/search?q=%28DeepSeek+OR+Qwen+OR+Kimi+OR+Zhipu+OR+MiniMax+OR+Hunyuan+OR+%22Baidu+AI%22+OR+%22Alibaba+AI%22+OR+%22Tencent+AI%22+OR+%22China+AI+chip%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
-  - {name: "Google News: frontier AI", tier: 3, ai_only: false, url: "https://news.google.com/rss/search?q=%28AGI+OR+superintelligence+OR+%22self-improving+AI%22+OR+%22recursive+self-improvement%22+OR+%22AI+breakthrough%22+OR+%22reasoning+model%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
-  - {name: "Google News: AI hardware", tier: 3, ai_only: false, url: "https://news.google.com/rss/search?q=%28%22chip+shortage%22+OR+HBM+OR+%22memory+chip%22+OR+%22GPU+shortage%22+OR+%22data+center+power%22+OR+%22AI+power+demand%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
-  - {name: "Google News: AI in defence", tier: 3, ai_only: false, url: "https://news.google.com/rss/search?q=%28%22military+AI%22+OR+%22defense+AI%22+OR+%22AI+drones%22+OR+%22Pentagon+AI%22+OR+%22autonomous+weapons%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
+  - {name: "Google News: China AI", tier: 3, ai_only: false, trusted_only: true, url: "https://news.google.com/rss/search?q=%28DeepSeek+OR+Qwen+OR+Kimi+OR+Zhipu+OR+MiniMax+OR+Hunyuan+OR+%22Baidu+AI%22+OR+%22Alibaba+AI%22+OR+%22Tencent+AI%22+OR+%22China+AI+chip%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
+  - {name: "Google News: frontier AI", tier: 3, ai_only: false, trusted_only: true, url: "https://news.google.com/rss/search?q=%28AGI+OR+superintelligence+OR+%22self-improving+AI%22+OR+%22recursive+self-improvement%22+OR+%22AI+breakthrough%22+OR+%22reasoning+model%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
+  - {name: "Google News: AI hardware", tier: 3, ai_only: false, trusted_only: true, url: "https://news.google.com/rss/search?q=%28%22chip+shortage%22+OR+HBM+OR+%22memory+chip%22+OR+%22GPU+shortage%22+OR+%22data+center+power%22+OR+%22AI+power+demand%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
+  - {name: "Google News: AI in defence", tier: 3, ai_only: false, trusted_only: true, url: "https://news.google.com/rss/search?q=%28%22military+AI%22+OR+%22defense+AI%22+OR+%22AI+drones%22+OR+%22Pentagon+AI%22+OR+%22autonomous+weapons%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
 
   # Markets channel: Greater China, Singapore and Asia-Pacific desks first, then global markets desks.
   - {name: South China Morning Post, tier: 1, channel: markets, url: "https://www.scmp.com/rss/92/feed"}
@@ -136,8 +136,21 @@ ai_keywords: ["ai", "a.i.", "artificial intelligence", "openai", "chatgpt", "ant
               "gemini", "xai", "qwen", "ernie", "doubao", "kimi", "hunyuan", "agi", "superintelligence",
               "self-improving", "frontier model", "frontier models", "hbm", "autonomous weapons"]
 
-# Publishers never offered to the editor (low-quality aggregators seen in Google News results).
-block_sources: ["BigGo Finance", "Moomoo"]
+# Search feeds (trusted_only: true) keep a story only when its publisher is listed here: raw Google News
+# results are mostly aggregators and listicles (measured 2026-11-23: 1 of 49 frontier-AI results was
+# from a known newsroom). Direct feeds are not affected.
+trusted_publishers: [
+  "Reuters", "Bloomberg", "Bloomberg.com", "Financial Times", "The Wall Street Journal",
+  "The New York Times", "The Economist", "Associated Press", "AP News", "Axios", "Semafor", "CNBC",
+  "Fortune", "Forbes", "The Guardian", "BBC", "BBC News", "Al Jazeera", "Nikkei Asia",
+  "South China Morning Post", "Caixin Global", "Yicai Global", "China Daily", "CGTN", "Xinhua",
+  "TechNode", "Pandaily", "KrASIA", "Tech in Asia", "The Straits Times", "The Business Times", "CNA",
+  "The Edge Singapore", "e27", "The Japan Times", "The Korea Herald", "Korea JoongAng Daily",
+  "DIGITIMES Asia", "digitimes", "TrendForce", "The Information", "WIRED", "The Verge", "TechCrunch",
+  "Ars Technica", "MIT Technology Review", "IEEE Spectrum", "Tom's Hardware", "The Register",
+  "SemiAnalysis", "Defense One", "Breaking Defense", "DefenseScoop", "C4ISRNET", "Nature", "Science",
+  "36Kr", "eu.36kr.com", "Singapore Business Review",
+  "Nanyang Technological University - NTU Singapore"]
 
 # Topics the editor puts first (owner's choice, 2026-11-21). Matching stories are offered to the
 # editor ahead of newer ones and marked with the topic name. Selection only: every fact is still

@@ -139,7 +139,7 @@ def fetch_stories(cfg: dict, *, since: dt.datetime, now: dt.datetime | None = No
     problems = problems if problems is not None else []
     seen: set[str] = set()
     stories: list[Story] = []
-    blocked = set(cfg.get("block_sources") or [])
+    trusted = set(cfg.get("trusted_publishers") or [])
     for feed in cfg["feeds"]:
         try:
             r = httpx.get(feed["url"], headers=_UA, timeout=20, follow_redirects=True)
@@ -153,7 +153,7 @@ def fetch_stories(cfg: dict, *, since: dt.datetime, now: dt.datetime | None = No
         if not items:
             problems.append(f"news feed '{feed['name']}' returned no readable stories")
         for s in items:
-            if not (since < s.published <= now) or s.source in blocked:
+            if not (since < s.published <= now) or (feed.get("trusted_only") and s.source not in trusted):
                 continue
             s.tier = int(feed.get("tier", 2))
             if feed.get("channel") == "markets":
