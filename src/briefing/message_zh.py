@@ -108,6 +108,8 @@ def translate(headlines: list[str], call: Callable[[str], str] | None = None) ->
             raise RuntimeError(type(last).__name__ if last else "no model")
     try:
         out = json.loads(writer._strip_fences(call(json.dumps(headlines, ensure_ascii=False))))
+        if isinstance(out, dict):                 # {"headlines": [...]}: take the list inside
+            out = next((v for v in out.values() if isinstance(v, list)), None)
         if not (isinstance(out, list) and len(out) == len(headlines)):
             raise ValueError("wrong shape")
     except Exception as exc:

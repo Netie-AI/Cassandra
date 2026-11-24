@@ -44,3 +44,8 @@ def test_message_has_risk_note_tip_and_tool_only_when_given():
     assert "【每日工具】" not in text and text.rstrip().endswith("https://ex.org/b/")
     with_tool, _ = message_zh.compose(_ed(), "https://ex.org/b/", call=call, tool="Tool guide here")
     assert "【每日工具】\nTool guide here" in with_tool
+
+
+def test_translation_wrapped_in_an_object_is_accepted():
+    heads, notes = message_zh.translate(["Fed holds rates"], lambda p: json.dumps({"headlines": ["美联储维持利率不变"]}))
+    assert heads == ["美联储维持利率不变"] and notes == []

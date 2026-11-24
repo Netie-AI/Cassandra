@@ -230,6 +230,9 @@ def parse_chart(payload: dict, *, symbol: str, label: str, note: str,
             return d < cut.date() or (d == cut.date() and cut.time() >= close_at)
         by_date = {d: c for d, c in by_date.items() if closed(d)}
         missing = {d for d in missing if closed(d)}
+        if by_date and any(d > max(by_date) for d in missing):
+            # Yahoo lists the session but has no close for it: an older close must not stand in for it
+            raise ValueError("latest closed session has no close")
     # Yahoo often leaves the newest daily bar empty for hours after the close; the meta block
     # has the real last price. Without this the "latest close" is silently a day old.
     elif ok(meta.get("regularMarketPrice")) and meta.get("regularMarketTime"):

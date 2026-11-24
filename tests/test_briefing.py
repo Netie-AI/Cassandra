@@ -906,3 +906,13 @@ def test_search_feeds_keep_only_trusted_publishers(monkeypatch):
     got = sources.fetch_stories(cfg, since=dt.datetime(2026, 11, 19, tzinfo=dt.timezone.utc),
                                 now=dt.datetime(2026, 11, 21, tzinfo=dt.timezone.utc), problems=[])
     assert [(s.source, s.title) for s in got] == [("Fortune", "HBM shortage deepens for AI servers")]
+
+
+def test_as_of_refuses_an_older_close_when_the_latest_session_has_none():
+    """Rebuild 2026-11-24: Yahoo had no 23 Nov close for Asian indices, so Friday's moves showed as Tuesday's."""
+    day0 = 1793926800
+    payload = _chart([100.0, 110.0, None], 120.0, day0 + 5 * 86400)               # day 3 listed, no close
+    payload["chart"]["result"][0]["meta"]["currentTradingPeriod"] = {"regular": {"start": day0, "end": day0 + 8 * 3600}}
+    after = dt.datetime(2026, 11, 8, 20, 30, tzinfo=dt.timezone(dt.timedelta(hours=8)))
+    with pytest.raises(ValueError, match="no close"):
+        sources.parse_chart(payload, symbol="X", label="X", note="", as_of=after)

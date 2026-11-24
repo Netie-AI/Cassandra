@@ -54,6 +54,13 @@ jobs:
           mkdir -p reports/briefings site/briefing/data
           cp site/briefing/data/*.json reports/briefings/ 2>/dev/null || true    # earlier editions
           python -m src.briefing --edition "${{ inputs.edition || 'auto' }}"
+          # Gemini is sometimes overloaded (503) for minutes: if the editor fell back to raw headlines,
+          # wait and build once more. A second fallback is published as is, labelled on the page.
+          newest() { python -c "import glob,json;f=max(glob.glob('reports/briefings/????-??-??-*.json'),key=lambda p:json.load(open(p))['generated_at']);print(json.load(open(f))['writer'])"; }
+          if [ "$(newest)" = "wire" ]; then
+            echo "::warning::AI editor unavailable, retrying in 5 minutes"; sleep 300
+            python -m src.briefing --edition "${{ inputs.edition || 'auto' }}"
+          fi
           cp reports/briefings/????-??-??-*.json site/briefing/data/
 
       - name: Build the page and the group message
