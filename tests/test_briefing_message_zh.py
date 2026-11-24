@@ -49,3 +49,12 @@ def test_message_has_risk_note_tip_and_tool_only_when_given():
 def test_translation_wrapped_in_an_object_is_accepted():
     heads, notes = message_zh.translate(["Fed holds rates"], lambda p: json.dumps({"headlines": ["美联储维持利率不变"]}))
     assert heads == ["美联储维持利率不变"] and notes == []
+
+
+def test_markets_still_trading_are_labelled_intraday():
+    ed = _ed()
+    ed["markets"][0]["live"] = True
+    ed["markets"][0]["rows"][1]["live"] = True
+    zh = message_zh.load_zh()
+    assert message_zh.market_lines(ed, zh)[0].startswith("美股（盘中）：")
+    assert message_zh.teaser(ed, zh).startswith("英伟达盘中大涨31.5%")

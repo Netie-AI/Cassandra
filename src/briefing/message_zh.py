@@ -42,7 +42,7 @@ def teaser(ed: dict, zh: dict) -> str:
     if not rows:
         return f"{ed['date_label']}：今日市场数据暂缺"
     _, top = max(rows, key=lambda kr: abs(kr[1]["pct"]))
-    name = zh["names"].get(top["label"], top["label"])
+    name = zh["names"].get(top["label"], top["label"]) + ("盘中" if top.get("live") else "")
     pick = dt.date.fromisoformat(ed["date"]).toordinal()
     p = round(top["pct"], 1)
     if p >= 5:
@@ -61,7 +61,8 @@ def market_lines(ed: dict, zh: dict) -> list[str]:
         cells = [f"{zh['names'].get(r['label'], r['label'])} {r['pct_text']}"
                  for r in b["rows"][:3] if not r.get("fx") and r.get("pct") is not None]
         if cells:
-            lines.append(f"{zh['blocks'].get(b.get('key', ''), b['title'])}：" + "｜".join(cells))
+            label = zh["blocks"].get(b.get("key", ""), b["title"]) + ("（盘中）" if b.get("live") else "")
+            lines.append(f"{label}：" + "｜".join(cells))
     return lines
 
 
