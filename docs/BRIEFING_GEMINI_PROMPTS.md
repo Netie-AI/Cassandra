@@ -32,6 +32,16 @@ Leave out entirely: anything naming Huawei, sanctions, export controls, entity l
 to China, China ties or allegations, national security, espionage, political leaders, Xinjiang,
 Tibet, Taiwan Strait, opinion columns, rumours, sponsored content, listicles ("3 stocks to buy").
 
+Use only established newsrooms or the company's own announcement: Reuters, Bloomberg, Financial
+Times, Wall Street Journal, Nikkei Asia, South China Morning Post, Caixin, Yicai, CGTN, China Daily,
+Xinhua, 36Kr, TechNode, Pandaily, Tech in Asia, The Straits Times, The Business Times, CNA, CNBC,
+Fortune, The Guardian, BBC, The Verge, TechCrunch, Ars Technica, MIT Technology Review, IEEE
+Spectrum, Tom's Hardware, DIGITIMES, TrendForce, Defense One, Breaking Defense, or an official
+company or government site. Not blogs, AI-written news sites, aggregators or stock-promotion sites
+(for example: Emergent, CellCog, remio AI, DEV Community, Stock Titan, Business Upturn, MarkTechPost).
+If the only source for a story is one of those, find the same story at an established newsroom or
+leave it out.
+
 For each story give one row:
 | Topic | Headline (the publisher's own) | Publisher | Published (date and time, with time zone) | Link | One factual sentence, copied or closely paraphrased from the article |
 
@@ -53,7 +63,14 @@ A match means the same session date, the close within 0.1%, and the % change wit
 Markets that are trading right now are "live": compare only that the direction (up or down) agrees.
 At the end write either "ALL MATCH" or "MISMATCH:" followed by the rows that do not match. Do not
 guess a figure you could not find: write "not found" instead.
+
+Before you answer, check your own table: a 0.00% change on a day when the stock is in the news is
+almost always a missing figure, not a real one. Re-check any 0.00% row on the exchange's own site.
 ```
+
+Your own check is fallible too: on 23 Nov this prompt reported SK hynix at 0.00%, while the real
+close was -2.52%. The newsletter's figures come from Yahoo Finance and are confirmed against Tencent
+Finance where possible; treat a mismatch as a reason to look, not as proof the newsletter is wrong.
 
 ## 3. Editor's check before posting (07:50, Mon to Fri)
 
@@ -80,6 +97,27 @@ and the story links instead.
 
 Same as prompt 1, with these two changes: "the last 14 hours", and add as topic 0: "How mainland
 China, Hong Kong and Singapore markets closed today, and the main reason given by the publisher."
+
+## 6. 一天一个AI小知识 research (Sunday 09:00, weekly)
+
+```
+你是企业 AI 应用顾问，读者是一家大型科技公司的普通员工，不一定懂技术。请用 Google 搜索，
+找出最近一个月里关于"AI 在日常业务工作中真正有用的做法"的可靠资料（公司官方博客、
+研究报告、知名媒体），重点是：提高准确率、更快生成材料、更准确地查找资料、找错与反复验证、
+定时自动执行和本地运行。
+
+写 5 条小知识，每条格式：
+- title: 一句话标题（不超过 16 个字）
+  body: 2 到 3 句，具体可操作，说明怎么做、为什么有用（不超过 90 个字）
+  source: 一个可以打开的链接
+
+要求：不夸大，不写具体百分比除非来源里有；不推荐任何需要上传内部资料的公开工具；
+不提任何具体公司的内部系统；不用破折号。输出 YAML，方便直接复制。
+```
+
+Send the five tips to Claude in this repository's session: they go into `config/briefing_zh.yaml`
+under `tips`, which the daily Chinese message rotates through (one per weekday). Check each
+`source` link yourself before adding.
 
 ## 5. Weekly review (Sunday 10:00)
 
