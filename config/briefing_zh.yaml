@@ -1,0 +1,57 @@
+# Chinese group message (src/briefing/message_zh.py). Public: nothing internal to any employer here.
+
+# Chinese names for market table rows (English label as in config/briefing.yaml: Chinese name).
+names:
+  "S&P 500": 标普500
+  "Nasdaq Composite": 纳斯达克指数
+  "Dow Jones": 道琼斯指数
+  "Semiconductors (SOX)": 费城半导体指数
+  "Nvidia": 英伟达
+  "TSMC (US-listed)": 台积电（美股）
+  "Shanghai Composite": 上证指数
+  "Shenzhen Component": 深证成指
+  "CSI 300": 沪深300
+  "Hang Seng": 恒生指数
+  "Hang Seng TECH": 恒生科技指数
+  "Straits Times Index": 新加坡海峡时报指数
+  "DBS": 星展银行
+  "Nikkei 225": 日经225
+  "KOSPI": 韩国综合指数
+  "Taiwan Weighted": 台湾加权指数
+  "S&P/ASX 200": 澳洲ASX200
+  "S&P 500 futures": 标普500期货
+  "Nasdaq futures": 纳指期货
+
+# Table titles by block key.
+blocks: {china: 大中华区, singapore: 新加坡, apac: 亚太, us: 美股, futures: 美股期货}
+
+# Teaser questions, picked by date so the same day always gets the same line.
+ask_up: ["真的王者归来了？", "反弹能持续吗？", "AI 行情又回来了？", "这波上涨靠得住吗？"]
+ask_down: ["AI 泡沫要破了吗？", "恐慌到底了吗？", "这是回调还是转势？", "市场在担心什么？"]
+
+# 一天一个AI小知识: one per weekday, in rotation. Practical use in ordinary business work.
+tips:
+  - title: AI 的价值在准确率，不在速度
+    body: 写得快不等于写得对。用 AI 起草后，把关键数字、人名、日期逐一对照原始资料。习惯是：AI 出初稿，人负责核对，错一个数字就可能让整份材料失去可信度。
+  - title: 让 AI 先给出处，再给结论
+    body: 提问时加一句"请列出你依据的原文和链接，找不到就说不知道"。有出处的答案可以快速核对；没有出处的答案，只能当作线索，不能当作事实。
+  - title: 用 AI 更快生成材料
+    body: 周报、会议纪要、PPT 大纲、邮件草稿，都可以先让 AI 按固定模板生成初稿。把你常用的格式写成一段说明，每次附上，输出就会稳定很多，节省的时间用来改内容。
+  - title: 用 AI 更准确地查找
+    body: 与其让 AI 凭记忆回答，不如把文件、表格、规章直接给它，再问"第几页、哪一条写了什么"。基于你提供的资料回答，准确率远高于让模型自由发挥。
+  - title: 让 AI 帮你找错
+    body: 把写好的方案交给 AI，请它"逐条找出数字不一致、前后矛盾和遗漏的地方，并说明位置"。AI 不累，适合做第二遍检查，但最后是否修改由你判断。
+  - title: 反复验证，比一次答对更重要
+    body: 同一个问题换一种问法再问一次，或让另一个模型独立回答。两次结果一致，可信度更高；不一致的地方，正是需要人工核实的重点。
+  - title: 本地运行，数据不出门
+    body: 涉及内部资料时，优先用公司批准的内部模型或本地部署的工具，不要把敏感内容贴到公开的网页版 AI。先确认工具的数据政策，再决定能放什么进去。
+  - title: 让 AI 自主安排重复工作
+    body: 每天固定要做的事，例如汇总邮件要点、整理日报、提醒签到，都可以设成定时任务。先手动跑通一次、确认结果正确，再交给定时执行，并定期抽查。
+  - title: 给例子，比给要求更有效
+    body: 想要某种写法，直接贴一段"好的例子"给 AI，说"按这个风格写"。一个好例子胜过十条形容词，输出会更贴近你真正想要的样子。
+  - title: 让 AI 输出表格，方便核对
+    body: 需要比较或汇总时，要求 AI 用表格输出，每行一个对象、每列一个字段，再加一列"来源"。表格里的空格和矛盾一眼就能看出来。
+  - title: 先拆任务，再交给 AI
+    body: 复杂任务一次性交给 AI 往往效果差。先拆成"收集资料、整理要点、起草、检查"几步，每步单独做、单独确认，整体准确率会明显提高。
+  - title: 记录好用的提示词
+    body: 效果好的提示词要保存下来，形成团队的模板库。下次直接复用、逐步改进，比每次从零开始更快，也让不同同事的输出质量更一致。
