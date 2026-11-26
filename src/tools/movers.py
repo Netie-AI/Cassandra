@@ -92,6 +92,37 @@ def fetch_watchlist_movers(*, symbols: tuple[str, ...] = _WATCHLIST) -> list[Mov
     return out
 
 
+_SYMBOL_OK = __import__("re").compile(r"^[A-Z0-9.\-^=]{1,12}$")
+
+
+def verified_quote(symbol: str) -> dict | None:
+    """One quote for the stock pages (GET /api/quote/{symbol}).
+
+    Finnhub when FINNHUB_API_KEY is set, otherwise the keyless Yahoo chart API used by the
+    briefing. Returns None (the route answers 404) for a malformed symbol or when no source
+    answers; never raises, so the page falls back to its watchlist row instead of a 500.
+    """
+    sym = (symbol or "").strip().upper()
+    if not _SYMBOL_OK.match(sym) or sym in _SKIP_SYMBOLS:
+        return None
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    row = _quote(sym) if get_key("FINNHUB_API_KEY") else None
+    if row and row.price is not None:
+        status = {True: "live", False: "closed"}.get(nyse_is_open(), "historical")
+        return {"symbol": sym, "price": round(row.price, 2), "pct_change": row.pct_change,
+                "source": "finnhub", "as_of": now, "market_status": status}
+    try:
+        from ..briefing.sources import _yahoo_quote
+
+        q = _yahoo_quote({"symbol": sym, "label": sym})
+    except Exception as exc:
+        _LOG.info("verified_quote %s: no source answered (%s)", sym, type(exc).__name__)
+        return None
+    return {"symbol": sym, "price": round(q.close, 2), "pct_change": q.pct_1d,
+            "source": "yahoo", "as_of": q.session_date,
+            "market_status": "live" if q.live else "closed"}
+
+
 if __name__ == "__main__":
     movers = fetch_watchlist_movers()
     print(f"movers={len(movers)} asof={datetime.now(timezone.utc).isoformat()}")

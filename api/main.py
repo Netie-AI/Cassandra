@@ -42,6 +42,11 @@ async def lifespan(app: FastAPI):
 
     load_env()
     log_activation_state()
+    from src.store import seed_scores_if_empty
+
+    seeded = seed_scores_if_empty()
+    if seeded:
+        logging.getLogger("cassandra.startup").info("Seeded %d daily scores from store/seed", seeded)
     yield
 
 
@@ -208,10 +213,25 @@ def newspaper_report():
 
 @app.get("/briefing")
 def briefing_latest():
-    """Latest AI Briefing edition as built by `python -m src.briefing` (same HTML as the email)."""
-    path = ROOT / "reports" / "briefings" / "latest.html"
+    """Latest AI Briefing edition as built by `python -m src.briefing` (same HTML as the email).
+    Falls back to the newest dated edition, then to a page that explains how to build one."""
+    folder = ROOT / "reports" / "briefings"
+    path = folder / "latest.html"
     if not path.is_file():
-        raise HTTPException(status_code=404, detail="No briefing built yet. Run: python -m src.briefing --edition morning")
+        dated = sorted(folder.glob("????-??-??-*.html")) if folder.is_dir() else []
+        dated = [p for p in dated if p.stem.count("-") == 3]          # skip -ai / -markets channel files
+        path = dated[-1] if dated else None
+    if path is None:
+        public = os.getenv("BRIEFING_PUBLIC_URL", "https://netie-ai.github.io/Cassandra/briefing/")
+        return HTMLResponse(
+            "<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>AI Briefing</title><body style='font-family:Georgia,serif;max-width:40rem;margin:4rem auto;"
+            "padding:0 1rem;line-height:1.5;background:#fbfaf8;color:#141414'>"
+            "<h1>AI Briefing</h1><p>No edition has been built on this server yet.</p>"
+            f"<p>Read the latest published edition at <a href='{public}'>{public}</a>, or build one here with "
+            "<code>python -m src.briefing --edition morning</code>.</p></body>",
+            status_code=200,
+        )
     return FileResponse(path, media_type="text/html; charset=utf-8")
 
 

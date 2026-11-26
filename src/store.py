@@ -934,3 +934,52 @@ def increment_agent_usage(email: str, date: str) -> int:
             (email, date),
         ).fetchone()
     return int(row["count"]) if row else 1
+
+
+# --------------------------------------------------------------------------- #
+# Score snapshot: the daily_scores table as portable JSON.
+# The daily cloud job keeps the history on gh-pages (briefing/data/score_history.json) because
+# its runner starts with an empty SQLite file; a fresh clone or container seeds from
+# store/seed/score_history.json so /api/latest and /api/dashboard serve the last real run.
+# --------------------------------------------------------------------------- #
+SEED = ROOT / "store" / "seed" / "score_history.json"
+_SNAPSHOT_COLS = ("asof", "crs", "band", "band_halfwidth", "confidence", "fragility", "trigger",
+                  "coverage", "factors_json", "momentum_state", "df_dt", "phase", "phase_confidence",
+                  "payload_json")
+
+
+def export_score_snapshot(path: Path) -> int:
+    """Write every daily_scores row (ascending by asof) to `path`. Returns the row count."""
+    with _conn() as c:
+        rows = c.execute(f"SELECT {', '.join(_SNAPSHOT_COLS)} FROM daily_scores ORDER BY asof ASC").fetchall()
+    out = [dict(r) for r in rows]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"version": 1, "rows": out}, indent=1) + "\n", encoding="utf-8")
+    return len(out)
+
+
+def import_score_snapshot(path: Path, *, overwrite: bool = False) -> int:
+    """Load rows written by export_score_snapshot. Existing dates are kept unless overwrite.
+    Returns the number of rows inserted. A missing file imports nothing."""
+    if not path.is_file():
+        return 0
+    rows = json.loads(path.read_text(encoding="utf-8")).get("rows") or []
+    verb = "INSERT OR REPLACE" if overwrite else "INSERT OR IGNORE"
+    n = 0
+    with _conn() as c:
+        for r in rows:
+            if not r.get("asof") or r.get("crs") is None:
+                continue
+            cur = c.execute(
+                f"{verb} INTO daily_scores ({', '.join(_SNAPSHOT_COLS)}) VALUES ({', '.join('?' * len(_SNAPSHOT_COLS))})",
+                tuple(r.get(k) for k in _SNAPSHOT_COLS),
+            )
+            n += cur.rowcount
+    return n
+
+
+def seed_scores_if_empty(path: Path = SEED) -> int:
+    """At API start: when no score has ever been stored, load the committed seed history."""
+    if latest_score():
+        return 0
+    return import_score_snapshot(path)
