@@ -149,7 +149,7 @@ def _gemini_generate(
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": config,
     }
-    r = httpx.post(url, params={"key": api_key}, json=body, timeout=timeout)
+    r = httpx.post(url, headers={"x-goog-api-key": api_key}, json=body, timeout=timeout)  # header, so the key never lands in a URL or traceback
     r.raise_for_status()
     data = r.json()
     return data["candidates"][0]["content"]["parts"][0]["text"]
