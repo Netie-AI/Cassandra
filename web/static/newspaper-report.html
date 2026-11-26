@@ -105,6 +105,9 @@
     padding: 6px 0 8px;
     margin-bottom: 4px;
   }
+  .np-emblem { width: 0.92em; height: 0.92em; vertical-align: -0.12em; margin-right: 0.22em; color: var(--ink); }
+  .np-emblem .a-ink { stroke: currentColor; } .np-emblem .a-fill { fill: currentColor; }
+  .np-emblem .a-paperfill { fill: var(--bg); } .np-emblem .a-red { stroke: var(--accent); }
   .masthead-meta {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -421,6 +424,16 @@
     .score-divider { display: none; }
   }
 </style>
+  <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml"/>
+  <link rel="icon" href="/static/img/favicon-32.png" type="image/png" sizes="32x32"/>
+  <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png"/>
+<meta property="og:type" content="article"/>
+<meta property="og:site_name" content="Cassandra"/>
+<meta property="og:title" content="Cassandra's Daily: Market Desk Edition"/>
+<meta property="og:image" content="/static/img/og.png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta name="twitter:card" content="summary_large_image"/>
 </head>
 <body>
 
@@ -442,7 +455,18 @@
 
 <!-- Masthead -->
 <header>
-  <div class="masthead-title">Cassandra's Daily</div>
+  <div class="masthead-title"><svg class="np-emblem" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+
+  <circle cx="32" cy="32" r="30.5" class="a-ink" stroke-width="1.6" fill="none"/>
+  <circle cx="32" cy="32" r="28.2" class="a-ink" stroke-width="0.5" fill="none"/>
+  <path d="M23 54.3 A24 24 0 0 1 10.8 20.7" class="a-ink" stroke-width="0.9" fill="none" stroke-linecap="round"/><ellipse cx="17.9" cy="53.7" rx="2.9" ry="1.05" transform="rotate(170 17.9 53.7)" class="a-fill"/><ellipse cx="19.7" cy="50.9" rx="2.5" ry="1.05" transform="rotate(246 19.7 50.9)" class="a-fill"/><ellipse cx="11" cy="47.2" rx="2.9" ry="1.05" transform="rotate(191 11 47.2)" class="a-fill"/><ellipse cx="13.8" cy="45.2" rx="2.5" ry="1.05" transform="rotate(267 13.8 45.2)" class="a-fill"/><ellipse cx="7" cy="38.7" rx="2.9" ry="1.05" transform="rotate(212 7 38.7)" class="a-fill"/><ellipse cx="10.2" cy="37.8" rx="2.5" ry="1.05" transform="rotate(288 10.2 37.8)" class="a-fill"/><ellipse cx="6.3" cy="29.3" rx="2.9" ry="1.05" transform="rotate(233 6.3 29.3)" class="a-fill"/><ellipse cx="9.6" cy="29.6" rx="2.5" ry="1.05" transform="rotate(309 9.6 29.6)" class="a-fill"/><ellipse cx="8.9" cy="20.2" rx="2.9" ry="1.05" transform="rotate(254 8.9 20.2)" class="a-fill"/><ellipse cx="11.9" cy="21.8" rx="2.5" ry="1.05" transform="rotate(330 11.9 21.8)" class="a-fill"/><ellipse cx="12" cy="18.4" rx="2.6" ry="1.05" transform="rotate(298 12 18.4)" class="a-fill"/><path d="M41 54.3 A24 24 0 0 0 53.2 20.7" class="a-ink" stroke-width="0.9" fill="none" stroke-linecap="round"/><ellipse cx="46.1" cy="53.7" rx="2.9" ry="1.05" transform="rotate(10 46.1 53.7)" class="a-fill"/><ellipse cx="44.3" cy="50.9" rx="2.5" ry="1.05" transform="rotate(-66 44.3 50.9)" class="a-fill"/><ellipse cx="53" cy="47.2" rx="2.9" ry="1.05" transform="rotate(-11 53 47.2)" class="a-fill"/><ellipse cx="50.2" cy="45.2" rx="2.5" ry="1.05" transform="rotate(-87 50.2 45.2)" class="a-fill"/><ellipse cx="57" cy="38.7" rx="2.9" ry="1.05" transform="rotate(-32 57 38.7)" class="a-fill"/><ellipse cx="53.8" cy="37.8" rx="2.5" ry="1.05" transform="rotate(-108 53.8 37.8)" class="a-fill"/><ellipse cx="57.7" cy="29.3" rx="2.9" ry="1.05" transform="rotate(-53 57.7 29.3)" class="a-fill"/><ellipse cx="54.4" cy="29.6" rx="2.5" ry="1.05" transform="rotate(-129 54.4 29.6)" class="a-fill"/><ellipse cx="55.1" cy="20.2" rx="2.9" ry="1.05" transform="rotate(-74 55.1 20.2)" class="a-fill"/><ellipse cx="52.1" cy="21.8" rx="2.5" ry="1.05" transform="rotate(-150 52.1 21.8)" class="a-fill"/><ellipse cx="52" cy="18.4" rx="2.6" ry="1.05" transform="rotate(-118 52 18.4)" class="a-fill"/>
+  <path d="M16.5 27 Q32 12 47.5 27 Q32 39 16.5 27 Z" class="a-ink a-paperfill" stroke-width="1.9" stroke-linejoin="round"/>
+  <circle cx="32" cy="26.4" r="5.6" class="a-fill"/>
+  <circle cx="34" cy="24.6" r="1.5" class="a-paperfill"/>
+  <polyline points="19.5,37.5 24.5,40.5 28.5,38.5 33.5,43.5 37.5,41.5 43,47.5" class="a-red" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M38.6 47.9 L43 47.5 L43 43.1" class="a-red" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+</svg><span>Cassandra's Daily</span></div>
   <div class="masthead-meta">
     <span class="meta-left" data-i18n="edition">Late City Edition</span>
     <span class="meta-center" id="report-date"></span>
@@ -464,7 +488,7 @@
   <button type="button" class="ctrl-btn" data-tier="agent">API · $49.99</button>
 </div>
 
-<div class="dateline-feels" id="dateline-feels">Today feels like March 14, 2000</div>
+<div class="dateline-feels" id="dateline-feels" hidden></div>
 
 <!-- Headline -->
 <div class="kicker" data-i18n="kicker">Global Market Desk · Morning Edition</div>
@@ -664,8 +688,10 @@ async function applyNewspaperBodies(lang) {
     if (window.__npAnalogDate) {
       const prefix = lang === 'zh' ? '今日情势令人想起 ' : lang === 'ms' ? 'Hari ini terasa seperti ' : 'Today feels like ';
       dl.textContent = prefix + window.__npAnalogDate;
+      dl.hidden = false;
     } else if (bodies.dateline_feels) {
       dl.textContent = bodies.dateline_feels;
+      dl.hidden = false;
     }
   }
 }

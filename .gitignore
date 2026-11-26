@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 config/settings.yaml
+# WeLink chat names: copy config/welink.example.yaml to config/welink.yaml
+config/welink.yaml
+# Internal tool guides for the Chinese group message (may hold employer-internal links)
+config/tools/
 Cpanel.md
 
 # ═══ Local database (stays on your machine) ════════════════

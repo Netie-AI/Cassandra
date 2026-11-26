@@ -1,0 +1,259 @@
+# Cassandra AI & Markets Briefing: sources, markets, schedule.
+# Everything here is keyless (RSS + public quote APIs). Edit freely, no code change needed.
+
+timezone: Asia/Singapore
+
+# auto mode: which edition runs at which local hour window (see src/briefing/build.py::pick_edition)
+schedule:
+  morning: {days: [mon, tue, wed, thu, fri], time: "07:30"}   # before Asian markets open (SGX 09:00, Shanghai 09:30)
+  evening: {days: [mon, tue, wed, thu, fri], time: "20:30"}   # after Asia closes, before the US opens
+  weekly:  {days: [sun], time: "09:00"}                        # week in review + week ahead
+
+# How far back each edition looks for stories (hours). after_weekend applies to Monday morning.
+lookback_hours: {morning: 16, evening: 14, weekly: 168, after_weekend: 62}
+
+# What each edition is for. `focus` is given to the editor; `blocks` is the order of the market
+# tables (keys of `markets` below). To lead an edition with a different region, reorder its blocks.
+editions:
+  morning:
+    focus: >-
+      Morning edition, sent before Asian markets open. The Markets channel is about the trading day
+      ahead in mainland China, Hong Kong, Singapore and the rest of Asia-Pacific: where those markets
+      last closed, and the overnight session on Wall Street as the lead-in. Prefer market stories
+      about China, Hong Kong, Singapore and Asia-Pacific, plus at most one on the overnight US session.
+    blocks: [china, apac, singapore, us]
+  evening:
+    focus: >-
+      Evening edition, sent after Asian markets close and before the US market opens. The Markets
+      channel covers the US market (last close, futures before tonight's open, what is scheduled
+      tonight) and how mainland China and Hong Kong traded today. Prefer one or two stories on the
+      US outlook and one on today's China or Hong Kong session.
+    blocks: [us, futures, china, singapore, apac]
+  weekly:
+    focus: >-
+      Weekly edition. Summarise the week in AI and the week in markets across the United States,
+      Greater China, Singapore and Asia-Pacific, then the week ahead.
+    blocks: [us, china, singapore, apac]
+
+# ---------------------------------------------------------------------------------------------
+# News feeds.
+#   channel: ai (default) or markets.
+#   ai feeds: ai_only true = every item is about AI; false = kept only when it matches ai_keywords.
+#   markets feeds: items are kept when they match market_keywords.
+#   tier: 1 = established newsroom or wire, 2 = trade press or company newsroom, 3 = aggregator
+#         (headline only). When two candidates report the same event the editor takes the lower tier.
+#   region: sg marks a Singapore-only feed. Other stories get the Singapore tag only if they mention it.
+# ---------------------------------------------------------------------------------------------
+feeds:
+  - {name: BBC News,              tier: 1, ai_only: false, url: "https://feeds.bbci.co.uk/news/topics/ce1qrvleleqt/rss.xml"}
+  - {name: The New York Times,    tier: 1, ai_only: true,  url: "https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/spotlight/artificial-intelligence/rss.xml"}
+  - {name: The Guardian,          tier: 1, ai_only: false, url: "https://www.theguardian.com/uk/technology/rss"}
+  - {name: South China Morning Post, tier: 1, ai_only: false, url: "https://www.scmp.com/rss/36/feed"}
+  - {name: The Straits Times,     tier: 1, ai_only: false, url: "https://www.straitstimes.com/news/business/rss.xml"}
+  - {name: The Business Times,    tier: 1, ai_only: false, url: "https://www.businesstimes.com.sg/rss/technology"}
+  - {name: CNA,                   tier: 1, ai_only: false, url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"}
+  - {name: MIT Technology Review, tier: 1, ai_only: true,  url: "https://www.technologyreview.com/topic/artificial-intelligence/feed"}
+  - {name: Financial Times,       tier: 1, ai_only: true,  url: "https://www.ft.com/artificial-intelligence?format=rss"}   # public headlines + standfirst
+  - {name: IEEE Spectrum,         tier: 1, ai_only: true,  url: "https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss"}
+  - {name: South China Morning Post, tier: 1, ai_only: false, url: "https://www.scmp.com/rss/320663/feed"}   # China tech
+  - {name: CGTN,                  tier: 2, ai_only: false, url: "https://www.cgtn.com/subscribe/rss/section/tech-sci.xml"}
+  - {name: TechNode,              tier: 2, ai_only: false, max_bytes: 15000000, url: "https://technode.com/feed/"}  # China tech; serves ~12 MB
+  - {name: Pandaily,              tier: 2, ai_only: false, url: "https://pandaily.com/feed/"}                # China tech
+  - {name: Defense One,           tier: 1, ai_only: false, url: "https://www.defenseone.com/rss/all/"}       # AI in defence
+  - {name: Breaking Defense,      tier: 2, ai_only: false, url: "https://breakingdefense.com/feed/"}
+  - {name: Google DeepMind,       tier: 2, ai_only: true,  url: "https://deepmind.google/blog/rss.xml"}
+  - {name: Import AI,             tier: 2, ai_only: true,  url: "https://importai.substack.com/feed"}        # frontier research, weekly
+  - {name: TechCrunch,            tier: 2, ai_only: true,  url: "https://techcrunch.com/category/artificial-intelligence/feed/"}
+  - {name: The Verge,             tier: 2, ai_only: true,  url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"}
+  - {name: Ars Technica,          tier: 2, ai_only: true,  url: "https://arstechnica.com/ai/feed/"}
+  - {name: Tech in Asia,          tier: 2, ai_only: false, url: "https://www.techinasia.com/feed"}
+  - {name: Fintech News Singapore, tier: 2, ai_only: false, url: "https://fintechnews.sg/feed/"}
+  - {name: e27,                   tier: 2, ai_only: false, url: "https://e27.co/feed/"}
+  - {name: OpenAI,                tier: 2, ai_only: true,  url: "https://openai.com/news/rss.xml"}
+  - {name: Google,                tier: 2, ai_only: true,  url: "https://blog.google/technology/ai/rss/"}
+  - {name: Nvidia,                tier: 2, ai_only: false, url: "https://nvidianews.nvidia.com/releases.xml"}
+  - {name: Google News SG,        tier: 3, region: sg, ai_only: false, trusted_only: true, url: "https://news.google.com/rss/search?q=(AI+OR+%22artificial+intelligence%22)+Singapore+when:2d&hl=en-SG&gl=SG&ceid=SG:en"}
+  # Google News searches for the priority topics (keyless). Stories carry the real publisher's
+  # headline only: the editor writes no summary for them and they rank below direct feeds.
+  - {name: "Google News: China AI", tier: 3, ai_only: false, trusted_only: true, url: "https://news.google.com/rss/search?q=%28DeepSeek+OR+Qwen+OR+Kimi+OR+Zhipu+OR+MiniMax+OR+Hunyuan+OR+%22Baidu+AI%22+OR+%22Alibaba+AI%22+OR+%22Tencent+AI%22+OR+%22China+AI+chip%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
+  - {name: "Google News: frontier AI", tier: 3, ai_only: false, trusted_only: true, url: "https://news.google.com/rss/search?q=%28AGI+OR+superintelligence+OR+%22self-improving+AI%22+OR+%22recursive+self-improvement%22+OR+%22AI+breakthrough%22+OR+%22reasoning+model%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
+  - {name: "Google News: AI hardware", tier: 3, ai_only: false, trusted_only: true, url: "https://news.google.com/rss/search?q=%28%22chip+shortage%22+OR+HBM+OR+%22memory+chip%22+OR+%22GPU+shortage%22+OR+%22data+center+power%22+OR+%22AI+power+demand%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
+  - {name: "Google News: AI in defence", tier: 3, ai_only: false, trusted_only: true, url: "https://news.google.com/rss/search?q=%28%22military+AI%22+OR+%22defense+AI%22+OR+%22AI+drones%22+OR+%22Pentagon+AI%22+OR+%22autonomous+weapons%22%29+when%3A1d&hl=en-SG&gl=SG&ceid=SG%3Aen"}
+
+  # Markets channel: Greater China, Singapore and Asia-Pacific desks first, then global markets desks.
+  - {name: South China Morning Post, tier: 1, channel: markets, url: "https://www.scmp.com/rss/92/feed"}
+  - {name: South China Morning Post, tier: 1, channel: markets, url: "https://www.scmp.com/rss/318421/feed"}
+  - {name: South China Morning Post, tier: 1, channel: markets, url: "https://www.scmp.com/rss/10/feed"}
+  - {name: CGTN,                  tier: 1, channel: markets, url: "https://www.cgtn.com/subscribe/rss/section/business.xml"}
+  - {name: The Business Times,    tier: 1, channel: markets, url: "https://www.businesstimes.com.sg/rss/companies-markets"}
+  - {name: The Business Times,    tier: 1, channel: markets, url: "https://www.businesstimes.com.sg/rss/top-stories"}
+  - {name: The Business Times,    tier: 1, channel: markets, url: "https://www.businesstimes.com.sg/rss/international"}
+  - {name: The Straits Times,     tier: 1, channel: markets, url: "https://www.straitstimes.com/news/business/rss.xml"}
+  - {name: CNA,                   tier: 1, channel: markets, url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"}
+  - {name: The Wall Street Journal, tier: 1, channel: markets, url: "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain"}
+  - {name: Financial Times,       tier: 1, channel: markets, url: "https://www.ft.com/markets?format=rss"}
+  - {name: Financial Times,       tier: 1, channel: markets, url: "https://www.ft.com/china?format=rss"}
+  - {name: Bloomberg,             tier: 1, channel: markets, url: "https://feeds.bloomberg.com/markets/news.rss"}
+  - {name: BBC News,              tier: 1, channel: markets, url: "https://feeds.bbci.co.uk/news/business/rss.xml"}
+  - {name: The Guardian,          tier: 1, channel: markets, url: "https://www.theguardian.com/uk/business/rss"}
+
+# whole-word matches, lowercase
+market_keywords: ["shares", "stocks", "stock market", "wall street", "nasdaq", "s&p", "dow", "index", "indices",
+                  "federal reserve", "fed", "interest rate", "interest rates", "rate cut", "rate hike", "inflation",
+                  "earnings", "ipo", "bonds", "bond yields", "yields", "treasury", "dollar", "straits times index",
+                  "sti", "sgx", "nikkei", "hang seng", "kospi", "rally", "sell-off", "selloff", "investors", "profit",
+                  "revenue", "gdp", "oil prices", "gold", "equities", "futures",
+                  "shanghai composite", "csi 300", "a-shares", "a shares", "shenzhen", "chinext", "hong kong stocks",
+                  "mainland stocks", "china stocks", "yuan", "renminbi", "pboc", "people's bank of china",
+                  "loan prime rate", "mas", "monetary authority of singapore", "singapore dollar", "asx", "sensex"]
+
+# Topics handled with extra care for this readership. A story that touches one is carried in the
+# publisher's own words with attribution, with no rewrite and no commentary, and the briefing's own
+# commentary lines may not mention these topics at all. Whole-word matches, lowercase.
+sensitive_terms: ["huawei", "hisilicon", "smic", "export control", "export controls", "export curbs", "export ban",
+                  "export restrictions", "chip ban", "sanction", "sanctions", "sanctioned", "entity list",
+                  "blacklist", "blacklisted", "national security", "espionage", "spy", "spies", "spying",
+                  "trade war", "tariff", "tariffs", "decoupling", "taiwan strait",
+                  "xi jinping", "communist party", "politburo", "xinjiang", "tibet", "uyghur", "uyghurs",
+                  "tiananmen", "dalai lama", "chips for china", "chips to china", "chip sales to china",
+                  "chips sold to china", "chips bound for china", "chip exports"]
+
+# ...and combinations: a story that mentions a place in `any` together with a word in `with`.
+sensitive_pairs:
+  - any: ["china", "chinese", "beijing", "mainland", "hong kong", "taiwan", "us-china", "sino-us"]
+    with: ["ties", "links", "short seller", "short sellers", "short-seller", "allegation", "allegations",
+           "scrutiny", "export", "exports", "ban", "bans", "banned", "curb", "curbs", "restriction", "restrictions",
+           "restrict", "restricts", "military", "military-backed", "pentagon", "congress", "house committee",
+           "senate", "security", "sanction", "blacklist", "probe", "probes", "investigation", "crackdown",
+           "geopolitical", "geopolitics", "tension", "tensions", "retaliation", "retaliates", "retaliate",
+           "dispute", "rivalry", "war"]
+
+# whole-word matches, lowercase
+ai_keywords: ["ai", "a.i.", "artificial intelligence", "openai", "chatgpt", "anthropic", "deepmind", "nvidia",
+              "llm", "llms", "chatbot", "chatbots", "machine learning", "data centre", "data centres",
+              "data center", "data centers", "gpu", "gpus", "semiconductor", "semiconductors", "chip", "chips",
+              "chipmaker", "chipmakers", "robot", "robots", "agentic", "deepseek", "tsmc", "generative", "copilot",
+              "gemini", "xai", "qwen", "ernie", "doubao", "kimi", "hunyuan", "agi", "superintelligence",
+              "self-improving", "frontier model", "frontier models", "hbm", "autonomous weapons"]
+
+# Search feeds (trusted_only: true) keep a story only when its publisher is listed here: raw Google News
+# results are mostly aggregators and listicles (measured 2026-11-23: 1 of 49 frontier-AI results was
+# from a known newsroom). Direct feeds are not affected.
+trusted_publishers: [
+  "Reuters", "Bloomberg", "Bloomberg.com", "Financial Times", "The Wall Street Journal",
+  "The New York Times", "The Economist", "Associated Press", "AP News", "Axios", "Semafor", "CNBC",
+  "Fortune", "Forbes", "The Guardian", "BBC", "BBC News", "Al Jazeera", "Nikkei Asia",
+  "South China Morning Post", "Caixin Global", "Yicai Global", "China Daily", "CGTN", "Xinhua",
+  "TechNode", "Pandaily", "KrASIA", "Tech in Asia", "The Straits Times", "The Business Times", "CNA",
+  "The Edge Singapore", "e27", "The Japan Times", "The Korea Herald", "Korea JoongAng Daily",
+  "DIGITIMES Asia", "digitimes", "TrendForce", "The Information", "WIRED", "The Verge", "TechCrunch",
+  "Ars Technica", "MIT Technology Review", "IEEE Spectrum", "Tom's Hardware", "The Register",
+  "SemiAnalysis", "Defense One", "Breaking Defense", "DefenseScoop", "C4ISRNET", "Nature", "Science",
+  "36Kr", "eu.36kr.com", "Singapore Business Review",
+  "Nanyang Technological University - NTU Singapore"]
+
+# Topics the editor puts first (owner's choice, 2026-11-21). Matching stories are offered to the
+# editor ahead of newer ones and marked with the topic name. Selection only: every fact is still
+# checked against its source, and sensitive stories are still dropped. Whole-word matches, lowercase.
+priority_topics:
+  - name: China technology progress
+    words: ["china", "chinese", "beijing", "shanghai", "shenzhen", "hangzhou", "hong kong", "alibaba", "baidu",
+            "tencent", "bytedance", "deepseek", "qwen", "kimi", "moonshot", "zhipu", "minimax", "hunyuan",
+            "doubao", "byd", "xiaomi", "unitree", "cambricon"]
+  - name: Frontier AI and what comes next
+    words: ["agi", "superintelligence", "superintelligent", "self-improve", "self-improves", "self-improving", "self-improvement", "recursive", "frontier model",
+            "frontier models", "reasoning model", "world model", "ai scientist", "automated research",
+            "breakthrough", "benchmark", "scaling"]
+  - name: Hardware and power shortage
+    words: ["chip shortage", "shortage", "shortages", "memory chip", "memory chips", "hbm", "dram", "supply chain",
+            "power grid", "electricity", "gigawatt", "data centre power", "data center power", "capacity crunch"]
+  - name: AI in defence
+    words: ["military", "defence", "defense", "pentagon", "drone", "drones", "autonomous weapons", "battlefield"]
+
+# ---------------------------------------------------------------------------------------------
+# Market tables. symbol = Yahoo Finance symbol. label is what a non-specialist reader sees.
+#   fx: true      a currency pair: trades around the clock, so it is left out of "which session" logic
+#   verify: ...   second-source code used to confirm the figure (see src/briefing/crosscheck.py).
+#                 Singapore rows, the SOX index, currencies and futures have no reliable second
+#                 source (Sina's Singapore and SOX rows were measured to be stale), so they stand alone.
+# ---------------------------------------------------------------------------------------------
+markets:
+  china:
+    name: Greater China
+    rows:
+      - {symbol: "000001.SS", label: "Shanghai Composite",  note: "mainland China's main index", verify: "tencent:sh000001"}
+      - {symbol: "399001.SZ", label: "Shenzhen Component",  note: "Shenzhen-listed companies, more technology", verify: "tencent:sz399001"}
+      - {symbol: "000300.SS", label: "CSI 300",             note: "300 largest mainland companies", verify: "tencent:sh000300"}
+      - {symbol: "^HSI",      label: "Hang Seng",           note: "Hong Kong's main index", verify: "tencent:hkHSI"}
+      - {symbol: "HSTECH.HK", label: "Hang Seng TECH",      note: "large Chinese technology companies listed in Hong Kong", verify: "tencent:hkHSTECH"}
+      - {symbol: "CNY=X",     label: "US dollar in yuan",   note: "yuan needed to buy one US dollar", fx: true}
+  singapore:
+    name: Singapore
+    rows:
+      - {symbol: "^STI",    label: "Straits Times Index", note: "Singapore's main index"}
+      - {symbol: "D05.SI",  label: "DBS",                 note: "Singapore's biggest bank"}
+      - {symbol: "SGD=X",   label: "US dollar in SGD",    note: "Singapore dollars needed to buy one US dollar", fx: true}
+  apac:
+    name: Asia-Pacific
+    rows:
+      - {symbol: "^N225",   label: "Nikkei 225",          note: "Japan", verify: "sina:b_NKY"}
+      - {symbol: "^KS11",   label: "KOSPI",               note: "South Korea, home of Samsung and SK Hynix", verify: "sina:b_KOSPI"}
+      - {symbol: "^TWII",   label: "Taiwan Weighted",     note: "Taiwan, home of TSMC", verify: "sina:znb_TWJQ"}
+      - {symbol: "^AXJO",   label: "S&P/ASX 200",         note: "Australia", verify: "sina:b_AS51"}
+  us:
+    name: Wall Street
+    rows:
+      - {symbol: "^GSPC", label: "S&P 500",             note: "500 biggest US companies", verify: "tencent:usINX"}
+      - {symbol: "^IXIC", label: "Nasdaq Composite",    note: "technology-heavy US index", verify: "tencent:usIXIC"}
+      - {symbol: "^DJI",  label: "Dow Jones",           note: "30 large US companies", verify: "tencent:usDJI"}
+      - {symbol: "^SOX",  label: "Semiconductors (SOX)", note: "US-listed chip companies"}
+      - {symbol: "NVDA",  label: "Nvidia",              note: "the biggest AI chip maker", verify: "tencent:usNVDA"}
+      - {symbol: "TSM",   label: "TSMC (US-listed)",    note: "the Taiwan firm that manufactures most AI chips", verify: "tencent:usTSM"}
+  futures:
+    name: US futures
+    rows:
+      - {symbol: "ES=F", label: "S&P 500 futures", note: "an indication of how US shares may open"}
+      - {symbol: "NQ=F", label: "Nasdaq futures",  note: "an indication of how US technology shares may open"}
+
+# "Looking ahead": scheduled data releases and big-tech results (both keyless, see docs/BRIEFING.md).
+calendar:
+  econ_url: "https://nfs.faireconomy.media/ff_calendar_thisweek.json"   # this week only; fetch once per run
+  countries: {USD: US, CNY: China}                                      # calendar currency code: label shown
+  earnings_url: "https://api.nasdaq.com/api/calendar/earnings"          # ?date=YYYY-MM-DD, one call per day
+  earnings_days_ahead: 5
+  # ticker: name a non-specialist reader recognises
+  watchlist: {NVDA: Nvidia, MSFT: Microsoft, GOOGL: "Google (Alphabet)", AMZN: Amazon, META: "Meta (Facebook)",
+              AAPL: Apple, TSM: TSMC, AMD: AMD, AVGO: Broadcom, ORCL: Oracle, PLTR: Palantir, TSLA: Tesla,
+              BABA: Alibaba, PDD: PDD (Temu), BIDU: Baidu, JD: JD.com}
+  # plain meaning of a data release, matched on the event title (first match wins). Country-neutral:
+  # the country is printed in front of the title.
+  explain:
+    - {match: "loan prime rate",    plain: "the benchmark lending rate that banks in China use for loans and mortgages"}
+    - {match: "pmi",                plain: "a survey of how busy companies are; a reading above 50 means activity is growing"}
+    - {match: "cpi",                plain: "the inflation report: how fast consumer prices are rising"}
+    - {match: "ppi",                plain: "prices charged by factories, an early indication of inflation"}
+    - {match: "pce",                plain: "the inflation measure the US central bank watches most closely"}
+    - {match: "non-farm",           plain: "the monthly US jobs report, the most closely watched figure on the economy"}
+    - {match: "unemployment claims", plain: "new applications for jobless benefits, a weekly check on the labour market"}
+    - {match: "unemployment rate",  plain: "the share of the workforce without a job"}
+    - {match: "federal funds rate", plain: "the US central bank's interest rate decision"}
+    - {match: "fomc",               plain: "a signal from the US central bank about where interest rates are heading"}
+    - {match: "fed chair",          plain: "remarks by the head of the US central bank, watched for signals on interest rates"}
+    - {match: "gdp",                plain: "how fast the economy is growing"}
+    - {match: "retail sales",       plain: "how much consumers are spending in shops and online"}
+    - {match: "industrial production", plain: "how much factories, mines and utilities produced"}
+    - {match: "trade balance",      plain: "exports minus imports"}
+    - {match: "new loans",          plain: "how much banks lent in the month, a measure of credit demand"}
+    - {match: "fixed asset investment", plain: "spending on buildings, machinery and infrastructure"}
+    - {match: "ism",                plain: "a survey of how busy US businesses are"}
+    - {match: "consumer sentiment", plain: "a survey of how confident consumers feel"}
+    - {match: "consumer confidence", plain: "a survey of how confident consumers feel"}
+    - {match: "bank holiday",       plain: "markets are closed"}
+
+# Fallback AI editors, tried in this order when Gemini is rate-limited or down. Each is used only
+# if its key is set in the environment. Any OpenAI-compatible chat endpoint works. The same fact
+# check runs on the copy whichever editor wrote it.
+writers:
+  - {name: mistral,    key_env: MISTRAL_API_KEY,    model: mistral-large-latest,        url: "https://api.mistral.ai/v1/chat/completions"}
+  - {name: cerebras,   key_env: CEREBRAS_API_KEY,   model: gpt-oss-120b,                url: "https://api.cerebras.ai/v1/chat/completions"}
+  - {name: openrouter, key_env: OPENROUTER_API_KEY, model: anthropic/claude-sonnet-4-6, url: "https://openrouter.ai/api/v1/chat/completions"}

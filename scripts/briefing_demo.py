@@ -1,0 +1,120 @@
+"""Build the shareable page (Morning + Evening tabs) from the latest edition JSON files.
+Usage: python scripts/briefing_demo.py OUT.html [DATA_DIR]   (run python -m src.briefing --edition ... first;
+DATA_DIR defaults to reports/briefings). The newest edition is the first, selected tab.
+
+Layout: two channels. One column on phones (AI Channel, then Markets Channel, then glossary);
+from 980px the AI Channel is the main column and the Markets Channel a right-hand rail.
+"""
+import glob, json, pathlib, sys
+from html import escape as e
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from src.briefing.art import story_art
+from src.briefing.render import _when, _day, _row_note, providers, read_minutes
+
+
+def load_editions(data_dir) -> list[dict]:
+    """Latest morning and latest evening edition, newest first. Raises if there is none at all."""
+    eds = []
+    for k in ("morning", "evening"):
+        files = sorted(glob.glob(str(pathlib.Path(data_dir) / f"????-??-??-{k}.json")))
+        if files:
+            eds.append(json.load(open(files[-1], encoding="utf-8")))
+    if not eds:
+        raise SystemExit(f"no edition JSON in {data_dir}")
+    return sorted(eds, key=lambda ed: ed["generated_at"], reverse=True)
+
+
+def story(s, top=False):
+    kick = " · ".join(x for x in (s.get("tag"), "Singapore" if s.get("region") == "sg" else "") if x)
+    kicker = f'<span class="kick">{e(kick)}</span>' if kick else ""
+    what = f'<p>{e(s["what"])}</p>' if s.get("what") else ""
+    why = f'<p class="why"><b>Why it matters</b> {e(s["why"])}</p>' if s.get("why") else ""
+    credit = f'As reported by {e(s["source"])}' if s.get("verbatim") else f'Source: {e(s["source"])}'
+    art = f'<div class="thumb">{story_art(s, wide=top)}</div>'
+    return (f'<article class="story{" top" if top else ""}">{art if top else ""}{kicker}'
+            f'<div class="sbody">{"" if top else art}<div><h3><a href="{e(s["url"], quote=True)}">{e(s["headline"])}</a></h3>'
+            f'{what}{why}</div></div>'
+            f'<a class="src" href="{e(s["url"], quote=True)}">{credit}</a></article>')
+
+
+def market(b):
+    rows = ""
+    for r in b["rows"]:
+        cls = "flat" if r["pct"] is None or r["pct_text"] == "flat" else ("up" if r["pct"] > 0 else "down")
+        rows += (f'<tr><td><b>{e(r["label"])}</b><span>{e(_row_note(r))}</span></td>'
+                 f'<td class="px">{e(r["close"])}</td><td class="pct {cls}">{e(r["pct_text"])}</td></tr>')
+    asof = "Snapshot when this edition was written" if b["live"] else f"Closing prices, {_day(b['asof'])}"
+    return (f'<div class="mkt"><h4>{e(b["title"])}</h4><p class="sum">{e(b["summary"])}</p>'
+            f'<div class="tw"><table>{rows}</table></div><p class="asof">{e(asof)}</p></div>')
+
+
+def sec(name, title, body):
+    return f'<section class="sec s-{name}" data-sec="{name}"><h2>{title}</h2>{body}</section>'
+
+
+def edition(ed, hidden):
+    ai = [x for x in ed["stories"] if x.get("channel", "ai") == "ai"]
+    mk = [x for x in ed["stories"] if x.get("channel") == "markets"]
+    main, side, chips = [], [], []
+    if ai:
+        body = story(ai[0], True) + ('<div class="stories">' + "".join(story(x) for x in ai[1:]) + "</div>" if ai[1:] else "")
+        if ed.get("big_picture"):
+            body += f'<p class="take"><b>The wider trend</b> {e(ed["big_picture"])}</p>'
+        main.append(f'<div class="band" data-sec="ai">AI Channel</div>' + sec("aibody", "Leading developments", body))
+        chips.append(("ai", "AI Channel"))
+    mbody = ""
+    if ed["markets"]:
+        take = f'<p class="take"><b>In brief</b> {e(ed["market_take"])}</p>' if ed.get("market_take") else ""
+        mbody += sec("markets", "Market summary", '<div class="mkts">' + "".join(market(b) for b in ed["markets"]) + "</div>" + take)
+    if mk:
+        mbody += sec("mnews", "Market news", '<div class="stories">' + "".join(story(x) for x in mk) + "</div>")
+    watch = f'<p class="take">{e(ed["outlook"])} <i>(editorial view, not a forecast)</i></p>' if ed.get("outlook") else ""
+    for c in ed.get("calendar", []):
+        watch += (f'<div class="cal"><b>{e(c["title"])}</b><span>{e(c["when"])}</span>'
+                  f'<p>{e(c["plain"][:1].upper() + c["plain"][1:])}.</p></div>')
+    for ev in ed["events"]:
+        watch += (f'<div class="ev"><a href="{e(ev["source"], quote=True)}">{e(ev["name"])}</a>'
+                  f'<span>{e(_when(ev))} · {e(ev.get("where", ""))}</span><p>{e(ev["why"])}</p></div>')
+    if watch:
+        mbody += sec("watch", "Looking ahead", f'<div class="watch">{watch}</div>')
+    if mbody:
+        side.append('<div class="band" data-sec="mk">Markets Channel</div>' + mbody)
+        chips.append(("mk", "Markets Channel"))
+        if watch:
+            chips.append(("watch", "Looking ahead"))
+    if ed["glossary"]:
+        side.append(sec("jargon", "Glossary", "<dl>" + "".join(
+            f'<dt>{e(g["term"])}</dt><dd>{e(g["plain"])}</dd>' for g in ed["glossary"]) + "</dl>"))
+        chips.append(("jargon", "Glossary"))
+    notes = "".join(f"<li>{e(n)}</li>" for n in ed["problems"] + [f"Editorial check: {r}" for r in ed["rejected"]])
+    nav = "".join(f'<button type="button" data-go="{k}">{label}</button>' for k, label in chips)
+    return "\n".join([
+        f'<section class="ed" id="ed-{ed["edition"]}"{" hidden" if hidden else ""}>',
+        f'<nav class="chips" aria-label="Jump to section">{nav}</nav>',
+        f'<p class="meta">{read_minutes(ed)} min read · {len(ai)} AI · {len(mk)} markets</p>',
+        f'<p class="hook"><b>Summary</b>{e(ed["hook"])}</p>' if ed.get("hook") else "",
+        f'<div class="cols"><div class="main">{"".join(main)}</div><aside class="side">{"".join(side)}</aside></div>',
+        '<details class="audit"><summary>How this edition was checked</summary><ul>'
+        f'<li>Email subject line: {e(ed["subject"])}</li>'
+        f'<li>{ed["candidates"]} reports read, {len(ed["stories"])} selected, edited by {e(ed["writer"])}.</li>'
+        f'<li>Built {e(ed["generated_at"].replace("T", " ")[:16])} UTC. Prices from {e(providers(ed))}.</li>'
+        f'{notes or "<li>No source failed and the editorial check rejected nothing.</li>"}</ul></details>',
+        "</section>"])
+
+
+def render(eds: list[dict]) -> str:
+    tabs = "".join(f'<button type="button" role="tab" id="tab-{ed["edition"]}" aria-controls="ed-{ed["edition"]}" '
+                   f'aria-selected="{"true" if i == 0 else "false"}">{e(ed["title"].replace(" Edition", ""))}'
+                   f'<small>{e(_day(ed["date"]))}, {"07:30" if ed["edition"] == "morning" else "20:30"} SGT</small></button>'
+                   for i, ed in enumerate(eds))
+    body = "\n".join(edition(ed, i > 0) for i, ed in enumerate(eds))
+    page = open(ROOT / "scripts" / "briefing_demo_shell.html", encoding="utf-8").read()
+    return page.replace("{{DATE}}", e(eds[0]["date_label"])).replace("{{TABS}}", tabs).replace("{{BODY}}", body)
+
+
+if __name__ == "__main__":
+    html = render(load_editions(sys.argv[2] if len(sys.argv) > 2 else ROOT / "reports" / "briefings"))
+    open(sys.argv[1], "w", encoding="utf-8").write(html)
+    print("ok", len(html))

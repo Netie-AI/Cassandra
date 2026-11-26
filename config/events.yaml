@@ -1,0 +1,68 @@
+# Events the briefing counts down to. Hand-curated on purpose: dates must be right.
+# Rules: every entry needs a source URL. confirmed: false means the organiser has not
+# published the date yet, and the email will say "date not yet confirmed".
+# Last verified: 2026-11-12. Re-check and extend roughly once a quarter.
+# kind: earnings | policy | conference
+events:
+  - name: Nvidia quarterly results
+    start: 2026-11-17
+    kind: earnings
+    ticker: NVDA
+    confirmed: true
+    where: after the US close (early Wed 18 Nov, Singapore time)
+    why: Nvidia sells most of the chips that run AI. Its sales numbers are the clearest signal of whether companies are still spending heavily on AI.
+    source: https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Sets-Conference-Call-for-Third-Quarter-Financial-Results/
+
+  - name: Singapore FinTech Festival 2026
+    start: 2026-11-18
+    end: 2026-11-20
+    kind: conference
+    confirmed: true
+    where: Singapore
+    why: The region's biggest finance and technology gathering. Expect announcements on how banks and regulators in Singapore plan to use AI.
+    source: https://fintechfestival.sg/
+
+  - name: US Federal Reserve interest rate decision
+    start: 2026-12-08
+    end: 2026-12-09
+    kind: policy
+    confirmed: true
+    where: decision early Thu 10 Dec, Singapore time
+    why: The Fed sets US interest rates. Lower rates usually help technology and AI shares, higher rates usually hurt them.
+    source: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+
+  - name: CES 2027
+    start: 2027-01-06
+    end: 2027-01-09
+    kind: conference
+    confirmed: true
+    where: Las Vegas
+    why: The world's biggest consumer technology show. This is where AI shows up in everyday products like phones, cars, TVs and home devices.
+    source: https://www.ces.tech/
+
+  - name: Nvidia GTC 2027
+    start: 2027-03-15
+    end: 2027-03-18
+    kind: conference
+    confirmed: true
+    where: San Jose, California
+    why: Nvidia's own conference, where it usually reveals its next generation of AI chips and its roadmap.
+    source: https://www.nvidia.com/gtc/
+
+  - name: Asia Tech x Singapore (ATxSG) 2027
+    start: 2027-05-26
+    end: 2027-05-28
+    kind: conference
+    confirmed: true
+    where: Singapore
+    why: Singapore's flagship technology event, run with the government. A good read on AI policy and investment in Southeast Asia.
+    source: https://asiatechxsg.com/
+
+  - name: Computex 2027
+    start: 2027-06-01
+    end: 2027-06-04
+    kind: conference
+    confirmed: false
+    where: Taipei
+    why: Asia's biggest computer hardware show. Chip makers such as Nvidia, AMD and Intel use it to launch the hardware that powers AI.
+    source: https://www.computextaipei.com.tw/

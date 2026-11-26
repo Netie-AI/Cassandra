@@ -269,14 +269,14 @@ def _call_openrouter(user_prompt: str, api_key: str) -> float:
 
 
 def _call_gemini(user_prompt: str, api_key: str) -> float:
-    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     body = {
         "systemInstruction": {"parts": [{"text": GRADER_SYSTEM}]},
         "contents": [{"parts": [{"text": user_prompt}]}],
         "generationConfig": {"temperature": 0.1, "maxOutputTokens": 100},
     }
-    r = httpx.post(url, params={"key": api_key}, json=body, timeout=45)
+    r = httpx.post(url, headers={"x-goog-api-key": api_key}, json=body, timeout=45)  # header, so the key never lands in a URL or traceback
     r.raise_for_status()
     text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
     return _parse_score(text)

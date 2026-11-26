@@ -1,0 +1,131 @@
+<title>Cassandra AI Briefing</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@500;700&family=DM+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: two channels. Phone: one column, AI Channel then Markets Channel, chips jump between them.
+   From 980px the two channels sit side by side: AI as the main column, Markets as the right rail. */
+:root {
+  --bg: #fbfaf8; --panel: #f3f1ed; --ink: #141414; --muted: #5c5a56; --rule: rgba(0,0,0,.14);
+  --up: #15803d; --down: #b91c1c; --sg: #9a1c2e;
+  --serif: "Crimson Pro", Georgia, "Times New Roman", serif;
+  --sans: "DM Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --bar: 118px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121215; --panel: #1c1c22; --ink: #f2f2f4; --muted: #a3a3ad; --rule: rgba(255,255,255,.16);
+  --up: #4ade80; --down: #f87171; --sg: #fb7185; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121215; --panel: #1c1c22; --ink: #f2f2f4; --muted: #a3a3ad; --rule: rgba(255,255,255,.16);
+  --up: #4ade80; --down: #f87171; --sg: #fb7185; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 400 17px/1.6 var(--sans); -webkit-text-size-adjust: 100%; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 680px; margin: 0 auto; padding-block: 14px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+a { color: inherit; }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+p { margin: 0; }
+
+header.mast { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding-bottom: 8px; border-bottom: 3px double var(--ink); }
+header.mast h1 { font: 700 clamp(30px, 8vw, 48px)/1 var(--serif); margin: 0; letter-spacing: -.01em; }
+header.mast p { font: 400 12px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; gap: 8px; padding: 10px 0; background: var(--bg); }
+.tabs button { flex: 1; min-width: 0; min-height: 48px; font: 700 16px var(--sans); color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 4px; padding: 6px 8px; cursor: pointer; }
+.tabs button small { display: block; font: 400 12px var(--mono); color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tabs button[aria-selected="true"] small { color: var(--bg); opacity: .8; }
+
+.chips { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 68px); z-index: 4; display: flex; gap: 8px; overflow-x: auto; padding: 0 0 10px; background: var(--bg); border-bottom: 1px solid var(--rule); scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { flex: none; min-height: 44px; padding: 0 14px; font: 500 14px var(--sans); color: var(--ink); background: var(--panel); border: 0; border-radius: 22px; cursor: pointer; white-space: nowrap; }
+
+.ed { display: flex; flex-direction: column; gap: 14px; }
+.meta { font: 400 12px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding-top: 4px; }
+.hook { font: 500 clamp(19px, 5vw, 22px)/1.4 var(--serif); text-wrap: pretty; background: var(--panel); padding: 12px 14px; }
+.hook b { display: block; font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.ed > .cols, .main, .side { display: flex; flex-direction: column; gap: 6px; min-width: 0; }   /* phone: AI channel, then markets */
+.sec { scroll-margin-top: calc(var(--bar) + env(safe-area-inset-top, 0px)); min-width: 0; }
+.band { scroll-margin-top: calc(var(--bar) + env(safe-area-inset-top, 0px)); margin-top: 22px; padding: 10px 14px; background: var(--ink); color: var(--bg); font: 700 13px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+.band + .sec h2 { border-top: 0; margin-top: 8px; }
+h2 { font: 700 13px var(--mono); text-transform: uppercase; letter-spacing: .1em; margin: 18px 0 12px; padding-top: 12px; border-top: 2px solid var(--ink); }
+
+.story { display: flex; flex-direction: column; gap: 6px; }
+.story h3 { font: 700 22px/1.25 var(--serif); margin: 0; text-wrap: balance; }
+.story.top h3 { font-size: clamp(26px, 7vw, 34px); line-height: 1.15; }
+.story h3 a { display: block; padding: 8px 0; text-decoration: none; } .story h3 a:hover { text-decoration: underline; }
+.stories { display: flex; flex-direction: column; gap: 20px; margin-top: 18px; }
+.story.top + .stories { padding-top: 18px; border-top: 1px solid var(--rule); }
+.sec > .take { margin-top: 16px; }
+.stories .story + .story { padding-top: 18px; border-top: 1px solid var(--rule); }
+.kick { font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--sg); }
+.thumb { line-height: 0; }
+.thumb .art { display: block; width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 4px; }
+.story.top .thumb .art { aspect-ratio: 3 / 1; margin-bottom: 4px; }
+.sbody { display: block; }
+.stories .sbody { display: grid; grid-template-columns: 1fr 76px; gap: 0 14px; align-items: start; }
+.stories .sbody .thumb { grid-column: 2; grid-row: 1; padding-top: 10px; }
+.stories .sbody > div:last-child { grid-column: 1; grid-row: 1; }
+.stories .sbody .art { width: 76px; height: 76px; }
+@media (min-width: 980px) { .stories .sbody { grid-template-columns: 1fr 96px; } .stories .sbody .art { width: 96px; height: 96px; } }
+.why b, .take b { display: block; font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.src { font-size: 14px; color: var(--muted); padding: 12px 0; align-self: flex-start; }
+
+.mkts { display: flex; flex-direction: column; gap: 20px; margin-bottom: 14px; }
+.mkt h4 { margin: 0; font: 700 16px var(--sans); } .sum { margin: 2px 0 6px; }
+.tw { overflow-x: auto; } table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+td { padding: 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td span { display: block; font-size: 13px; color: var(--muted); }
+td.px { text-align: right; font: 400 13px var(--mono); color: var(--muted); white-space: nowrap; padding-left: 10px; }
+td.pct { text-align: right; font: 600 15px var(--mono); white-space: nowrap; padding-left: 12px; }
+.up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--muted); }
+.asof { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.take i { color: var(--muted); font-size: 14px; }
+.watch { display: flex; flex-direction: column; gap: 14px; }
+.cal, .ev { display: flex; flex-direction: column; gap: 2px; }
+.cal span, .ev span { font-size: 13px; color: var(--muted); }
+.ev { border-left: 3px solid var(--ink); padding-left: 12px; }
+.ev a { font-weight: 700; display: block; padding: 10px 0; }
+dl { margin: 0; display: grid; gap: 4px; } dt { font-weight: 700; } dd { margin: 0 0 8px; }
+.audit { background: var(--panel); padding: 0 14px; font-size: 14px; margin-top: 18px; overflow-wrap: anywhere; }
+.audit summary { cursor: pointer; font-weight: 700; padding: 12px 0; min-height: 20px; } .audit ul { margin: 0; padding: 0 0 12px 18px; }
+footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+
+@media (max-width: 359px) { body { font-size: 16px; } td.px { display: none; } }   /* very small phones: drop the raw price column */
+@media (min-width: 980px) {
+  .wrap { max-width: 1120px; }
+  .ed > .cols { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); column-gap: 56px; align-items: start; }
+  .main .band, .side .band { margin-top: 10px; }
+  .chips { display: none; }                         /* both channels are side by side: nothing to jump to */
+  :root { --bar: 76px; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+<div class="wrap">
+  <header class="mast"><h1>Cassandra</h1><p>AI Briefing · {{DATE}}</p></header>
+  <div class="tabs" role="tablist" aria-label="Edition">{{TABS}}</div>
+  {{BODY}}
+  <footer>A daily briefing on AI and financial markets. Compiled from public sources by an automated editor and checked by software against each linked source. An independent publication: not an official communication of any company, and not investment advice. Please read the source before relying on a report.</footer>
+</div>
+<script>
+(function () {
+  var tabs = [].slice.call(document.querySelectorAll('[role="tab"]'));
+  function show(id) {
+    tabs.forEach(function (t) {
+      var on = t.id === 'tab-' + id;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    try { localStorage.setItem('edition', id); } catch (e) {}
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.id.slice(4)); window.scrollTo(0, 0); }); });
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-go]'); if (!b) return;
+    var sec = b.closest('.ed').querySelector('[data-sec="' + b.getAttribute('data-go') + '"]');
+    if (sec) sec.scrollIntoView({ block: 'start' });
+  });
+  var want = (location.hash || '').slice(1);
+  if (!want) { try { want = localStorage.getItem('edition'); } catch (e) {} }
+  if (want && document.getElementById('tab-' + want)) show(want);
+})();
+</script>

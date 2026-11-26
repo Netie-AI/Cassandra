@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mock chat (test fixture, not WeLink)</title>
+<style>
+  body { font: 14px sans-serif; margin: 0; display: flex; height: 100vh; }
+  #side { width: 220px; border-right: 1px solid #ccc; padding: 8px; }
+  #main { flex: 1; display: flex; flex-direction: column; padding: 8px; }
+  #conversation { flex: 1; overflow: auto; border: 1px solid #ddd; padding: 6px; }
+  .msg { white-space: pre-wrap; background: #e8f0fe; margin: 4px 0; padding: 4px 8px; border-radius: 6px; }
+  #editor { border: 1px solid #999; min-height: 48px; padding: 6px; margin-top: 8px; }
+  li.chat { cursor: pointer; padding: 4px; list-style: none; }
+</style>
+</head>
+<body>
+<div id="side">
+  <div id="me">signed in as tester</div>
+  <input id="search" type="text" placeholder="Find a chat">
+  <ul id="results"></ul>
+</div>
+<div id="main">
+  <h3 id="title">No chat open</h3>
+  <div id="conversation"></div>
+  <div id="editor" contenteditable="true"></div>
+</div>
+<script>
+  const CHATS = ["Mock Alpha", "Mock Beta", "Another Room"];
+  const history = {};          // chat name -> array of message strings
+  let active = null;
+  const $ = id => document.getElementById(id);
+
+  function renderResults() {
+    const q = $("search").value.trim().toLowerCase();
+    $("results").innerHTML = "";
+    if (!q) return;
+    CHATS.filter(c => c.toLowerCase().includes(q)).forEach(c => {
+      const li = document.createElement("li");
+      li.className = "chat";
+      li.textContent = c;
+      li.onclick = () => open(c);
+      $("results").appendChild(li);
+    });
+  }
+  function open(name) {
+    active = name;
+    $("title").textContent = name;
+    $("conversation").innerHTML = "";
+    (history[name] || []).forEach(addMsg);
+  }
+  function addMsg(text) {
+    const d = document.createElement("div");
+    d.className = "msg";
+    d.textContent = text;
+    $("conversation").appendChild(d);
+  }
+  $("search").addEventListener("input", renderResults);
+  $("editor").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) {       // Enter sends, Shift+Enter falls through to a newline
+      e.preventDefault();
+      const text = $("editor").innerText.replace(/\n+$/, "");
+      if (!active || !text) return;
+      (history[active] = history[active] || []).push(text);
+      addMsg(text);
+      $("editor").innerHTML = "";
+    }
+  });
+</script>
+</body>
+</html>

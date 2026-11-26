@@ -153,6 +153,29 @@ def run_pipeline() -> DailyScore:
     return score
 
 
-if __name__ == "__main__":
+def main(argv: list[str] | None = None) -> int:
+    """python -m src.pipeline [--history PATH]
+
+    --history PATH  load earlier scores from PATH first (the cloud job's runner starts empty),
+                    then write the full history including today's run back to PATH.
+    """
+    import argparse
+
+    from .store import export_score_snapshot, import_score_snapshot
+
+    ap = argparse.ArgumentParser(prog="python -m src.pipeline")
+    ap.add_argument("--history", type=Path, default=None)
+    args = ap.parse_args(argv)
+    load_env()
+    if args.history:
+        import_score_snapshot(args.history)
     s = run_pipeline()
     print(f"CRS={s.crs} band={s.band_label} F={s.fragility} T={s.trigger} coverage={s.coverage}")
+    if args.history:
+        n = export_score_snapshot(args.history)
+        print(f"history: {n} daily scores in {args.history}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

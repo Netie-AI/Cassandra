@@ -1,0 +1,21 @@
+{
+ "version": 1,
+ "rows": [
+  {
+   "asof": "2026-11-26",
+   "crs": 38.8,
+   "band": "Awareness",
+   "band_halfwidth": 2.3,
+   "confidence": 0.812,
+   "fragility": 0.5,
+   "trigger": 0.5,
+   "coverage": 0.25,
+   "factors_json": "{\"L\": 0.5, \"V\": 0.5, \"S\": 0.5, \"B\": 0.5, \"C\": 0.5}",
+   "momentum_state": "plateau",
+   "df_dt": 0.0,
+   "phase": "accumulation",
+   "phase_confidence": 0.4,
+   "payload_json": "{\"metric_count\": 12, \"coverage\": 0.25}"
+  }
+ ]
+}

@@ -57,7 +57,17 @@ def test_calibration_set_structure():
 )
 @pytest.mark.parametrize("case", CAPEX_CUT_CALIBRATION, ids=lambda c: c["id"])
 def test_calibration_live_within_tolerance(case):
-    score = score_capex_cut(case["snippet"])
+    import httpx
+
+    try:
+        score = score_capex_cut(case["snippet"])
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code
+        if code == 429 or code >= 500:
+            pytest.skip(f"live LLM unavailable (HTTP {code}); calibration not measured")
+        raise
+    except httpx.TransportError as exc:
+        pytest.skip(f"live LLM unreachable ({type(exc).__name__}); calibration not measured")
     assert abs(score - case["expected_score"]) <= 0.08, (
         f"{case['id']}: got {score}, expected {case['expected_score']}"
     )
