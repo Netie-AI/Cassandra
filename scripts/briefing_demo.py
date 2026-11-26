@@ -10,6 +10,7 @@ from html import escape as e
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+from src.briefing.art import story_art
 from src.briefing.render import _when, _day, _row_note, providers, read_minutes
 
 
@@ -31,8 +32,10 @@ def story(s, top=False):
     what = f'<p>{e(s["what"])}</p>' if s.get("what") else ""
     why = f'<p class="why"><b>Why it matters</b> {e(s["why"])}</p>' if s.get("why") else ""
     credit = f'As reported by {e(s["source"])}' if s.get("verbatim") else f'Source: {e(s["source"])}'
-    return (f'<article class="story{" top" if top else ""}">{kicker}'
-            f'<h3><a href="{e(s["url"], quote=True)}">{e(s["headline"])}</a></h3>{what}{why}'
+    art = f'<div class="thumb">{story_art(s, wide=top)}</div>'
+    return (f'<article class="story{" top" if top else ""}">{art if top else ""}{kicker}'
+            f'<div class="sbody">{"" if top else art}<div><h3><a href="{e(s["url"], quote=True)}">{e(s["headline"])}</a></h3>'
+            f'{what}{why}</div></div>'
             f'<a class="src" href="{e(s["url"], quote=True)}">{credit}</a></article>')
 
 

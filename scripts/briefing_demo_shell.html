@@ -59,6 +59,15 @@ h2 { font: 700 13px var(--mono); text-transform: uppercase; letter-spacing: .1em
 .sec > .take { margin-top: 16px; }
 .stories .story + .story { padding-top: 18px; border-top: 1px solid var(--rule); }
 .kick { font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--sg); }
+.thumb { line-height: 0; }
+.thumb .art { display: block; width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 4px; }
+.story.top .thumb .art { aspect-ratio: 3 / 1; margin-bottom: 4px; }
+.sbody { display: block; }
+.stories .sbody { display: grid; grid-template-columns: 1fr 76px; gap: 0 14px; align-items: start; }
+.stories .sbody .thumb { grid-column: 2; grid-row: 1; padding-top: 10px; }
+.stories .sbody > div:last-child { grid-column: 1; grid-row: 1; }
+.stories .sbody .art { width: 76px; height: 76px; }
+@media (min-width: 980px) { .stories .sbody { grid-template-columns: 1fr 96px; } .stories .sbody .art { width: 96px; height: 96px; } }
 .why b, .take b { display: block; font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .src { font-size: 14px; color: var(--muted); padding: 12px 0; align-self: flex-start; }
 

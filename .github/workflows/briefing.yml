@@ -63,6 +63,13 @@ jobs:
           fi
           cp reports/briefings/????-??-??-*.json site/briefing/data/
 
+      - name: Daily Crash Risk Score (history kept on gh-pages)
+        continue-on-error: true      # the briefing still publishes if a market data source is down
+        run: |
+          pip install -q -r requirements.txt
+          python -m src.pipeline --history site/briefing/data/score_history.json
+          cp site/briefing/data/score_history.json site/briefing/score_history.json
+
       - name: Build the page and the group message
         run: |
           python scripts/briefing_site.py site/briefing site/briefing/data "$SITE_URL"

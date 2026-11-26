@@ -39,6 +39,17 @@ repository secrets `GEMINI_API_KEY` (required), `MISTRAL_API_KEY` and `CEREBRAS_
 by hand: Actions tab, "Daily AI Briefing", Run workflow. The page is public: it carries public
 news and links only. Build it locally with `python scripts/briefing_site.py OUT_DIR reports/briefings URL`.
 
+### Daily Crash Risk Score on the same schedule
+
+The same workflow runs `python -m src.pipeline --history site/briefing/data/score_history.json`
+(continue-on-error, so the briefing still publishes when a data source is down). The runner starts
+with an empty SQLite file, so the history lives on `gh-pages` and grows by one row per run; it is
+also published at `.../briefing/score_history.json`. A fresh clone or container seeds the API from
+`store/seed/score_history.json` (written by the same command) so `/api/latest`, `/api/dashboard`
+and the home page charts show the last real run instead of a 404. Refresh the seed with
+`python -m src.pipeline --history store/seed/score_history.json`. Keyless runs have low coverage
+(about 25%: most factors sit at neutral defaults); the home page says so.
+
 ## Where the information comes from
 
 | Part | Source | Key needed |
