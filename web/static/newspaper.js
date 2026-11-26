@@ -73,7 +73,9 @@
     const lang = window.currentLang || "en";
     const feels = document.getElementById("dateline-feels");
     if (!feels) return;
-    const date = window.__npAnalogDate || "March 14, 2000";
+    const date = window.__npAnalogDate;
+    if (!date) { feels.hidden = true; return; }
+    feels.hidden = false;
     const prefix = lang === "zh" ? "今日情势令人想起 " : lang === "ms" ? "Hari ini terasa seperti " : "Today feels like ";
     feels.textContent = prefix + date;
   }
@@ -91,7 +93,8 @@
         const sel = document.getElementById("edition-select");
         if (sel) sel.value = selectedAsof;
       }
-      if (d.analog_date) {
+      // Only show the analog line when the edition backs it with sourced analog news.
+      if (d.analog_date && Array.isArray(d.analog_news) && d.analog_news.length) {
         window.__npAnalogDate = d.analog_date;
         refreshDateline();
       }

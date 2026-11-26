@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+<style>
+  .f-bg{fill:#f3f1ed} .f-ink{stroke:#141414} .f-fill{fill:#141414} .f-red{stroke:#b91c1c}
+  @media (prefers-color-scheme: dark) { .f-bg{fill:#18181c} .f-ink{stroke:#f2f2f4} .f-fill{fill:#f2f2f4} .f-red{stroke:#f05252} }
+</style>
+
+  <rect x="1" y="1" width="62" height="62" rx="12" class="f-bg"/>
+  <path d="M7 28 Q32 4 57 28 Q32 47 7 28 Z" class="f-ink" fill="none" stroke-width="4.2" stroke-linejoin="round"/>
+  <circle cx="32" cy="26.5" r="8.5" class="f-fill"/>
+  <polyline points="9,46 21,40 29,46 38,41 47,53 55,50" class="f-red" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+</svg>

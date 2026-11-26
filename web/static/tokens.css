@@ -33,6 +33,16 @@
   --color-warn: #92400e;
   --color-neutral: #6b6b6b;
   --color-ok: #15803d;
+  /* CRS bands, mirroring src/scoring.py (Benign / Awareness / Mania / Danger / Blow-off) */
+  --band-benign: #15803d;
+  --band-awareness: #b7791f;
+  --band-mania: #dd6b20;
+  --band-danger: #c53030;
+  --band-blowoff: #822727;
+  /* page paper (chart surface) and raised surface */
+  --paper: #f3f1ed;
+  --color-background-primary: #fbfaf7;
+  --art-red: #b91c1c;
 }
 
 [data-theme="dark"] {
@@ -42,4 +52,18 @@
   --color-border-secondary: rgba(255, 255, 255, 0.1);
   --color-border-tertiary: rgba(255, 255, 255, 0.05);
   --color-background-secondary: #1a1a20;
+  --band-benign: #3fb877;
+  --band-awareness: #e0b04a;
+  --band-mania: #f08a4b;
+  --band-danger: #f05252;
+  --band-blowoff: #f7a1a1;
+  --market-up: #3fb877;
+  --market-down: #f05252;
+  --color-danger: #f05252;
+  --color-warn: #e0a040;
+  --color-neutral: #9a9aa4;
+  --color-ok: #3fb877;
+  --paper: #1a1a20;
+  --color-background-primary: #16161b;
+  --art-red: #f05252;
 }
