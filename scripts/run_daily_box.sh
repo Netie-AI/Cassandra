@@ -8,8 +8,10 @@
 #
 # Exits non-zero, with a one-line reason on stderr, when the Gemini fetch fails
 # or the edition is held or the editor fell back to wire copy.
-# Exit 3 is needs-login (the Chrome profile is signed out). This script never
-# prints a key value.
+# Exit 3 is needs-login (signed out, consent, or the unusual-traffic page).
+# Exit 4 is none-found (chat missing, no usable response, or no scheduled tasks).
+# Both stop here, before the briefing build, and nothing is published.
+# This script never prints a key value.
 #
 # BRIEFING_SITE_DIR: a checkout of the gh-pages branch. Created by cloning the
 # public repo when it is missing. Push uses whatever credentials the box already has.
@@ -28,6 +30,8 @@ set -e
 if [[ "$rc" -ne 0 ]]; then
   if [[ "$rc" -eq 3 ]]; then
     echo "gemini fetch failed: needs-login" >&2
+  elif [[ "$rc" -eq 4 ]]; then
+    echo "gemini fetch failed: none-found" >&2
   else
     echo "gemini fetch failed: exit $rc" >&2
   fi
