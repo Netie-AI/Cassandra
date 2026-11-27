@@ -517,3 +517,30 @@ def test_deadman_reads_the_pages_data_url_and_falls_back_when_it_cannot(monkeypa
     stamp, how = dead.collect(empty)
     assert stamp == dt.datetime(2026, 11, 27, 10, 0, tzinfo=UTC)
     assert "latest.json" in how
+
+
+def test_openvault_writer_sends_its_route_role(monkeypatch):
+    """OpenVault serves Claude only for a role-routed request; no role means the free pool."""
+    seen = []
+
+    def post(url, headers=None, timeout=None, json=None):
+        seen.append(dict(json))
+
+        class Ok:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"choices": [{"message": {"content": '{"ok": true}'}}]}
+
+        return Ok()
+
+    monkeypatch.setattr(writer.httpx, "post", post)
+    monkeypatch.setenv("FAKE_KEY", "f")
+    editors = writer._editors(None, [{"name": "openvault", "key_env": "FAKE_KEY", "model": "claude-sonnet-5-5",
+                                      "role": "summarize", "url": "http://127.0.0.1:5000/v1/chat/completions"}])
+    assert editors[0][1]("p") == '{"ok": true}'
+    assert seen[0]["role"] == "summarize"
+    other = writer._editors(None, [{"name": "mistral", "key_env": "FAKE_KEY", "model": "m", "url": "https://x/v1"}])
+    other[0][1]("p")
+    assert "role" not in seen[1]
