@@ -13,4 +13,4 @@ uvicorn[standard]>=0.32
 supabase>=2.0
 pyjwt>=2.8
 stripe>=8.0
-playwright>=1.40          # only for posting to WeLink chats (src/briefing/welink.py), imported lazily
+playwright>=1.40          # WeLink posting and scripts/gemini_fetch.py (CDP attach). Imported lazily.

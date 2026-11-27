@@ -1,0 +1,4 @@
+# Empty template for the xinliaoxin check. Items stay empty until the owner writes them.
+# This file does not define any check. Item fields, when an item is added: id, text, check_type.
+fields: [id, text, check_type]
+items: []
