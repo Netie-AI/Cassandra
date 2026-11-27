@@ -48,8 +48,21 @@ class FetchError(Exception):
 
 
 def login_wall(url: str) -> bool:
-    host = (urlsplit(url).hostname or "").lower()
-    return host == "accounts.google.com" or host.endswith(".accounts.google.com")
+    """True for any page that is not a usable signed-in Gemini page: the Google sign-in host, the
+    consent host, and Google's "unusual traffic" interstitial (www.google.com/sorry/...)."""
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if host == "accounts.google.com" or host.endswith(".accounts.google.com"):
+        return True
+    if host == "consent.google.com":
+        return True
+    if host.endswith("google.com") and parts.path.startswith("/sorry"):
+        return True
+    return False
+
+
+def is_gemini_host(url: str) -> bool:
+    return (urlsplit(url).hostname or "").lower() == "gemini.google.com"
 
 
 def slugify(title: str) -> str:
@@ -100,9 +113,28 @@ def record_result(inbox: Path, title: str, text: str, *, dry_run: bool,
     return n
 
 
-def _guard(page) -> None:
+def _signed_in(page) -> bool:
+    """The signed-in Gemini shell has a "Google Account: <name>" link in the sidebar. A signed-out
+    visit shows a "Sign in" link instead."""
+    if page.get_by_role("link", name=re.compile(r"^Google Account", re.I)).count():
+        return True
+    return False
+
+
+def _guard(page, *, need_account: bool = False) -> None:
     if login_wall(page.url):
         raise NeedsLogin()
+    if need_account and not _signed_in(page):
+        raise NeedsLogin()
+
+
+def _pick_page(ctx):
+    """Reuse the founder's open Gemini tab. A brand-new tab is a fresh navigation and Google answers
+    it with the unusual-traffic page; a tab already in the app can navigate inside it."""
+    for pg in ctx.pages:
+        if is_gemini_host(pg.url) or login_wall(pg.url):
+            return pg, False
+    return ctx.new_page(), True
 
 
 def _click_first(page, patterns: tuple[re.Pattern, ...] | list[re.Pattern]) -> bool:
@@ -123,7 +155,7 @@ def _click_first(page, patterns: tuple[re.Pattern, ...] | list[re.Pattern]) -> b
 
 def _open_action(page, title: str) -> None:
     if not _click_first(page, [re.compile(re.escape(title), re.I)]):
-        raise FetchError(f"action not found: {title}")
+        raise FetchError(f"action not found on the Scheduled page: {title}")
     _guard(page)
     # UNVERIFIED: some layouts show a list of runs and need an extra click on the latest one.
     _click_first(page, [re.compile(r"^\s*latest\s*$", re.I)])
@@ -147,8 +179,18 @@ def _back_to_list(page) -> None:
     _guard(page)
 
 
+def _open_scheduled(page) -> None:
+    link = page.locator('a[href$="/scheduled"], a[href="scheduled"]')
+    if link.count():
+        link.first.click()
+    elif not _click_first(page, [re.compile(r"^\s*scheduled\s*$", re.I)]):
+        raise FetchError("scheduled control not found")
+    page.wait_for_url(re.compile(r"/scheduled"), timeout=15000)
+    page.wait_for_timeout(1500)
+
+
 def fetch_all(cdp_url: str, titles: list[str], inbox: Path, *, dry_run: bool) -> list[tuple[str, int]]:
-    """Attach to Chrome, read each action, record results. Leaves Chrome open."""
+    """Attach to Chrome, read each action, record results. Leaves Chrome and its tab open."""
     from playwright.sync_api import sync_playwright
 
     counts: list[tuple[str, int]] = []
@@ -159,14 +201,17 @@ def fetch_all(cdp_url: str, titles: list[str], inbox: Path, *, dry_run: bool) ->
             raise FetchError("cdp unreachable") from None
         if not browser.contexts:
             raise FetchError("cdp browser has no window")
-        page = browser.contexts[0].new_page()
+        page, created = _pick_page(browser.contexts[0])
         try:
             page.set_default_timeout(20000)
-            page.goto(APP_URL, wait_until="domcontentloaded")
+            _guard(page)                      # an interstitial or sign-in page already open: stop, no navigation
+            if not is_gemini_host(page.url):
+                page.goto(APP_URL, wait_until="domcontentloaded")
             _guard(page)
-            if not _click_first(page, _SCHEDULED):
-                raise FetchError("scheduled actions control not found")
-            _guard(page)
+            page.wait_for_timeout(1500)
+            _guard(page, need_account=True)
+            _open_scheduled(page)
+            _guard(page, need_account=True)
             for i, title in enumerate(titles):
                 if i:
                     _back_to_list(page)
@@ -177,7 +222,8 @@ def fetch_all(cdp_url: str, titles: list[str], inbox: Path, *, dry_run: bool) ->
                 n = record_result(inbox, title, text, dry_run=dry_run)
                 counts.append((title, n))
         finally:
-            page.close()
+            if created:
+                page.close()                  # only a tab this run opened; never the founder's tab
             # Do not call browser.close(): on a CDP attach that can shut the signed-in Chrome.
     return counts
 
