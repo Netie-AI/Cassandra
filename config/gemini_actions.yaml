@@ -1,6 +1,14 @@
+# Named chat is the default source (founder decision 2026-11-27).
+# GEMINI_SOURCE=chat|scheduled|both overrides this file.
+# scripts/gemini_fetch.py reads the chat. It never types credentials, never types
+# into the chat composer, and never edits a schedule.
+source: chat
+chats:
+  - {title: "AI Briefing Automation Setup", label: briefing}
+
 # Titles of the four daily Gemini scheduled actions in docs/BRIEFING_GEMINI_PROMPTS.md.
-# scripts/gemini_fetch.py opens the latest result for each title. It never types credentials.
-# Live page controls are not verified against a signed-in Gemini session.
+# Used only when GEMINI_SOURCE is scheduled or both. A title that is not on
+# /scheduled is skipped with a count, not an error, in mode both.
 actions:
   - {title: "Morning scout"}
   - {title: "Market check"}

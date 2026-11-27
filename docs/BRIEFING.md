@@ -26,10 +26,12 @@ python -m src.briefing --edition auto --send        # what the scheduler calls
 Preview the last build at `/briefing` on the local API, or open `reports/briefings/latest.html`.
 Schedule on Windows: `scripts/register-briefing-tasks.ps1` (calls `scripts/run-briefing.ps1`).
 
-On the box (no systemd unit), cron calls `scripts/run_daily_box.sh`. That script fetches Gemini
-scheduled actions, builds the edition, and pushes a `gh-pages` checkout as `cassandra-briefing`.
+On the box (no systemd unit), cron calls `scripts/run_daily_box.sh`. That script fetches the
+Gemini chat (scheduled actions only when `GEMINI_SOURCE` is `scheduled` or `both`), builds the
+edition, and pushes a `gh-pages` checkout as `cassandra-briefing`.
 It exits non-zero if the fetch fails, if a Gemini check held the edition, or if the editor fell
-back to wire copy. Suggested UTC crontab, which is 08:05 and 20:35 Singapore (inside the edition
+back to wire copy. Exit 3 and exit 4 each print a one-line reason and stop before the build, so
+nothing is published. Suggested UTC crontab, which is 08:05 and 20:35 Singapore (inside the edition
 window, and after the 07:50 checks):
 
 ```
@@ -70,15 +72,45 @@ If that yields no timestamp it uses `briefing/latest.json` and says so. Monday b
 edition can fail, because Friday's file is already older than 26 hours. That is the threshold
 as specified.
 
-### Gemini scheduled actions (extra candidates)
+### Gemini inbox (named chat by default)
+
+Founder decision 2026-11-27: the source is the Gemini chat named "AI Briefing Automation Setup".
+Named-chat mode is the default. Scheduled-task mode is optional.
 
 `scripts/gemini_fetch.py` attaches with Playwright over CDP (`GEMINI_CDP_URL`, default
-`http://127.0.0.1:9223`) to a Chrome that is already signed in. It opens
-https://gemini.google.com/app, then Scheduled actions, then the latest result for each title in
-`config/gemini_actions.yaml` (the four daily prompts in `docs/BRIEFING_GEMINI_PROMPTS.md`). If the
-page is accounts.google.com it exits 3 and prints `needs-login`. It never types credentials.
-`--dry-run` prints row counts and writes nothing. Results land in `inbox/gemini/` as
-`<YYYY-MM-DD>-<action>.md` and `.json` (gitignored).
+`http://127.0.0.1:9223`) to a Chrome that is already signed in. It reuses the open Gemini tab and
+does not call goto, reload, or new_page while that tab is on gemini.google.com. A fresh navigation
+from the box gets Google's unusual-traffic page. It moves by clicking sidebar links. It never types
+credentials, never types into the chat composer, never clicks send, and never edits a schedule.
+The only typing is the configured chat title, and only into Search chats, and only when that
+sidebar link is not already visible.
+
+`config/gemini_actions.yaml` sets `source: chat` and lists `chats:` (title plus a filename label).
+`actions:` remains the four scheduled titles from `docs/BRIEFING_GEMINI_PROMPTS.md`, used only when
+`GEMINI_SOURCE` is `scheduled` or `both`. That variable overrides the file. In mode `both`, a
+scheduled title that is not on the page is skipped with a count and is not an error.
+`--dry-run` prints row counts and writes nothing. `--probe` prints only structure: url path, which
+selector matched, response count, table-row count, and sidebar titles. It never prints a message body.
+`--probe` exits 0 when that page could be read (even with zero responses), 3 on needs-login, and 4
+when the chat title is not in the sidebar.
+
+Chat results land in `inbox/gemini/` as `<YYYY-MM-DD>-<label>.md` and `.json`. The json `action`
+is the chat title. Scheduled results keep `<YYYY-MM-DD>-<action>.md`. Each json has `closing` and
+`sha256`. The directory is gitignored.
+
+Exit codes from `scripts/gemini_fetch.py`:
+
+| Code | Meaning |
+|---|---|
+| 0 | ok |
+| 1 | other failure |
+| 2 | bad config |
+| 3 | needs-login, printed with `signin` or `interstitial` |
+| 4 | none-found: chat title not in the sidebar, no usable model response, or scheduled mode with no tasks |
+| 5 | unparsed: model responses exist, but none has an http(s) table row or a "Sources checked" line. Nothing is invented |
+
+`scripts/run_daily_box.sh` maps exit 3 and exit 4 to a one-line reason and stops before the briefing
+build. It does not publish on those codes. Any other non-zero fetch code stops the same way.
 
 The briefing reads that inbox only when `CASSANDRA_GEMINI_INBOX=1` (default off; the box script
 turns it on). Files not dated today in Asia/Singapore are ignored. Scout rows become tier-2
@@ -86,7 +118,14 @@ stories (source = publisher, url = link, summary = sentence). Rows without an ht
 rows whose URL is already in the feeds, are dropped. Text is stripped and capped before the
 editor sees it. A Market check or Editor's check file that says MISMATCH or HOLD sets
 `held` on the edition, prints it in the run summary, labels the page, and blocks publish.
-The live Gemini selectors are not verified. See the gaps at the end of this file.
+
+Unverified live (2026-11-27): the conversation DOM selectors (`model-response`, `user-query`,
+`[data-message-id]`, `role=article`, `[aria-live]`), the Search chats control, and the
+scheduled-run result page. A click on a chat link changed the URL, and the conversation had not
+rendered after 6 seconds. The `/scheduled` page that day had no tasks. Verified live that day:
+the sidebar Scheduled link (`href` `/scheduled`), chat links (`href` `/app/<id>`, text = title),
+the Google Account link when signed in. goto, reload, and a new tab hit the unusual-traffic
+page. Clicking a sidebar link in the already-open tab does not.
 
 ### Daily Crash Risk Score on the same schedule
 
@@ -109,7 +148,7 @@ and the home page charts show the last real run instead of a 404. Refresh the se
 | Events | `config/events.yaml`, hand-curated with a source URL per event | none |
 | Jargon buster | `config/glossary.yaml`, hand-written definitions | none |
 | Rewrite into plain English | Gemini when `GEMINI_API_KEY` is set, else the first configured writer whose key is set. On the box that is OpenVault (`OV_CASSANDRA_TOKEN`) | optional |
-| Extra candidates | Gemini scheduled actions in `inbox/gemini/`, only if `CASSANDRA_GEMINI_INBOX=1` | no (signed-in Chrome over CDP) |
+| Extra candidates | Gemini chat inbox in `inbox/gemini/`, only if `CASSANDRA_GEMINI_INBOX=1` | no (signed-in Chrome over CDP) |
 | Delivery | Resend or SMTP, same as the CRS digest | yes |
 
 ## How accuracy is enforced

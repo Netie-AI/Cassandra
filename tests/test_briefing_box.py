@@ -378,6 +378,10 @@ def test_fetch_script_never_types_and_dry_run_writes_nothing(tmp_path, capsys):
         assert banned not in text
     assert gf.login_wall("https://accounts.google.com/ServiceLogin") is True
     assert gf.login_wall("https://gemini.google.com/app") is False
+    assert gf.login_wall("https://www.google.com/sorry/index?continue=https://gemini.google.com/app") is True
+    assert gf.login_wall("https://consent.google.com/m?continue=x") is True
+    assert gf.login_wall("https://gemini.google.com/scheduled") is False
+    assert gf.is_gemini_host("https://gemini.google.com/app") and not gf.is_gemini_host("https://www.google.com/sorry")
     body = (FIX / "morning_scout.md").read_text(encoding="utf-8")
     n = gf.record_result(tmp_path, "Morning scout", body, dry_run=True,
                          now=dt.datetime(2026, 11, 27, 7, 0, tzinfo=SG))
