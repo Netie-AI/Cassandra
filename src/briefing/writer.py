@@ -430,14 +430,19 @@ def _read_chat(url: str, key: str, payload: dict) -> str:
 _REJECTED_PARAM = re.compile(r"response_format|max_tokens", re.I)
 
 
-def _openai_chat(url: str, key: str, model: str, prompt: str, *, tolerant: bool = False) -> str:
+def _openai_chat(url: str, key: str, model: str, prompt: str, *, tolerant: bool = False, role: str = "") -> str:
     """Any OpenAI-compatible chat endpoint (Mistral, Cerebras, OpenRouter, OpenVault), JSON mode.
     tolerant=True (the openvault writer only) retries once without response_format and max_tokens
-    when the endpoint rejects those fields. The caller still fact-checks the text."""
+    when the endpoint rejects those fields. The caller still fact-checks the text.
+    role (openvault only): OpenVault reaches Claude only on a request that carries a route role
+    (sql, tool, reason, summarize, grain, ontology). Without it the request walks the free pool
+    and a free model answers, often with an empty reply. The briefing edit is "summarize" (Sonnet)."""
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
     full = {"model": model, "temperature": 0.3, "response_format": {"type": "json_object"},
             "max_tokens": 16000,        # reasoning models spend most of this thinking before they answer
             "messages": messages}
+    if role:
+        full["role"] = role
     try:
         return _read_chat(url, key, full)
     except httpx.HTTPStatusError as exc:
@@ -450,6 +455,8 @@ def _openai_chat(url: str, key: str, model: str, prompt: str, *, tolerant: bool 
                 body = ""
         if tolerant and status in (400, 422) and _REJECTED_PARAM.search(body):
             bare = {"model": model, "temperature": 0.3, "messages": messages}
+            if role:
+                bare["role"] = role
             return _read_chat(url, key, bare)
         raise
 
@@ -471,7 +478,7 @@ def _editors(gemini_key: str | None, writers: list[dict]) -> list[tuple[str, Any
         tolerant = w.get("name") == "openvault"
         out.append((f"{w['name']}:{w['model']}",
                     lambda p, w=w, k=k, tolerant=tolerant: _openai_chat(
-                        w["url"], k, w["model"], p, tolerant=tolerant)))
+                        w["url"], k, w["model"], p, tolerant=tolerant, role=str(w.get("role") or ""))))
     return out
 
 

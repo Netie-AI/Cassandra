@@ -66,7 +66,7 @@ def openvault_complete(prompt: str, model: str = OPUS_MODEL) -> str:
         raise RuntimeError(f"{KEY_ENV} is not set")
     url = os.getenv("OV_CASSANDRA_URL", "").strip() or OPUS_URL
     messages = [{"role": "user", "content": prompt}]
-    payload = {"model": model, "temperature": 0, "max_tokens": 2000, "messages": messages}
+    payload = {"model": model, "role": "reason", "temperature": 0, "max_tokens": 2000, "messages": messages}
     try:
         return _read(url, key, payload)
     except httpx.HTTPStatusError as exc:
@@ -79,7 +79,7 @@ def openvault_complete(prompt: str, model: str = OPUS_MODEL) -> str:
                 body = ""
         if status in (400, 422) and "max_tokens" in body.lower():
             try:
-                return _read(url, key, {"model": model, "temperature": 0, "messages": messages})
+                return _read(url, key, {"model": model, "role": "reason", "temperature": 0, "messages": messages})
             except httpx.HTTPStatusError as again:
                 status = again.response.status_code if again.response is not None else status
         raise RuntimeError(f"openvault opus failed ({status})") from None
