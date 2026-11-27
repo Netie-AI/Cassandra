@@ -1,15 +1,16 @@
-# Daily AI Briefing: build the edition in the cloud and publish it to GitHub Pages.
+# Daily AI Briefing: manual build, then publish to GitHub Pages.
 #   Link readers open (always the latest): https://netie-ai.github.io/Cassandra/briefing/
 #   The Chinese and English group messages are in each run's summary and at .../briefing/message_zh.txt
 #   and .../briefing/message.txt; the link preview image is .../briefing/share.png
-# Needs repository secrets: GEMINI_API_KEY (required), MISTRAL_API_KEY and CEREBRAS_API_KEY (fallback editors).
-# GitHub runs schedules only from the default branch, so this starts once it is merged into master.
+# The scheduled run lives on the box (scripts/run_daily_box.sh). This workflow is dispatch only.
+# GEMINI_API_KEY is optional. A blank key skips Gemini. MISTRAL_API_KEY and CEREBRAS_API_KEY
+# are optional fallbacks. The on-box editor is OpenVault (OV_CASSANDRA_TOKEN), which is not on GitHub.
+# A held edition (Gemini MISMATCH or HOLD) is not pushed. A wire fallback is still published
+# after one retry, labelled on the page. The box runner refuses wire copy.
+# Freshness of the public page is checked by briefing-deadman.yml.
 name: Daily AI Briefing
 
 on:
-  schedule:
-    - cron: "35 23 * * 0-4"   # Mon-Fri 07:35 Singapore time: morning edition
-    - cron: "35 12 * * 1-5"   # Mon-Fri 20:35 Singapore time: evening edition
   workflow_dispatch:
     inputs:
       edition:
@@ -50,7 +51,7 @@ jobs:
 
       - name: Build the edition
         run: |
-          test -n "$GEMINI_API_KEY" || { echo "::error::GEMINI_API_KEY secret is not set"; exit 1; }
+          # GEMINI_API_KEY may be empty. Gemini is skipped; another writer is used when its key is set.
           mkdir -p reports/briefings site/briefing/data
           cp site/briefing/data/*.json reports/briefings/ 2>/dev/null || true    # earlier editions
           python -m src.briefing --edition "${{ inputs.edition || 'auto' }}"
@@ -80,6 +81,25 @@ jobs:
       - name: Publish
         working-directory: site
         run: |
+          python - << 'PY'
+          import glob, json, sys
+          files = glob.glob("briefing/data/????-??-??-*.json")
+          if not files:
+              sys.exit(0)
+          eds = []
+          for path in files:
+              try:
+                  eds.append(json.load(open(path, encoding="utf-8")))
+              except (OSError, json.JSONDecodeError):
+                  continue
+          if not eds:
+              sys.exit(0)
+          ed = max(eds, key=lambda e: str(e.get("generated_at") or ""))
+          if ed.get("held"):
+              reason = str(ed.get("held_reason") or "a Gemini check reported MISMATCH or HOLD")
+              print("Held. " + reason, file=sys.stderr)
+              sys.exit(1)
+          PY
           git config user.name "cassandra-briefing"
           git config user.email "cassandra-briefing@users.noreply.github.com"
           git add briefing

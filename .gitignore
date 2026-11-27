@@ -46,6 +46,9 @@ dist/
 venv/
 env/
 
+# ═══ Gemini scheduled-action drops (fetched on the box, untrusted) ═
+inbox/
+
 # ═══ Reports output (generated, not source) ════════════════
 reports/*
 !reports/.gitkeep

@@ -11,10 +11,12 @@ All market sentences are built here from fetched numbers. The model never writes
 from __future__ import annotations
 
 import datetime as dt
+import json
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import sources, writer
+from . import gemini_inbox, sources, writer
 
 EDITIONS = ("morning", "evening", "weekly")
 _DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
@@ -167,7 +169,9 @@ def reader_notes(problems: list[str], n_feeds: int) -> list[str]:
     stays in the run log; a missing price, a withheld figure, raw headlines or a large loss of
     sources is always shown."""
     feed = [p for p in problems if p.startswith("news feed ")]
-    notes = list(dict.fromkeys(p for p in problems if not p.startswith("news feed ")))
+    # "gemini inbox " lines are operator detail (a skipped row, a stale file). Held stays.
+    notes = list(dict.fromkeys(p for p in problems
+                               if not p.startswith("news feed ") and not p.startswith("gemini inbox ")))
     if n_feeds and len(set(feed)) * 3 >= n_feeds:
         notes.append(f"{len(set(feed))} of {n_feeds} news sources were unavailable, so coverage is thinner than usual")
     return notes
@@ -198,6 +202,17 @@ def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | N
         hours = cfg["lookback_hours"].get("after_weekend", hours)
     since = now - dt.timedelta(hours=hours)
     stories = sources.fetch_stories(cfg, since=since, now=now, problems=problems)
+    held, held_reason = False, ""
+    if gemini_inbox.enabled():
+        extra, inotes, held, held_reason = gemini_inbox.read_inbox(
+            gemini_inbox.inbox_dir(), stories, now=local, market_keywords=cfg.get("market_keywords"))
+        problems.extend(inotes)
+        if extra:
+            stories = extra + stories
+            for i, s in enumerate(stories, 1):
+                s.id = f"s{i}"
+        if held:
+            problems.append(f"Held. {held_reason}")
     events = sources.upcoming_events(today, horizon_days=14 if not weekly else 45)
     all_events = sources.load_config("events").get("events", [])
     calendar = sources.fetch_calendar(
@@ -238,8 +253,53 @@ def build_edition(edition: str, *, now: dt.datetime | None = None, cfg: dict | N
         "calendar": calendar,
         "glossary": sources.glossary_hits(glossary_text),
         "writer": copy["writer"],
+        "writer_note": copy.get("writer_note", ""),
         "rejected": copy.get("rejected", []),
         "problems": list(dict.fromkeys(problems)),            # everything, for the run log and the audit
         "notes": reader_notes(problems, len(cfg["feeds"])),   # what is printed to readers
         "candidates": len(stories),
+        "held": held,
+        "held_reason": held_reason if held else "",
     }
+
+
+def box_publish_block(ed: dict) -> str:
+    """Why the box runner must not push this edition. Empty means it may be published."""
+    parts = []
+    if ed.get("held"):
+        parts.append("Held. " + str(ed.get("held_reason") or "a Gemini check reported MISMATCH or HOLD"))
+    if ed.get("writer") == "wire":
+        parts.append("editor fell back to wire: " + str(ed.get("writer_note") or "no editor produced copy"))
+    return " ".join(p.replace("\n", " ") for p in parts)[:400]
+
+
+def this_run(ed: dict, now: dt.datetime, window_s: int = 45 * 60) -> bool:
+    """True when `ed` was generated within window_s before `now` (a build from this invocation)."""
+    try:
+        gen = dt.datetime.fromisoformat(str(ed.get("generated_at") or ""))
+    except ValueError:
+        return False
+    if gen.tzinfo is None:
+        return False
+    age = (now.astimezone(dt.timezone.utc) - gen.astimezone(dt.timezone.utc)).total_seconds()
+    return 0 <= age <= window_s
+
+
+def load_newest_edition(directory: Path) -> dict | None:
+    """The edition JSON with the latest generated_at, or None."""
+    best: dict | None = None
+    best_at = ""
+    if not directory.is_dir():
+        return None
+    for path in directory.glob("????-??-??-*.json"):
+        try:
+            ed = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(ed, dict):
+            continue
+        stamp = str(ed.get("generated_at") or "")
+        if stamp >= best_at:
+            best_at = stamp
+            best = ed
+    return best

@@ -26,18 +26,67 @@ python -m src.briefing --edition auto --send        # what the scheduler calls
 Preview the last build at `/briefing` on the local API, or open `reports/briefings/latest.html`.
 Schedule on Windows: `scripts/register-briefing-tasks.ps1` (calls `scripts/run-briefing.ps1`).
 
+On the box (no systemd unit), cron calls `scripts/run_daily_box.sh`. That script fetches Gemini
+scheduled actions, builds the edition, and pushes a `gh-pages` checkout as `cassandra-briefing`.
+It exits non-zero if the fetch fails, if a Gemini check held the edition, or if the editor fell
+back to wire copy. Suggested UTC crontab, which is 08:05 and 20:35 Singapore (inside the edition
+window, and after the 07:50 checks):
+
+```
+5 0 * * 1-5   /path/to/Cassandra/scripts/run_daily_box.sh
+35 12 * * 1-5 /path/to/Cassandra/scripts/run_daily_box.sh
+```
+
+`BRIEFING_SITE_DIR` may point at an existing `gh-pages` checkout. If it is unset, the script
+clones `https://github.com/Netie-AI/Cassandra.git` (branch `gh-pages`) next to the repo. Push
+uses credentials already on the box. The script does not mint tokens and does not print key values.
+
 ## Daily website (one link for phone and laptop)
 
-`.github/workflows/briefing.yml` builds each edition in the cloud (Mon to Fri, 07:35 and 20:35
-Singapore time) and publishes it to GitHub Pages at https://netie-ai.github.io/Cassandra/briefing/.
-The link never changes: readers bookmark it or use "Add to Home Screen" (Android and iPhone get a
-Cassandra app icon). Each run's summary shows the message to paste into the group chat; it is also
-at `.../briefing/message.txt`. Edition JSON files are kept in `briefing/data/` on `gh-pages`.
+The box publishes each edition to GitHub Pages at https://netie-ai.github.io/Cassandra/briefing/.
+`.github/workflows/briefing.yml` is manual only (`workflow_dispatch`). The old GitHub schedule
+was removed so a cloud run cannot race the box. The link never changes: readers bookmark it or
+use "Add to Home Screen" (Android and iPhone get a Cassandra app icon). Each run's summary shows
+the message to paste into the group chat; it is also at `.../briefing/message.txt`. Edition JSON
+files are kept in `briefing/data/` on `gh-pages`.
 
-One-time setup: merge into `master` (GitHub runs schedules only from the default branch), and add
-repository secrets `GEMINI_API_KEY` (required), `MISTRAL_API_KEY` and `CEREBRAS_API_KEY`. To run it
-by hand: Actions tab, "Daily AI Briefing", Run workflow. The page is public: it carries public
-news and links only. Build it locally with `python scripts/briefing_site.py OUT_DIR reports/briefings URL`.
+`GEMINI_API_KEY` is optional. A blank key skips Gemini and is not a failure. Optional cloud
+fallbacks are `MISTRAL_API_KEY` and `CEREBRAS_API_KEY`. The on-box editor is OpenVault
+(`OV_CASSANDRA_TOKEN`, `http://127.0.0.1:5000/v1/chat/completions`, model `claude-sonnet-5-5`),
+the first entry under `writers:` in `config/briefing.yaml`. To run the workflow by hand: Actions
+tab, "Daily AI Briefing", Run workflow. A held edition is not pushed. A manual cloud run that
+falls back to wire copy is still published after one retry, labelled on the page. The box runner
+does not publish wire copy. The page is public: it carries public news and links only. Build it
+locally with `python scripts/briefing_site.py OUT_DIR reports/briefings URL`.
+
+### Dead-man
+
+`.github/workflows/briefing-deadman.yml` runs every 6 hours (`0 */6 * * *`) and on demand.
+`scripts/briefing_deadman.py` fails the job when
+https://netie-ai.github.io/Cassandra/briefing/data is older than 26 hours on a Singapore weekday.
+Saturday and Sunday do not fail. GitHub Pages usually does not list that directory, so the script
+may learn file names from the GitHub contents API and then read the JSON from the pages URL.
+If that yields no timestamp it uses `briefing/latest.json` and says so. Monday before the morning
+edition can fail, because Friday's file is already older than 26 hours. That is the threshold
+as specified.
+
+### Gemini scheduled actions (extra candidates)
+
+`scripts/gemini_fetch.py` attaches with Playwright over CDP (`GEMINI_CDP_URL`, default
+`http://127.0.0.1:9223`) to a Chrome that is already signed in. It opens
+https://gemini.google.com/app, then Scheduled actions, then the latest result for each title in
+`config/gemini_actions.yaml` (the four daily prompts in `docs/BRIEFING_GEMINI_PROMPTS.md`). If the
+page is accounts.google.com it exits 3 and prints `needs-login`. It never types credentials.
+`--dry-run` prints row counts and writes nothing. Results land in `inbox/gemini/` as
+`<YYYY-MM-DD>-<action>.md` and `.json` (gitignored).
+
+The briefing reads that inbox only when `CASSANDRA_GEMINI_INBOX=1` (default off; the box script
+turns it on). Files not dated today in Asia/Singapore are ignored. Scout rows become tier-2
+stories (source = publisher, url = link, summary = sentence). Rows without an http(s) link, and
+rows whose URL is already in the feeds, are dropped. Text is stripped and capped before the
+editor sees it. A Market check or Editor's check file that says MISMATCH or HOLD sets
+`held` on the edition, prints it in the run summary, labels the page, and blocks publish.
+The live Gemini selectors are not verified. See the gaps at the end of this file.
 
 ### Daily Crash Risk Score on the same schedule
 
@@ -59,7 +108,8 @@ and the home page charts show the last real run instead of a 404. Refresh the se
 | What to expect next | US data releases from the ForexFactory weekly calendar (US, high and medium impact, only those with a plain-English meaning in `config/briefing.yaml`), and results dates for a watchlist of big tech names from Nasdaq's public calendar | none |
 | Events | `config/events.yaml`, hand-curated with a source URL per event | none |
 | Jargon buster | `config/glossary.yaml`, hand-written definitions | none |
-| Rewrite into plain English | Gemini (`GEMINI_API_KEY`, models in `GEMINI_BRIEFING_MODELS`) | yes |
+| Rewrite into plain English | Gemini when `GEMINI_API_KEY` is set, else the first configured writer whose key is set. On the box that is OpenVault (`OV_CASSANDRA_TOKEN`) | optional |
+| Extra candidates | Gemini scheduled actions in `inbox/gemini/`, only if `CASSANDRA_GEMINI_INBOX=1` | no (signed-in Chrome over CDP) |
 | Delivery | Resend or SMTP, same as the CRS digest | yes |
 
 ## How accuracy is enforced
@@ -114,10 +164,17 @@ Known limits (open, from two adversarial reviews on 2026-11-13):
 - The weekly change is "past five sessions", not the calendar week, and the weekly "week
   ahead" depends on the calendar source having rolled over by Sunday 09:00.
 - The AI keyword filter still lets through the odd non-AI "chip" story; the editor is the backstop.
-- Gemini's free tier rate-limits heavy use (many builds in an hour). Fallback editors are
-  configured under `writers:` in `config/briefing.yaml` (Mistral, Cerebras, OpenRouter) and are
-  unit-tested, but none has produced a live edition yet: Mistral returned an unusable reply on
-  the full prompt and then rate-limited, and the Cerebras key had no credit (2026-11-13).
+- Gemini's free tier rate-limits heavy use (many builds in an hour). A blank `GEMINI_API_KEY`
+  skips Gemini. Writers under `writers:` in `config/briefing.yaml` then run in order: OpenVault
+  on the box, then Mistral, Cerebras, OpenRouter. OpenVault is retried once without JSON mode
+  when that endpoint rejects `response_format` or a large `max_tokens`. The fact check is the
+  same for every editor. Mistral and Cerebras are unit-tested and have not produced a live
+  edition: Mistral returned an unusable reply on the full prompt and then rate-limited, and the
+  Cerebras key had no credit (2026-11-13).
+- `config/xinliaoxin_spec.yaml` is an empty template (`items: []`, fields `id`, `text`,
+  `check_type`). `src/briefing/spec_check.py` can ask the OpenVault Opus route
+  (`claude-opus-5-5` on the same local endpoint) for PASS or FAIL per item. No spec text is
+  filled in. Nothing calls it from the daily run.
 - CSI 300 and Hang Seng TECH (Tencent only) are always marked as closed, so a run during Asian
   trading hours uses past tense for those two rows. The scheduled 07:30 and 20:30 runs are outside
   those hours.

@@ -10,7 +10,9 @@ dropped denials or "reportedly", invented quotes, advice words, market mood that
 the data. What they cannot catch: a wrong name or a wrong claim that has no such marker, so
 every story always carries its source link.
 
-No GEMINI_API_KEY, or every model fails -> wire_copy(): original headlines, labelled as such.
+An empty GEMINI_API_KEY skips Gemini and is not an error. If no editor key is set, or every
+model fails, wire_copy() keeps the original headlines and says so. The openvault route is retried
+once without JSON mode when that endpoint rejects it. The fact check does not change.
 """
 from __future__ import annotations
 
@@ -408,24 +410,53 @@ def _strip_fences(text: str) -> str:
     return text.strip()
 
 
-def _openai_chat(url: str, key: str, model: str, prompt: str) -> str:
-    """Any OpenAI-compatible chat endpoint (Mistral, Cerebras, OpenRouter, Groq), JSON mode."""
-    r = httpx.post(url, headers={"Authorization": f"Bearer {key}"}, timeout=240, json={
-        "model": model, "temperature": 0.3, "response_format": {"type": "json_object"},
-        "max_tokens": 16000,        # reasoning models spend most of this thinking before they answer
-        "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]})
+def _message_text(content: Any) -> str:
+    if isinstance(content, list):      # reasoning models return parts; keep the answer, drop the thinking
+        return "".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
+    return content or ""
+
+
+def _read_chat(url: str, key: str, payload: dict) -> str:
+    r = httpx.post(url, headers={"Authorization": f"Bearer {key}"}, timeout=240, json=payload)
     r.raise_for_status()
     choice = r.json()["choices"][0]
-    content = choice["message"]["content"]
-    if isinstance(content, list):      # reasoning models return parts; keep the answer, drop the thinking
-        content = "".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
-    if not (content or "").strip():
+    content = _message_text(choice["message"]["content"])
+    if not content.strip():
         raise EditorError(f"empty reply (finish_reason={choice.get('finish_reason')})")
     return content
 
 
+# OpenVault's local route rejects response_format and a large max_tokens. One retry, that route only.
+_REJECTED_PARAM = re.compile(r"response_format|max_tokens", re.I)
+
+
+def _openai_chat(url: str, key: str, model: str, prompt: str, *, tolerant: bool = False) -> str:
+    """Any OpenAI-compatible chat endpoint (Mistral, Cerebras, OpenRouter, OpenVault), JSON mode.
+    tolerant=True (the openvault writer only) retries once without response_format and max_tokens
+    when the endpoint rejects those fields. The caller still fact-checks the text."""
+    messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
+    full = {"model": model, "temperature": 0.3, "response_format": {"type": "json_object"},
+            "max_tokens": 16000,        # reasoning models spend most of this thinking before they answer
+            "messages": messages}
+    try:
+        return _read_chat(url, key, full)
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code if exc.response is not None else 0
+        body = ""
+        if exc.response is not None:
+            try:
+                body = exc.response.text or ""
+            except Exception:
+                body = ""
+        if tolerant and status in (400, 422) and _REJECTED_PARAM.search(body):
+            bare = {"model": model, "temperature": 0.3, "messages": messages}
+            return _read_chat(url, key, bare)
+        raise
+
+
 def _editors(gemini_key: str | None, writers: list[dict]) -> list[tuple[str, Any]]:
-    """Editors to try, in order: Gemini models first, then every configured fallback whose key is set.
+    """Editors to try, in order. Gemini models run only when GEMINI_API_KEY is non-empty;
+    a blank key skips them with no error. Then every configured writer whose key is set.
     Whichever writes the copy, the same fact check runs on it."""
     out: list[tuple[str, Any]] = []
     if gemini_key:
@@ -435,8 +466,12 @@ def _editors(gemini_key: str | None, writers: list[dict]) -> list[tuple[str, Any
                     gemini_key, p, SYSTEM, model=m, max_tokens=8192, temperature=0.3, json_mode=True, timeout=120)))
     for w in writers:
         k = os.getenv(w["key_env"], "").strip()
-        if k:
-            out.append((f"{w['name']}:{w['model']}", lambda p, w=w, k=k: _openai_chat(w["url"], k, w["model"], p)))
+        if not k:
+            continue
+        tolerant = w.get("name") == "openvault"
+        out.append((f"{w['name']}:{w['model']}",
+                    lambda p, w=w, k=k, tolerant=tolerant: _openai_chat(
+                        w["url"], k, w["model"], p, tolerant=tolerant)))
     return out
 
 
@@ -470,7 +505,7 @@ def _write_copy(stories: list[Story], *, edition: str, date_label: str, market_f
                 priorities: list[dict] | None) -> dict[str, Any]:
     if not stories:
         return wire_copy([], "no stories in the window")
-    key = os.getenv("GEMINI_API_KEY")
+    key = (os.getenv("GEMINI_API_KEY") or "").strip()
     if not _editors(key, writers or []):
         return wire_copy(stories, "GEMINI_API_KEY not set and no fallback editor key is set")
 

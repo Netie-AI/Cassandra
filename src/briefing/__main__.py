@@ -89,9 +89,15 @@ def main(argv: list[str] | None = None) -> int:
     for p in ed["problems"] + [f"rejected by fact check: {r}" for r in ed["rejected"]]:
         print(f"[briefing] NOTE {p}")
     print(f"[briefing] saved {path}")
+    if ed.get("held"):
+        print(f"[briefing] HELD {ed.get('held_reason', '')}")
 
     if not ed["stories"] and not ed["markets"]:
         print("[briefing] FAIL empty edition, not sending", file=sys.stderr)
+        return 1
+
+    if ed.get("held") and (args.send or args.welink):
+        print(f"[briefing] FAIL held, not sending. {ed.get('held_reason', '')}", file=sys.stderr)
         return 1
 
     if args.send and ed["writer"] == "wire" and not args.allow_wire:

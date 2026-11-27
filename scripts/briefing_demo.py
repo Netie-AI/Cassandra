@@ -94,6 +94,8 @@ def edition(ed, hidden):
         f'<section class="ed" id="ed-{ed["edition"]}"{" hidden" if hidden else ""}>',
         f'<nav class="chips" aria-label="Jump to section">{nav}</nav>',
         f'<p class="meta">{read_minutes(ed)} min read · {len(ai)} AI · {len(mk)} markets</p>',
+        (f'<p class="held"><b>Held.</b> {e(ed.get("held_reason") or "A Gemini check reported a mismatch or a hold.")}</p>'
+         if ed.get("held") else ""),
         f'<p class="hook"><b>Summary</b>{e(ed["hook"])}</p>' if ed.get("hook") else "",
         f'<div class="cols"><div class="main">{"".join(main)}</div><aside class="side">{"".join(side)}</aside></div>',
         '<details class="audit"><summary>How this edition was checked</summary><ul>'

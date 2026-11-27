@@ -1,0 +1,8 @@
+# Titles of the four daily Gemini scheduled actions in docs/BRIEFING_GEMINI_PROMPTS.md.
+# scripts/gemini_fetch.py opens the latest result for each title. It never types credentials.
+# Live page controls are not verified against a signed-in Gemini session.
+actions:
+  - {title: "Morning scout"}
+  - {title: "Market check"}
+  - {title: "Editor's check before posting"}
+  - {title: "Evening scout"}

@@ -183,6 +183,10 @@ def render_html(ed: dict[str, Any], channel: str = "all") -> str:
         f"<div style='font-size:13px;color:#555;'>{name} · {e(ed['title'])} · "
         f"{e(ed['date_label']).replace(' ', '&nbsp;')} · {read_minutes(ed, channel)}&nbsp;min&nbsp;read</div></div>",
     ]
+    if ed.get("held"):
+        reason = ed.get("held_reason") or "A Gemini check reported a mismatch or a hold."
+        parts.append("<p style='margin:12px 0 0;padding:10px 12px;border:1px solid #B91C1C;"
+                     f"font-weight:700;'>Held. {e(reason)}</p>")
     if ed.get("hook") and channel == "all":
         parts.append(f"<p style='font-size:17px;line-height:1.5;margin:14px 0 0;padding:12px 14px;"
                      f"background:#f3f1ed;'><strong>Summary.</strong> {e(ed['hook'])}</p>")
@@ -228,6 +232,8 @@ def _story_text(s: dict) -> list[str]:
 def render_text(ed: dict[str, Any], channel: str = "all") -> str:
     name = "AI & MARKETS BRIEFING" if channel == "all" else CHANNEL_NAMES[channel].upper()
     lines = [f"CASSANDRA {name} · {ed['title']} · {ed['date_label']}", ""]
+    if ed.get("held"):
+        lines += [f"Held. {ed.get('held_reason') or 'A Gemini check reported a mismatch or a hold.'}", ""]
     if ed.get("hook") and channel == "all":
         lines += [f"Summary. {ed['hook']}", ""]
     if channel in ("all", "ai") and channel_stories(ed, "ai"):
@@ -286,6 +292,9 @@ def render_chat(ed: dict[str, Any], channel: str) -> str:
     channel has nothing to say (the caller must not post an empty message)."""
     head = f"Cassandra {CHANNEL_NAMES[channel]} | {ed['title']} | {ed['date_label']}"
     lines: list[str] = []
+    if ed.get("held"):
+        lines.append(f"Held. {ed.get('held_reason') or 'A Gemini check reported a mismatch or a hold.'}")
+        lines.append("")
     if channel == "ai":
         stories = channel_stories(ed, "ai")
         if not stories:

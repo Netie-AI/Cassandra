@@ -45,7 +45,10 @@ def head(title: str, description: str, url: str) -> str:
 
 def message(ed: dict, url: str) -> str:
     """Plain text for WeLink or WhatsApp: title, up to 4 headlines, the market line, the link."""
-    lines = [f"Cassandra {ed['title']} · {ed['date_label']}", ""]
+    lines = [f"Cassandra {ed['title']} · {ed['date_label']}"]
+    if ed.get("held"):
+        lines += ["", "Held. " + (ed.get("held_reason") or "A Gemini check reported a mismatch or a hold.")]
+    lines.append("")
     lines += [f"• {s['headline']}" for s in ed["stories"][:4]]
     if ed["markets"]:
         lines += ["", ed["markets"][0]["summary"]]

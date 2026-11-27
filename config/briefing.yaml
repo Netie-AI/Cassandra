@@ -250,10 +250,12 @@ calendar:
     - {match: "consumer confidence", plain: "a survey of how confident consumers feel"}
     - {match: "bank holiday",       plain: "markets are closed"}
 
-# Fallback AI editors, tried in this order when Gemini is rate-limited or down. Each is used only
-# if its key is set in the environment. Any OpenAI-compatible chat endpoint works. The same fact
-# check runs on the copy whichever editor wrote it.
+# Editors after Gemini. Gemini models run only when GEMINI_API_KEY is non-empty; a blank key
+# skips them and is not a failure. Each writer below is used only if its own key is set.
+# openvault is the on-box Claude route. If that endpoint rejects JSON mode or a large max_tokens,
+# the writer retries once without those fields. The same fact check runs whichever editor wrote it.
 writers:
+  - {name: openvault,  key_env: OV_CASSANDRA_TOKEN, model: claude-sonnet-5-5,          url: "http://127.0.0.1:5000/v1/chat/completions"}
   - {name: mistral,    key_env: MISTRAL_API_KEY,    model: mistral-large-latest,        url: "https://api.mistral.ai/v1/chat/completions"}
   - {name: cerebras,   key_env: CEREBRAS_API_KEY,   model: gpt-oss-120b,                url: "https://api.cerebras.ai/v1/chat/completions"}
   - {name: openrouter, key_env: OPENROUTER_API_KEY, model: anthropic/claude-sonnet-4-6, url: "https://openrouter.ai/api/v1/chat/completions"}

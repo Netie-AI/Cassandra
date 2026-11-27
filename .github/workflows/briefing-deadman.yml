@@ -1,0 +1,24 @@
+# Fails when the public briefing data is older than 26 hours on a Singapore weekday.
+# Weekend runs exit 0. See scripts/briefing_deadman.py and docs/BRIEFING.md.
+name: Briefing dead-man
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "httpx>=0.27"
+      - name: Fail if the published briefing is stale on a weekday
+        run: python scripts/briefing_deadman.py

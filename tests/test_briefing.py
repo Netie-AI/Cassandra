@@ -350,8 +350,9 @@ def test_fallback_editor_takes_over_when_gemini_is_rate_limited(monkeypatch):
     monkeypatch.setattr(writer, "_gemini_generate", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("429")))
     calls = []
 
-    def chat(url, key, model, prompt):
+    def chat(url, key, model, prompt, **kw):
         calls.append((url, key, model))
+        assert kw.get("tolerant") is False
         return '```json\n{"stories": [{"id": "s1", "headline": "Nvidia sells 250 chips", "what": "It paid $3 billion.", "why": ""}]}\n```'
 
     monkeypatch.setattr(writer, "_openai_chat", chat)
